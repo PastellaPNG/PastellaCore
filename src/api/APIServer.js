@@ -32,8 +32,11 @@ class APIServer {
     this.app.use(express.urlencoded({ extended: true }));
     
     // Add authentication middleware for sensitive endpoints
+    // These endpoints require a valid API key to prevent unauthorized access
     this.app.use('/api/blocks/submit', this.auth.validateApiKey.bind(this.auth));
     this.app.use('/api/network/connect', this.auth.validateApiKey.bind(this.auth));
+    this.app.use('/api/network/message-validation/reset', this.auth.validateApiKey.bind(this.auth));
+    this.app.use('/api/network/partition-reset', this.auth.validateApiKey.bind(this.auth));
     
     // Add error handling middleware
     this.app.use((error, req, res, next) => {

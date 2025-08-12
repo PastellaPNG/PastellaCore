@@ -94,6 +94,20 @@ class PastellaCLI {
         },
       };
 
+      // Add authentication headers for sensitive endpoints
+      if (this.apiKey) {
+        const sensitiveEndpoints = [
+          '/api/blocks/submit',
+          '/api/network/connect',
+          '/api/network/message-validation/reset',
+          '/api/network/partition-reset'
+        ];
+        
+        if (sensitiveEndpoints.includes(endpoint)) {
+          options.headers['X-API-Key'] = this.apiKey;
+        }
+      }
+
       if (data && (method === 'POST' || method === 'PUT')) {
         options.body = JSON.stringify(data);
       }
