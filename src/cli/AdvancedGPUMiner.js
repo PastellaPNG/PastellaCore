@@ -729,7 +729,6 @@ class AdvancedGPUMiner {
     
     kernelsToShow.forEach((kernel, index) => {
       const gpuNumber = this.activeGPUKernels ? (this.activeGPUKernels.indexOf(kernel) + 1) : (index + 1);
-      const isActiveGPU = this.activeGPUKernels && this.activeGPUKernels.includes(kernel);
       
       // GPU header with status
       const gpuStatus = kernel.isActive ? '🟢 ACTIVE' : '🔴 INACTIVE';
