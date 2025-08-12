@@ -1,0 +1,74 @@
+{
+  "name": "pastella-cryptocurrency",
+  "version": "1.0.0",
+  "description": "Pastella (PAS) - A NodeJS cryptocurrency implementation with PoW mining, UTXO model, and P2P networking",
+  "main": "src/index.js",
+  "scripts": {
+    "start": "node src/index.js",
+    "dev": "nodemon src/index.js",
+    "test": "jest",
+    "cli": "node src/cli.js",
+    "build": "npm run build:daemon && npm run build:cli",
+    "build:daemon": "npm run build:daemon:win && npm run build:daemon:linux && npm run build:daemon:mac",
+    "build:cli": "npm run build:cli:win && npm run build:cli:linux && npm run build:cli:mac",
+    "build:daemon:win": "pkg src/index.js --targets node18-win-x64 --output dist/pastella-daemon-win.exe",
+    "build:daemon:linux": "pkg src/index.js --targets node18-linux-x64 --output dist/pastella-daemon-linux",
+    "build:daemon:mac": "pkg src/index.js --targets node18-linux-x64 --output dist/pastella-daemon-mac",
+    "build:cli:win": "pkg src/cli.js --targets node18-win-x64 --output dist/pastella-cli-win.exe",
+    "build:cli:linux": "pkg src/cli.js --targets node18-linux-x64 --output dist/pastella-cli-linux",
+    "build:cli:mac": "pkg src/cli.js --targets node18-linux-x64 --output dist/pastella-cli-mac",
+    "build:win": "npm run build:daemon:win && npm run build:cli:win",
+    "build:linux": "npm run build:daemon:linux && npm run build:cli:linux",
+    "build:mac": "npm run build:daemon:mac && npm run build:cli:mac",
+    "clean": "rimraf dist",
+    "prebuild": "npm run clean && mkdir -p dist"
+  },
+  "keywords": [
+    "cryptocurrency",
+    "blockchain",
+    "mining",
+    "p2p",
+    "pastella",
+    "pas"
+  ],
+  "author": "Pastella Team",
+  "license": "MIT",
+  "dependencies": {
+    "chalk": "^4.1.2",
+    "commander": "^11.1.0",
+    "cors": "^2.8.5",
+    "crypto-js": "^4.2.0",
+    "express": "^4.18.2",
+    "gpu.js": "^2.16.0",
+    "inquirer": "^8.2.6",
+    "keccak256": "^1.0.6",
+    "node-cron": "^3.0.3",
+    "secp256k1": "^5.0.1",
+    "uuid": "^9.0.1",
+    "ws": "^8.14.2"
+  },
+  "devDependencies": {
+    "jest": "^29.7.0",
+    "nodemon": "^3.0.2",
+    "pkg": "^5.8.1",
+    "rimraf": "^5.0.5"
+  },
+  "bin": {
+    "pastella": "./src/cli.js"
+  },
+  "pkg": {
+    "assets": [
+      "config.json",
+      "src/**/*",
+      "data/**/*"
+    ],
+    "scripts": [
+      "src/**/*.js"
+    ],
+    "targets": [
+      "node18-win-x64",
+      "node18-linux-x64",
+      "node18-macos-x64"
+    ]
+  }
+}

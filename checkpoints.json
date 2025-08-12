@@ -1,0 +1,21 @@
+{
+  "checkpoints": [
+    {
+      "height": 0,
+      "hash": "003dcd10eecc379031a14483df555d63f2dd96ed03ef0b9ed68c38c4220a4fe1",
+      "description": "Genesis block"
+    },
+    {
+      "height": 7,
+      "hash": "0002f67a9a1ec1f8a7ec828e106d8bc143343e263f1cdb7ba8047c5d569c013d",
+      "description": "Block 50 checkpoint (to be filled)"
+    }
+  ],
+  "metadata": {
+    "description": "Blockchain checkpoints for fast validation",
+    "version": "1.0",
+    "algorithm": "kawpow",
+    "lastUpdated": "",
+    "instructions": "Fill in the hash values for blocks at these heights. Empty hashes will be ignored during validation."
+  }
+}

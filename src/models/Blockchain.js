@@ -1,0 +1,1173 @@
+const Block = require('./Block');
+const { Transaction } = require('./Transaction');
+const fs = require('fs');
+const path = require('path');
+const logger = require('../utils/logger');
+const { TRANSACTION_TAGS } = require('../utils/constants');
+
+class Blockchain {
+  constructor(dataDir = './data') {
+    this.chain = [];
+    this.pendingTransactions = [];
+    this.utxoSet = new Map(); // Map of UTXO: txHash:outputIndex -> {address, amount}
+    this.difficulty = 1000; // Default difficulty (will be overridden by config)
+    this.miningReward = 50;
+    this.blockTime = 60000; // 1 minute
+    this.dataDir = dataDir;
+    this.difficultyAlgorithm = 'lwma3'; // Default to LWMA-3 algorithm
+    this.difficultyBlocks = 60; // Default number of blocks for LWMA calculation
+    this.difficultyMinimum = 1; // Minimum difficulty floor
+  }
+
+  /**
+   * Initialize blockchain with genesis block
+   */
+  initialize(address, config = null, suppressLogging = false) {
+    // Load configuration values
+    if (config && config.blockchain) {
+      // Use genesis difficulty as the starting difficulty
+      this.difficulty = config.blockchain.genesis?.difficulty || this.difficulty;
+      this.blockTime = config.blockchain.blockTime || this.blockTime;
+      this.miningReward = config.blockchain.coinbaseReward || this.miningReward;
+      this.difficultyAlgorithm = config.blockchain.difficultyAlgorithm || 'lwma3';
+      this.difficultyBlocks = config.blockchain.difficultyBlocks || 60;
+      this.difficultyMinimum = config.blockchain.difficultyMinimum || 1;
+
+      // Safety check: if difficulty is unreasonably high, reset it
+      if (this.difficulty > 100000) {
+        logger.warn('BLOCKCHAIN', `Initial difficulty too high (${this.difficulty}), resetting to 100`);
+        this.difficulty = 100;
+      }
+    }
+
+    if (this.chain.length === 0) {
+      let genesisBlock;
+
+      if (config && config.blockchain && config.blockchain.genesis) {
+        // Use config settings for genesis block
+        const genesisConfig = config.blockchain.genesis;
+        const genesisTimestamp = genesisConfig.timestamp; // Already a Unix timestamp
+        const premineAmount = genesisConfig.premineAmount;
+        const premineAddress = genesisConfig.premineAddress;
+
+        // Create premine transaction with the same timestamp as genesis block
+        const premineTransaction = Transaction.createCoinbase(premineAddress, premineAmount);
+        premineTransaction.tag = TRANSACTION_TAGS.PREMINE;
+        premineTransaction.timestamp = genesisTimestamp; // Set transaction timestamp to match genesis block
+        // Recalculate transaction ID with the correct timestamp
+        premineTransaction.calculateId();
+
+        genesisBlock = Block.createGenesisBlock(premineAddress, genesisTimestamp, [premineTransaction], this.difficulty, genesisConfig);
+        if (!suppressLogging) {
+          logger.info('BLOCKCHAIN', `Genesis block created with premine: ${premineAmount} PAS to ${premineAddress}`);
+        }
+
+      } else {
+        // Use default genesis block with matching timestamps
+        const defaultTimestamp = Date.now();
+        genesisBlock = Block.createGenesisBlock(address, defaultTimestamp, null, this.difficulty);
+        // Set the coinbase transaction timestamp to match the block
+        if (genesisBlock.transactions.length > 0) {
+          genesisBlock.transactions[0].timestamp = defaultTimestamp;
+        }
+        if (!suppressLogging) {
+          logger.info('BLOCKCHAIN', 'Genesis block created with default settings');
+        }
+      }
+
+      this.chain.push(genesisBlock);
+      this.updateUTXOSet(genesisBlock);
+
+      if (!suppressLogging) {
+        logger.info('BLOCKCHAIN', `Initialized with difficulty: ${this.difficulty}, block time: ${this.blockTime}ms, algorithm: ${this.difficultyAlgorithm}`);
+      }
+    }
+  }
+
+  /**
+   * Get the latest block
+   */
+  getLatestBlock() {
+    return this.chain[this.chain.length - 1];
+  }
+
+  /**
+   * Clear the blockchain (for resync purposes)
+   */
+  clearChain() {
+    this.chain = [];
+    this.utxoSet.clear();
+    this.pendingTransactions = [];
+  }
+
+  /**
+   * Add a new block to the chain
+   */
+  addBlock(block, suppressLogging = false) {
+    // Check if block already exists
+    if (this.chain.some(existingBlock => existingBlock.hash === block.hash)) {
+      return false; // Block already exists, silently skip
+    }
+
+    // Verify block
+    if (!this.isValidBlock(block)) {
+      console.log('Invalid block, cannot add to chain');
+      return false;
+    }
+
+    // Add block to chain
+    this.chain.push(block);
+
+    // Adjust difficulty based on block time (moved from minePendingTransactions)
+    const newDifficulty = this.adjustDifficulty();
+
+    // Store old difficulty for logging
+    const oldDifficulty = this.difficulty;
+
+    // Apply the new difficulty (replace, don't add)
+    if (newDifficulty !== this.difficulty) {
+      this.difficulty = newDifficulty;
+      logger.info('BLOCKCHAIN', `Difficulty adjusted: ${oldDifficulty} → ${this.difficulty}`);
+    }
+
+    // Update UTXO set
+    this.updateUTXOSet(block);
+
+    // Remove transactions from pending pool
+    this.removeFromPendingTransactions(block.transactions);
+
+    // Only log if not suppressed (for CLI wallet sync)
+    if (!suppressLogging) {
+      logger.info('BLOCKCHAIN', `Block #${block.index} added | Difficulty: ${block.difficulty} | Time: ${this.getBlockTime(block)}ms | Hash: ${block.hash.substring(0, 16)}...`);
+
+      // Log difficulty change if it occurred
+      if (newDifficulty !== oldDifficulty) {
+        logger.info('BLOCKCHAIN', `Difficulty adjusted: ${oldDifficulty} → ${this.difficulty}`);
+      }
+    }
+
+    // Save blockchain to file
+    const blockchainPath = path.join(this.dataDir, 'blockchain.json');
+    this.saveToFile(blockchainPath);
+
+    return true;
+  }
+
+  /**
+   * Validate a block
+   */
+  isValidBlock(block) {
+    const latestBlock = this.getLatestBlock();
+
+    // Check if block already exists in chain
+    if (this.chain.some(existingBlock => existingBlock.hash === block.hash)) {
+      return false; // Block already exists, silently skip
+    }
+
+    // Check if block is properly linked
+    if (latestBlock && block.previousHash !== latestBlock.hash) {
+      console.log('Block is not properly linked to previous block');
+      return false;
+    }
+
+    // Check if block index is correct
+    if (latestBlock && block.index !== latestBlock.index + 1) {
+      console.log('Block index is incorrect');
+      return false;
+    }
+
+    // Validate block itself
+    if (!block.isValid()) {
+      console.log('Block validation failed');
+      return false;
+    }
+
+    return true;
+  }
+
+  /**
+   * Load checkpoints from file
+   */
+  loadCheckpoints() {
+    try {
+      const checkpointsPath = path.join(__dirname, '..', 'checkpoints.json');
+      if (fs.existsSync(checkpointsPath)) {
+        const checkpointsData = fs.readFileSync(checkpointsPath, 'utf8');
+        const checkpoints = JSON.parse(checkpointsData);
+        return checkpoints.checkpoints || [];
+      }
+    } catch (error) {
+      logger.warn('BLOCKCHAIN', `Could not load checkpoints: ${error.message}`);
+    }
+    return [];
+  }
+
+  /**
+   * Validate chain using checkpoints for faster validation
+   */
+  isValidChainWithCheckpoints() {
+    try {
+      // Check if chain exists and is an array
+      if (!this.chain || !Array.isArray(this.chain)) {
+        logger.error('BLOCKCHAIN', 'Blockchain chain property is missing or not an array');
+        return false;
+      }
+
+      if (this.chain.length === 0) {
+        logger.warn('BLOCKCHAIN', 'Blockchain is empty');
+        return false;
+      }
+
+      logger.info('BLOCKCHAIN', `Validating blockchain with ${this.chain.length} blocks using checkpoints...`);
+
+      // Load checkpoints
+      const checkpoints = this.loadCheckpoints();
+      const validCheckpoints = checkpoints.filter(cp => cp.hash && cp.hash.length === 64);
+      
+      if (validCheckpoints.length > 0) {
+        logger.info('BLOCKCHAIN', `Found ${validCheckpoints.length} valid checkpoints for fast validation`);
+      }
+
+      // Validate genesis block
+      const genesisBlock = this.chain[0];
+      if (!genesisBlock) {
+        logger.error('BLOCKCHAIN', 'Genesis block is missing');
+        return false;
+      }
+
+      if (genesisBlock.index !== 0) {
+        logger.error('BLOCKCHAIN', `Genesis block has incorrect index: ${genesisBlock.index}, expected 0`);
+        return false;
+      }
+
+      if (genesisBlock.previousHash !== '0') {
+        logger.error('BLOCKCHAIN', `Genesis block has incorrect previous hash: ${genesisBlock.previousHash}, expected '0'`);
+        return false;
+      }
+
+      if (!genesisBlock.isValid()) {
+        logger.error('BLOCKCHAIN', 'Genesis block validation failed');
+        return false;
+      }
+
+      logger.info('BLOCKCHAIN', 'Genesis block validation passed');
+
+      // Find the highest checkpoint we can use
+      let lastCheckpointHeight = 0;
+      let lastCheckpointHash = '0';
+      
+      for (const checkpoint of validCheckpoints) {
+        if (checkpoint.height < this.chain.length && checkpoint.height > lastCheckpointHeight) {
+          lastCheckpointHeight = checkpoint.height;
+          lastCheckpointHash = checkpoint.hash;
+        }
+      }
+
+      if (lastCheckpointHeight > 0) {
+        logger.info('BLOCKCHAIN', `Using checkpoint at height ${lastCheckpointHeight} for fast validation`);
+        
+        // Verify checkpoint hash matches
+        const checkpointBlock = this.chain[lastCheckpointHeight];
+        if (checkpointBlock && checkpointBlock.hash === lastCheckpointHash) {
+          logger.info('BLOCKCHAIN', `Checkpoint verification passed, skipping validation of blocks 1-${lastCheckpointHeight}`);
+        } else {
+          logger.error('BLOCKCHAIN', `Checkpoint verification failed at height ${lastCheckpointHeight}`);
+          logger.error('BLOCKCHAIN', `Expected: ${lastCheckpointHash}, Got: ${checkpointBlock ? checkpointBlock.hash : 'NO_BLOCK'}`);
+          return false;
+        }
+      }
+
+      // Validate blocks after the last checkpoint
+      const totalBlocks = this.chain.length;
+      const progressInterval = 50; // Show progress every 50 blocks
+      const startIndex = lastCheckpointHeight + 1;
+      
+      logger.info('BLOCKCHAIN', `Starting detailed validation from block ${startIndex}`);
+      
+      for (let i = startIndex; i < this.chain.length; i++) {
+        try {
+          const currentBlock = this.chain[i];
+          const previousBlock = this.chain[i - 1];
+
+          // Show progress every 50 blocks
+          if (i % progressInterval === 0 || i === totalBlocks - 1) {
+            const progress = ((i / (totalBlocks - 1)) * 100).toFixed(1);
+            logger.info('BLOCKCHAIN', `Validating progress: ${i}/${totalBlocks - 1} blocks (${progress}%)`);
+          }
+
+          if (!currentBlock) {
+            logger.error('BLOCKCHAIN', `Block at index ${i} is missing`);
+            return false;
+          }
+
+          if (!previousBlock) {
+            logger.error('BLOCKCHAIN', `Previous block at index ${i - 1} is missing`);
+            return false;
+          }
+
+          // Check block index sequence
+          if (currentBlock.index !== previousBlock.index + 1) {
+            logger.error('BLOCKCHAIN', `Block index sequence broken at index ${i}: expected ${previousBlock.index + 1}, got ${currentBlock.index}`);
+            return false;
+          }
+
+          // Check if current block is valid
+          if (!currentBlock.isValid()) {
+            logger.error('BLOCKCHAIN', `Block at index ${i} (${currentBlock.hash ? currentBlock.hash.substring(0, 16) : 'NO_HASH'}...) validation failed`);
+            return false;
+          }
+
+          // Check if block is properly linked
+          if (currentBlock.previousHash !== previousBlock.hash) {
+            logger.error('BLOCKCHAIN', `Block at index ${i} is not properly linked to previous block`);
+            logger.error('BLOCKCHAIN', `  Expected previous hash: ${previousBlock.hash}`);
+            logger.error('BLOCKCHAIN', `  Got previous hash: ${currentBlock.previousHash}`);
+            return false;
+          }
+
+          // Check for duplicate blocks (only in the range we're validating)
+          const duplicateIndex = this.chain.findIndex((block, idx) =>
+            idx !== i && idx >= startIndex && block && block.hash === currentBlock.hash
+          );
+          if (duplicateIndex !== -1) {
+            logger.error('BLOCKCHAIN', `Duplicate block found: block ${i} and block ${duplicateIndex} have the same hash: ${currentBlock.hash ? currentBlock.hash.substring(0, 16) : 'NO_HASH'}...`);
+            return false;
+          }
+        } catch (blockError) {
+          logger.error('BLOCKCHAIN', `Error validating block at index ${i}: ${blockError.message}`);
+          return false;
+        }
+      }
+
+      logger.info('BLOCKCHAIN', 'Blockchain validation completed successfully using checkpoints');
+      return true;
+    } catch (error) {
+      logger.error('BLOCKCHAIN', `Blockchain validation error: ${error.message}`);
+      return false;
+    }
+  }
+
+  /**
+   * Update checkpoints file with current blockchain state
+   */
+  updateCheckpoints() {
+    try {
+      const checkpointsPath = path.join(__dirname, '..', 'checkpoints.json');
+      if (!fs.existsSync(checkpointsPath)) {
+        logger.warn('BLOCKCHAIN', 'Checkpoints file not found, cannot update');
+        return false;
+      }
+
+      // Read current checkpoints
+      const checkpointsData = fs.readFileSync(checkpointsPath, 'utf8');
+      const checkpoints = JSON.parse(checkpointsData);
+      
+      // Update checkpoints with current blockchain hashes
+      let updated = false;
+      for (const checkpoint of checkpoints.checkpoints) {
+        if (checkpoint.height < this.chain.length) {
+          const block = this.chain[checkpoint.height];
+          if (block && block.hash && block.hash !== checkpoint.hash) {
+            const oldHash = checkpoint.hash;
+            checkpoint.hash = block.hash;
+            checkpoint.lastUpdated = new Date().toISOString();
+            updated = true;
+            logger.info('BLOCKCHAIN', `Updated checkpoint at height ${checkpoint.height}: ${oldHash || 'empty'} → ${block.hash.substring(0, 16)}...`);
+          }
+        }
+      }
+
+      if (updated) {
+        // Update metadata
+        checkpoints.metadata.lastUpdated = new Date().toISOString();
+        
+        // Write back to file
+        fs.writeFileSync(checkpointsPath, JSON.stringify(checkpoints, null, 2));
+        logger.info('BLOCKCHAIN', 'Checkpoints file updated successfully');
+        return true;
+      } else {
+        logger.info('BLOCKCHAIN', 'No checkpoints needed updating');
+        return true;
+      }
+    } catch (error) {
+      logger.error('BLOCKCHAIN', `Error updating checkpoints: ${error.message}`);
+      return false;
+    }
+  }
+
+  /**
+   * Add a new checkpoint at a specific height
+   */
+  addCheckpoint(height, description = '') {
+    try {
+      if (height >= this.chain.length) {
+        logger.error('BLOCKCHAIN', `Cannot add checkpoint at height ${height}: chain only has ${this.chain.length} blocks`);
+        return false;
+      }
+
+      const checkpointsPath = path.join(__dirname, '..', 'checkpoints.json');
+      if (!fs.existsSync(checkpointsPath)) {
+        logger.error('BLOCKCHAIN', 'Checkpoints file not found');
+        return false;
+      }
+
+      // Read current checkpoints
+      const checkpointsData = fs.readFileSync(checkpointsPath, 'utf8');
+      const checkpoints = JSON.parse(checkpointsData);
+      
+      // Check if checkpoint already exists at this height
+      const existingIndex = checkpoints.checkpoints.findIndex(cp => cp.height === height);
+      if (existingIndex !== -1) {
+        logger.warn('BLOCKCHAIN', `Checkpoint already exists at height ${height}`);
+        return false;
+      }
+
+      // Add new checkpoint
+      const block = this.chain[height];
+      const newCheckpoint = {
+        height: height,
+        hash: block.hash,
+        description: description || `Block ${height} checkpoint`,
+        lastUpdated: new Date().toISOString()
+      };
+
+      checkpoints.checkpoints.push(newCheckpoint);
+      
+      // Sort checkpoints by height
+      checkpoints.checkpoints.sort((a, b) => a.height - b.height);
+      
+      // Update metadata
+      checkpoints.metadata.lastUpdated = new Date().toISOString();
+      
+      // Write back to file
+      fs.writeFileSync(checkpointsPath, JSON.stringify(checkpoints, null, 2));
+      logger.info('BLOCKCHAIN', `Added checkpoint at height ${height}: ${block.hash.substring(0, 16)}...`);
+      return true;
+    } catch (error) {
+      logger.error('BLOCKCHAIN', `Error adding checkpoint: ${error.message}`);
+      return false;
+    }
+  }
+
+  /**
+   * Validate the entire blockchain with detailed checks (original method)
+   */
+  isValidChain() {
+    try {
+      // Check if chain exists and is an array
+      if (!this.chain || !Array.isArray(this.chain)) {
+        logger.error('BLOCKCHAIN', 'Blockchain chain property is missing or not an array');
+        return false;
+      }
+
+      if (this.chain.length === 0) {
+        logger.warn('BLOCKCHAIN', 'Blockchain is empty');
+        return false;
+      }
+
+      logger.info('BLOCKCHAIN', `Validating blockchain with ${this.chain.length} blocks...`);
+
+      // Validate genesis block
+      const genesisBlock = this.chain[0];
+      if (!genesisBlock) {
+        logger.error('BLOCKCHAIN', 'Genesis block is missing');
+        return false;
+      }
+
+      if (genesisBlock.index !== 0) {
+        logger.error('BLOCKCHAIN', `Genesis block has incorrect index: ${genesisBlock.index}, expected 0`);
+        return false;
+      }
+
+      if (genesisBlock.previousHash !== '0') {
+        logger.error('BLOCKCHAIN', `Genesis block has incorrect previous hash: ${genesisBlock.previousHash}, expected '0'`);
+        return false;
+      }
+
+      if (!genesisBlock.isValid()) {
+        logger.error('BLOCKCHAIN', 'Genesis block validation failed');
+        logger.debug('BLOCKCHAIN', `Genesis block hash: ${genesisBlock.hash}`);
+        logger.debug('BLOCKCHAIN', `Genesis block difficulty: ${genesisBlock.difficulty}`);
+        logger.debug('BLOCKCHAIN', `Genesis block target: ${genesisBlock.calculateTarget()}`);
+        logger.debug('BLOCKCHAIN', `Genesis block hash as number: ${BigInt('0x' + genesisBlock.hash)}`);
+        logger.debug('BLOCKCHAIN', `Genesis block target as number: ${BigInt('0x' + genesisBlock.calculateTarget())}`);
+        return false;
+      }
+
+      logger.info('BLOCKCHAIN', 'Genesis block validation passed');
+
+      // Validate all subsequent blocks
+      const totalBlocks = this.chain.length;
+      const progressInterval = 50; // Show progress every 50 blocks
+      
+      for (let i = 1; i < this.chain.length; i++) {
+        try {
+          const currentBlock = this.chain[i];
+          const previousBlock = this.chain[i - 1];
+
+          // Show progress every 50 blocks
+          if (i % progressInterval === 0 || i === totalBlocks - 1) {
+            const progress = ((i / (totalBlocks - 1)) * 100).toFixed(1);
+            logger.info('BLOCKCHAIN', `Validating progress: ${i}/${totalBlocks - 1} blocks (${progress}%)`);
+          }
+
+          if (!currentBlock) {
+            logger.error('BLOCKCHAIN', `Block at index ${i} is missing`);
+            return false;
+          }
+
+          if (!previousBlock) {
+            logger.error('BLOCKCHAIN', `Previous block at index ${i - 1} is missing`);
+            return false;
+          }
+
+          // Check block index sequence
+          if (currentBlock.index !== previousBlock.index + 1) {
+            logger.error('BLOCKCHAIN', `Block index sequence broken at index ${i}: expected ${previousBlock.index + 1}, got ${currentBlock.index}`);
+            return false;
+          }
+
+          // Check if current block is valid
+          if (!currentBlock.isValid()) {
+            logger.error('BLOCKCHAIN', `Block at index ${i} (${currentBlock.hash ? currentBlock.hash.substring(0, 16) : 'NO_HASH'}...) validation failed`);
+            return false;
+          }
+
+          // Check if block is properly linked
+          if (currentBlock.previousHash !== previousBlock.hash) {
+            logger.error('BLOCKCHAIN', `Block at index ${i} is not properly linked to previous block`);
+            logger.error('BLOCKCHAIN', `  Expected previous hash: ${previousBlock.hash}`);
+            logger.error('BLOCKCHAIN', `  Got previous hash: ${currentBlock.previousHash}`);
+            return false;
+          }
+
+          // Check for duplicate blocks
+          const duplicateIndex = this.chain.findIndex((block, idx) =>
+            idx !== i && block && block.hash === currentBlock.hash
+          );
+          if (duplicateIndex !== -1) {
+            logger.error('BLOCKCHAIN', `Duplicate block found: block ${i} and block ${duplicateIndex} have the same hash: ${currentBlock.hash ? currentBlock.hash.substring(0, 16) : 'NO_HASH'}...`);
+            return false;
+          }
+        } catch (blockError) {
+          logger.error('BLOCKCHAIN', `Error validating block at index ${i}: ${blockError.message}`);
+          return false;
+        }
+      }
+
+      logger.info('BLOCKCHAIN', 'Blockchain validation completed successfully');
+      return true;
+    } catch (error) {
+      logger.error('BLOCKCHAIN', `Blockchain validation error: ${error.message}`);
+      return false;
+    }
+  }
+
+  /**
+   * Resolve forks using longest chain rule
+   */
+  resolveForks(newChain) {
+    if (newChain.length > this.chain.length && this.isValidChain(newChain)) {
+      console.log('Replacing chain with longer valid chain');
+      this.chain = newChain;
+      this.rebuildUTXOSet();
+      return true;
+    }
+    return false;
+  }
+
+  /**
+   * Validate a chain (for chain replacement)
+   */
+  isValidChainForReplacement(chain) {
+    for (let i = 1; i < chain.length; i++) {
+      const currentBlock = chain[i];
+      const previousBlock = chain[i - 1];
+
+      if (!currentBlock.isValid() || currentBlock.previousHash !== previousBlock.hash) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  /**
+   * Add transaction to pending pool
+   */
+  addPendingTransaction(transaction) {
+    // Convert JSON transaction to Transaction instance if needed
+    let transactionInstance = transaction;
+    if (typeof transaction === 'object' && !transaction.isValid) {
+      const { Transaction } = require('./Transaction');
+      transactionInstance = Transaction.fromJSON(transaction);
+    }
+
+    if (transactionInstance.isValid()) {
+      this.pendingTransactions.push(transactionInstance);
+      logger.debug('BLOCKCHAIN', `Transaction added to pending pool: ${transactionInstance.id}`);
+      return true;
+    }
+    console.log('Invalid transaction, not added to pending pool');
+    return false;
+  }
+
+  /**
+   * Remove transactions from pending pool
+   */
+  removeFromPendingTransactions(transactions) {
+    const txIds = transactions.map(tx => tx.id);
+    this.pendingTransactions = this.pendingTransactions.filter(tx => !txIds.includes(tx.id));
+  }
+
+  /**
+   * Update UTXO set when adding a block
+   */
+  updateUTXOSet(block) {
+    block.transactions.forEach(transaction => {
+      // Remove spent UTXOs
+      transaction.inputs.forEach(input => {
+        const utxoKey = `${input.txHash}:${input.outputIndex}`;
+        this.utxoSet.delete(utxoKey);
+      });
+
+      // Add new UTXOs
+      transaction.outputs.forEach((output, index) => {
+        const utxoKey = `${transaction.id}:${index}`;
+        this.utxoSet.set(utxoKey, {
+          address: output.address,
+          amount: output.amount,
+          scriptPubKey: output.scriptPubKey
+        });
+      });
+    });
+  }
+
+  /**
+   * Rebuild UTXO set from entire chain
+   */
+  rebuildUTXOSet() {
+    this.utxoSet.clear();
+    this.chain.forEach(block => {
+      this.updateUTXOSet(block);
+    });
+  }
+
+  /**
+   * Get balance for an address
+   */
+  getBalance(address) {
+    let balance = 0;
+
+    this.utxoSet.forEach(utxo => {
+      if (utxo.address === address) {
+        balance += utxo.amount;
+      }
+    });
+
+    return balance;
+  }
+
+  /**
+   * Get UTXOs for an address
+   */
+  getUTXOsForAddress(address) {
+    const utxos = [];
+
+    this.utxoSet.forEach((utxo, key) => {
+      if (utxo.address === address) {
+        const [txHash, outputIndex] = key.split(':');
+        utxos.push({
+          txHash,
+          outputIndex: parseInt(outputIndex),
+          amount: utxo.amount,
+          scriptPubKey: utxo.scriptPubKey
+        });
+      }
+    });
+
+    return utxos;
+  }
+
+  /**
+   * Create transaction
+   */
+  createTransaction(fromAddress, toAddress, amount, fee = 0.001, tag = TRANSACTION_TAGS.TRANSACTION) {
+    // Users can only create TRANSACTION tagged transactions
+    if (tag !== TRANSACTION_TAGS.TRANSACTION) {
+      throw new Error('Users can only create TRANSACTION tagged transactions. Other tags are reserved for system use.');
+    }
+
+    const utxos = this.getUTXOsForAddress(fromAddress);
+    const totalAvailable = utxos.reduce((sum, utxo) => sum + utxo.amount, 0);
+
+    if (totalAvailable < amount + fee) {
+      throw new Error('Insufficient balance');
+    }
+
+    // Select UTXOs to spend
+    let selectedAmount = 0;
+    const selectedUtxos = [];
+
+    for (const utxo of utxos) {
+      selectedUtxos.push(utxo);
+      selectedAmount += utxo.amount;
+      if (selectedAmount >= amount + fee) break;
+    }
+
+    // Create inputs
+    const inputs = selectedUtxos.map(utxo =>
+      new TransactionInput(utxo.txHash, utxo.outputIndex, '', '') // Signature will be added later
+    );
+
+    // Create outputs
+    const outputs = [
+      new TransactionOutput(toAddress, amount),
+      new TransactionOutput(fromAddress, selectedAmount - amount - fee) // Change
+    ];
+
+    return { Transaction, TransactionInput, TransactionOutput }.Transaction.createTransaction(inputs, outputs, fee, tag);
+  }
+
+  /**
+   * Mine pending transactions
+   */
+  minePendingTransactions(minerAddress) {
+    // Create coinbase transaction
+    const coinbaseTransaction = Transaction.createCoinbase(minerAddress, this.miningReward);
+
+    // Get transactions for new block (limit to prevent oversized blocks)
+    const transactions = [coinbaseTransaction, ...this.pendingTransactions.slice(0, 100)];
+
+    // Create new block with current difficulty
+    const latestBlock = this.getLatestBlock();
+    const newBlock = Block.createBlock(
+      latestBlock.index + 1,
+      transactions,
+      latestBlock.hash,
+      this.difficulty
+    );
+
+    logger.info('BLOCKCHAIN', `Mining block ${newBlock.index} with difficulty ${this.difficulty}`);
+
+    // Mine the block
+    if (newBlock.mine()) {
+      this.addBlock(newBlock);
+      return newBlock;
+    }
+
+    return null;
+  }
+
+  /**
+   * Get consecutive block pattern for aggressive difficulty adjustment
+   */
+  getConsecutiveBlockPattern() {
+    if (this.chain.length < 3) return { fastCount: 0, slowCount: 0, pattern: 'normal' };
+
+    const targetTime = this.blockTime;
+    let fastCount = 0;
+    let slowCount = 0;
+
+    // Check last 10 blocks for patterns
+    const blocksToCheck = Math.min(10, this.chain.length - 1);
+
+    for (let i = this.chain.length - blocksToCheck; i < this.chain.length; i++) {
+      const currentBlock = this.chain[i];
+      const previousBlock = this.chain[i - 1];
+      const timeDiff = currentBlock.timestamp - previousBlock.timestamp;
+
+      if (timeDiff < targetTime * 0.5) {
+        fastCount++;
+        slowCount = 0; // Reset slow count
+      } else if (timeDiff > targetTime * 1.5) {
+        slowCount++;
+        fastCount = 0; // Reset fast count
+      } else {
+        // Normal block time, reset both counts
+        fastCount = 0;
+        slowCount = 0;
+      }
+    }
+
+    let pattern = 'normal';
+    if (fastCount >= 5) {
+      pattern = 'very_fast';
+    } else if (fastCount >= 3) {
+      pattern = 'fast';
+    } else if (slowCount >= 5) {
+      pattern = 'very_slow';
+    } else if (slowCount >= 3) {
+      pattern = 'slow';
+    }
+
+    return { fastCount, slowCount, pattern };
+  }
+
+  /**
+   * LWMA Difficulty Adjustment Algorithm - EXACT C++ Port
+   * Direct translation of the C++ nextDifficultyV6 function
+   */
+  adjustDifficultyLWMA3() {
+    const T = this.blockTime; // DIFFICULTY_TARGET
+    let N = this.difficultyBlocks; // DIFFICULTY_WINDOW_V3
+    const height = this.chain.length - 1;
+
+    // Build timestamps and cumulativeDifficulties arrays exactly like C++
+    const timestamps = [];
+    const cumulativeDifficulties = [];
+
+    // Get the required number of blocks
+    const startIdx = Math.max(0, height - N);
+    let cumulative = 0;
+
+    // Build arrays from startIdx to height
+    for (let i = startIdx; i <= height; i++) {
+      timestamps.push(this.chain[i].timestamp);
+      cumulativeDifficulties.push(cumulative);
+      cumulative += (this.chain[i].difficulty || 1);
+    }
+    // Add final cumulative value
+    cumulativeDifficulties.push(cumulative);
+
+    // If we are starting up, return a difficulty guess
+    if (timestamps.length <= 10) {
+      logger.info('DIFFICULTY', `[LWMA-${N}] Starting up, returning default difficulty: 10000`);
+      return 10000; // EXACT C++ behavior
+    }
+
+    // Don't have the full amount of blocks yet, starting up
+    if (timestamps.length < N + 1) {
+      N = timestamps.length - 1;
+      logger.info('DIFFICULTY', `[LWMA-${N}] Not enough blocks, using N=${N}`);
+    }
+
+    // IMPORTANT: LWMA3 should only start adjusting after we have the full window (60 blocks)
+    // This prevents premature difficulty adjustments and matches C++ behavior
+    if (height < this.difficultyBlocks) {
+      logger.info('DIFFICULTY', `[LWMA-${N}] Not enough blocks for full window (${height + 1}/${this.difficultyBlocks + 1}), keeping current difficulty: ${this.difficulty}`);
+      return this.difficulty; // Keep current difficulty until we have full window
+    }
+
+    logger.info('DIFFICULTY', `[LWMA-${N}] ✅ Full difficulty window reached! Starting LWMA3 adjustments from block ${this.difficultyBlocks + 1}`);
+
+    logger.info('DIFFICULTY', `[LWMA-${N}] Starting adjustment: height=${height}, N=${N}, T=${T}`);
+
+    let L = 0; // Weighted sum (corresponds to C++ variable L)
+    let sum_3_ST = 0; // Sum of last 3 solve times
+    let previousTimestamp = timestamps[0];
+
+    // EXACT C++ LOOP TRANSLATION
+    for (let i = 1; i <= N; i++) {
+      let thisTimestamp;
+
+      // Ensure timestamps are monotonic (exact C++ logic)
+      if (timestamps[i] > previousTimestamp) {
+        thisTimestamp = timestamps[i];
+      } else {
+        thisTimestamp = previousTimestamp + 1;
+      }
+
+      // Calculate solve time, capped at 6*T (exact C++ logic)
+      const ST = Math.min(6 * T, thisTimestamp - previousTimestamp);
+
+      previousTimestamp = thisTimestamp;
+
+      // Weighted sum: L += ST * i (exact C++ logic)
+      L += ST * i;
+
+      // Track last 3 solve times for special case (exact C++ logic)
+      if (i > N - 3) {
+        sum_3_ST += ST;
+      }
+
+      // Debug logging for first few and last few blocks
+      if (i <= 3 || i > N - 3) {
+        const blockIdx = startIdx + i;
+        const difficulty = this.chain[blockIdx]?.difficulty || 1;
+        logger.info('DIFFICULTY', `[LWMA-${N}] Block ${blockIdx}: ST=${ST}ms, difficulty=${difficulty}`);
+      }
+    }
+
+    // EXACT C++ FORMULA TRANSLATION
+    const diffRange = cumulativeDifficulties[N] - cumulativeDifficulties[0];
+    let next_D = Math.floor((diffRange * T * (N + 1) * 99) / (100 * 2 * L));
+
+    // Get previous difficulty (last block's difficulty) - exact C++ logic
+    const prev_D = cumulativeDifficulties[N] - cumulativeDifficulties[N - 1];
+
+    // Apply limits EXACTLY like C++: max 50% increase, max 33% decrease
+    const maxIncrease = Math.floor((prev_D * 150) / 100);
+    const maxDecrease = Math.floor((prev_D * 67) / 100);
+    next_D = Math.max(maxDecrease, Math.min(next_D, maxIncrease));
+
+    // Special case: if last 3 blocks were very fast, increase difficulty by 8%
+    if (sum_3_ST < (8 * T) / 10) {
+      next_D = Math.max(next_D, Math.floor((prev_D * 108) / 100));
+      logger.info('DIFFICULTY', `[LWMA-${N}] Fast blocks detected, applying 8% increase`);
+    }
+
+    // Never go below minimum
+    next_D = Math.max(next_D, this.difficultyMinimum);
+
+    logger.info('DIFFICULTY', `[LWMA-${N}] Weighted sum (L): ${L}, Difficulty range: ${diffRange}`);
+    logger.info('DIFFICULTY', `[LWMA-${N}] Last 3 solve times: ${sum_3_ST}ms (threshold: ${(8 * T) / 10}ms)`);
+    logger.info('DIFFICULTY', `[LWMA-${N}] Previous difficulty: ${prev_D}, Calculated: ${next_D}`);
+    logger.info('DIFFICULTY', `[LWMA-${N}] Limits - Max: ${maxIncrease}, Min: ${maxDecrease}`);
+    logger.info('DIFFICULTY', `[LWMA-${N}] Difficulty adjusted: ${this.difficulty} → ${next_D}`);
+
+    return next_D; // Return the new difficulty, not a change
+  }
+
+  /**
+   * Main difficulty adjustment method - routes to selected algorithm
+   */
+  adjustDifficulty() {
+    // Check which algorithm to use (default to LWMA-3 if not specified)
+    const algorithm = this.difficultyAlgorithm || 'lwma3';
+
+    switch (algorithm) {
+      case 'lwma3':
+      default:
+        return this.adjustDifficultyLWMA3();
+    }
+  }
+
+  /**
+   * Reset difficulty to a reasonable value (emergency use)
+   */
+  resetDifficulty(newDifficulty = 100) {
+    const oldDifficulty = this.difficulty;
+    this.difficulty = Math.max(newDifficulty, this.difficultyMinimum);
+    logger.warn('BLOCKCHAIN', `Difficulty manually reset: ${oldDifficulty} → ${this.difficulty}`);
+    return this.difficulty;
+  }
+
+  /**
+   * Get block time for a specific block
+   */
+  getBlockTime(block) {
+    if (this.chain.length < 2) return 0;
+
+    const blockIndex = block.index;
+    if (blockIndex === 0) return 0; // Genesis block
+
+    // Use the block parameter instead of accessing the chain
+    const previousBlock = this.chain[blockIndex - 1];
+
+    if (!previousBlock) {
+      return 0;
+    }
+
+    return block.timestamp - previousBlock.timestamp;
+  }
+
+  /**
+   * Save blockchain to file
+   */
+  saveToFile(filePath) {
+    const data = {
+      chain: this.chain.map(block => block.toJSON()),
+      pendingTransactions: this.pendingTransactions.map(tx => tx.toJSON()),
+      utxoSet: Object.fromEntries(this.utxoSet),
+      difficulty: this.difficulty,
+      miningReward: this.miningReward,
+      blockTime: this.blockTime,
+      difficultyAlgorithm: this.difficultyAlgorithm
+    };
+
+    // Ensure directory exists
+    const dir = path.dirname(filePath);
+    if (!fs.existsSync(dir)) {
+      fs.mkdirSync(dir, { recursive: true });
+    }
+
+    fs.writeFileSync(filePath, JSON.stringify(data, null, 2));
+  }
+
+  /**
+   * Load blockchain from file
+   */
+  loadFromFile(filePath, config = null) {
+    if (!fs.existsSync(filePath)) return false;
+
+    // Parse the file first to check for difficulty mismatch
+    let data;
+    try {
+      data = JSON.parse(fs.readFileSync(filePath, 'utf8'));
+    } catch (parseError) {
+      logger.error('BLOCKCHAIN', `Failed to parse blockchain file: ${parseError.message}`);
+      return false;
+    }
+
+    // Check if config difficulty has changed - this makes the existing blockchain invalid
+    // This check must happen BEFORE any other processing
+    const configDifficulty = config?.blockchain?.genesis?.difficulty || this.difficulty;
+    if (data && data.chain && Array.isArray(data.chain) && data.chain.length > 0 && data.chain[0].difficulty !== configDifficulty) {
+      logger.error('BLOCKCHAIN', `❌ INVALID BLOCKCHAIN: Config difficulty changed from ${data.chain[0].difficulty} to ${configDifficulty}`);
+      logger.error('BLOCKCHAIN', '❌ Existing blockchain is incompatible with current configuration');
+      logger.error('BLOCKCHAIN', '❌ This blockchain would be rejected by the network');
+      logger.error('BLOCKCHAIN', '❌ DAEMON MUST STOP - Invalid blockchain state');
+      // Use a special error type that won't be caught by general error handling
+      const error = new Error(`BLOCKCHAIN_DIFFICULTY_MISMATCH: existing=${data.chain[0].difficulty}, config=${configDifficulty}`);
+      error.name = 'BlockchainDifficultyMismatchError';
+      throw error;
+    }
+
+    try {
+      // Validate the data structure before processing
+      if (!data || typeof data !== 'object') {
+        logger.error('BLOCKCHAIN', 'Invalid blockchain file: data is not an object');
+        return false;
+      }
+
+      if (!data.chain || !Array.isArray(data.chain)) {
+        logger.error('BLOCKCHAIN', 'Invalid blockchain file: chain property is missing or not an array');
+        return false;
+      }
+
+      if (!data.pendingTransactions || !Array.isArray(data.pendingTransactions)) {
+        logger.error('BLOCKCHAIN', 'Invalid blockchain file: pendingTransactions property is missing or not an array');
+        return false;
+      }
+
+      if (!data.utxoSet || typeof data.utxoSet !== 'object') {
+        logger.error('BLOCKCHAIN', 'Invalid blockchain file: utxoSet property is missing or not an object');
+        return false;
+      }
+
+      // Load the data with comprehensive error handling
+      try {
+        // Load blocks with detailed error reporting
+        this.chain = [];
+        for (let i = 0; i < data.chain.length; i++) {
+          try {
+            const block = Block.fromJSON(data.chain[i]);
+            this.chain.push(block);
+          } catch (blockError) {
+            logger.error('BLOCKCHAIN', `Failed to load block at index ${i}: ${blockError.message}`);
+            throw new Error(`Block ${i} loading failed: ${blockError.message}`);
+          }
+        }
+
+        // Load pending transactions with detailed error reporting
+        this.pendingTransactions = [];
+        for (let i = 0; i < data.pendingTransactions.length; i++) {
+          try {
+            const transaction = Transaction.fromJSON(data.pendingTransactions[i]);
+            this.pendingTransactions.push(transaction);
+          } catch (txError) {
+            logger.error('BLOCKCHAIN', `Failed to load pending transaction at index ${i}: ${txError.message}`);
+            throw new Error(`Pending transaction ${i} loading failed: ${txError.message}`);
+          }
+        }
+
+        // Load UTXO set
+        try {
+          this.utxoSet = new Map(Object.entries(data.utxoSet));
+        } catch (utxoError) {
+          logger.error('BLOCKCHAIN', `Failed to load UTXO set: ${utxoError.message}`);
+          throw new Error(`UTXO set loading failed: ${utxoError.message}`);
+        }
+
+        // Load configuration with defaults (but preserve config difficulty for validation)
+        this.difficulty = data.difficulty || 100; // Difficulty stored in blockchain file
+        this.miningReward = data.miningReward || 50;
+        this.blockTime = data.blockTime || 60000;
+        this.difficultyAlgorithm = data.difficultyAlgorithm || 'lwma3'; // Load saved algorithm
+
+        // Safety check: if loaded difficulty is unreasonably high, reset it
+        if (this.difficulty > 100000) {
+          logger.warn('BLOCKCHAIN', `Loaded difficulty too high (${this.difficulty}), resetting to 100`);
+          this.difficulty = 100;
+        }
+
+        logger.info('BLOCKCHAIN', `Successfully loaded ${this.chain.length} blocks and ${this.pendingTransactions.length} pending transactions`);
+      } catch (loadError) {
+        logger.error('BLOCKCHAIN', `Failed to load blockchain data: ${loadError.message}`);
+        throw loadError;
+      }
+
+      // Validate the loaded blockchain
+      logger.info('BLOCKCHAIN', 'Starting blockchain validation...');
+      try {
+        if (!this.isValidChain()) {
+          logger.error('BLOCKCHAIN', 'Loaded blockchain is invalid!');
+          return false;
+        }
+      } catch (validationError) {
+        logger.error('BLOCKCHAIN', `Blockchain validation threw an error: ${validationError.message}`);
+        logger.error('BLOCKCHAIN', `Stack trace: ${validationError.stack}`);
+        return false;
+      }
+
+      logger.info('BLOCKCHAIN', `Successfully loaded and validated blockchain with ${this.chain.length} blocks`);
+      return true;
+
+    } catch (error) {
+      logger.error('BLOCKCHAIN', `Failed to load blockchain from ${filePath}: ${error.message}`);
+      return false;
+    }
+  }
+
+  /**
+   * Replace the current blockchain with a new one
+   */
+  replaceChain(newChain) {
+    // Validate the new chain
+    if (!this.isValidChainForReplacement(newChain)) {
+      logger.warn('BLOCKCHAIN', 'Invalid chain received, cannot replace');
+      return false;
+    }
+
+    // Check if the new chain is actually longer
+    if (newChain.length <= this.chain.length) {
+      logger.warn('BLOCKCHAIN', 'New chain is not longer than current chain');
+      return false;
+    }
+
+    logger.info('BLOCKCHAIN', `Replacing blockchain: ${this.chain.length} blocks -> ${newChain.length} blocks`);
+
+    // Replace the chain
+    this.chain = newChain;
+
+    // Rebuild UTXO set from the new chain
+    this.rebuildUTXOSet();
+
+    // Clear pending transactions (they might be invalid now)
+    this.pendingTransactions = [];
+
+    // Save the new blockchain to file
+    const blockchainPath = path.join(this.dataDir, 'blockchain.json');
+    this.saveToFile(blockchainPath);
+
+    logger.info('BLOCKCHAIN', 'Blockchain successfully synced');
+    return true;
+  }
+
+  /**
+   * Get blockchain status
+   */
+  getStatus() {
+    return {
+      length: this.chain.length,
+      height: this.chain.length, // Add height for API consistency
+      latestBlock: this.getLatestBlock()?.hash,
+      pendingTransactions: this.pendingTransactions.length,
+      difficulty: this.difficulty,
+      totalSupply: this.getTotalSupply()
+    };
+  }
+
+  /**
+   * Get total supply of coins
+   */
+  getTotalSupply() {
+    return this.chain.reduce((total, block) => {
+      return total + block.transactions.reduce((blockTotal, tx) => {
+        return blockTotal + tx.outputs.reduce((txTotal, output) => txTotal + output.amount, 0);
+      }, 0);
+    }, 0);
+  }
+}
+
+module.exports = Blockchain; 
