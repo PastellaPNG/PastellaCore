@@ -15,7 +15,7 @@
   },
   "blockchain": {
     "blockTime": 15000,
-    "maxBlockSize": 1000000,
+    "maxBlockSize": 8388608,
     "coinbaseReward": 50,
     "difficultyAlgorithm": "lwma3",
     "difficultyBlocks": 60,
