@@ -614,10 +614,31 @@ class AdvancedGPUMiner {
         coinbaseTransaction.timestamp = Date.now();
         coinbaseTransaction.calculateId();
         
-        // Create new block to mine with the coinbase transaction
+        // Get pending transactions from mempool
+        const pendingResponse = await this.cli.makeApiRequest('/api/blockchain/transactions');
+        const pendingTransactions = pendingResponse.transactions || [];
+        
+        // Select transactions that fit within block size limit (1MB)
+        const selectedTransactions = this.selectTransactionsForBlock(
+          pendingTransactions, 
+          coinbaseTransaction
+        );
+        
+        // Create new block to mine with coinbase + selected pending transactions
+        const transactions = [coinbaseTransaction, ...selectedTransactions];
+        
+        // Final safety check: ensure block size is within limits
+        const finalBlockSize = JSON.stringify(transactions).length;
+        const maxBlockSize = this.cli.config.blockchain.maxBlockSize || 1024 * 1024;
+        if (finalBlockSize > maxBlockSize) {
+          const maxSizeMB = (maxBlockSize / 1024 / 1024).toFixed(2);
+          const currentSizeMB = (finalBlockSize / 1024 / 1024).toFixed(2);
+          throw new Error(`Block size ${currentSizeMB} MB exceeds maximum ${maxSizeMB} MB limit`);
+        }
+        
         this.currentMiningBlock = this.cli.Block.createBlock(
           height,
-          [coinbaseTransaction], // Include the coinbase transaction
+          transactions, // Include coinbase + pending transactions
           latestBlockFromDaemon.hash,
           difficulty,
           this.cli.config
@@ -645,6 +666,46 @@ class AdvancedGPUMiner {
 
       setTimeout(() => this.mineBlocksAdvanced(), 1000);
     }
+  }
+
+  /**
+   * Select transactions that fit within the block size limit from config
+   * Prioritizes transactions by age (oldest first) and ensures block fits
+   */
+  selectTransactionsForBlock(pendingTransactions, coinbaseTransaction) {
+    const maxBlockSize = this.cli.config.blockchain.maxBlockSize || 1024 * 1024; // Default to 1MB if not in config
+    const selectedTransactions = [];
+    
+    // Start with coinbase transaction size
+    const coinbaseSize = JSON.stringify(coinbaseTransaction).length;
+    let currentBlockSize = coinbaseSize;
+    
+    // Sort transactions by age (oldest first) for fair processing
+    const sortedTransactions = [...pendingTransactions].sort((a, b) => 
+      (a.timestamp || 0) - (b.timestamp || 0)
+    );
+    
+    for (const tx of sortedTransactions) {
+      const txSize = JSON.stringify(tx).length;
+      
+      // Check if adding this transaction would exceed block size
+      if (currentBlockSize + txSize <= maxBlockSize) {
+        selectedTransactions.push(tx);
+        currentBlockSize += txSize;
+      } else {
+        // Block is full, stop adding transactions
+        break;
+      }
+    }
+    
+    if (this.showMiningLogs) {
+      const maxSizeKB = (maxBlockSize / 1024).toFixed(2);
+      const currentSizeKB = (currentBlockSize / 1024).toFixed(2);
+      console.log(chalk.cyan(`📦 Selected ${selectedTransactions.length}/${pendingTransactions.length} transactions for block`));
+      console.log(chalk.cyan(`📏 Block size: ${currentSizeKB} KB / ${maxSizeKB} KB`));
+    }
+    
+    return selectedTransactions;
   }
 
   async generateCacheForBlock(blockNumber, headerHash) {
