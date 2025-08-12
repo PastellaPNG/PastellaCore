@@ -20,12 +20,14 @@ class AdvancedGPUMiner {
     };
     this.showMiningLogs = false;
     this.showMiningLogsDebug = false; // Separate debug logging control
+    this.performanceMode = false; // Performance mode to reduce logging during mining
     this.hashRate = 0;
     this.startTime = null;
     this.totalHashes = 0;
     this.lastHashCount = 0;
     this.lastUpdateTime = null;
     this.recentHashRate = 0;
+    this.blocksMined = 0; // Track total blocks mined
     this.miningAddress = '1Q66qLnTYFfLZBafed3RZqGCEG4pgtbCL4';
     
     // KawPow specific
@@ -71,8 +73,6 @@ class AdvancedGPUMiner {
 
   async detectGPUs() {
     try {
-      console.log(chalk.blue('🔍 Detecting available GPUs...'));
-      
       // Try to create a test GPU instance to verify GPU.js is working
       let testGPU;
       try {
@@ -87,13 +87,10 @@ class AdvancedGPUMiner {
         testGPU.destroy();
         
         if (testResult && testResult.length === 100) {
-          console.log(chalk.green('✅ GPU.js successfully initialized and tested'));
-          
           // For now, we'll use 1 GPU, but you can extend this to detect multiple GPUs
           // by checking for WebGL extensions or using other detection methods
           this.availableGPUs = 1;
           
-          console.log(chalk.green(`✅ Detected ${this.availableGPUs} GPU(s) for KawPow mining`));
           console.log(chalk.blue('💡 GPU.js is working correctly - real GPU mining will be used'));
           return this.availableGPUs;
         } else {
@@ -117,7 +114,6 @@ class AdvancedGPUMiner {
 
   async initializeAdvancedKernels() {
     try {
-      console.log(chalk.blue('🔧 Initializing KawPow GPU mining kernels...'));
       
       // Clear any existing kernels and force GPU context cleanup
       if (this.gpuKernels.length > 0) {
@@ -141,8 +137,6 @@ class AdvancedGPUMiner {
       if (this.availableGPUs === 0) {
         await this.detectGPUs();
       }
-
-      console.log(chalk.green(`✅ Detected ${this.availableGPUs} GPU(s)`));
       
       // Create KawPow kernels for each GPU
       for (let i = 0; i < this.availableGPUs; i++) {
@@ -153,27 +147,24 @@ class AdvancedGPUMiner {
           kernel.hashRate = 0;
           kernel.gpuIndex = i;
           this.gpuKernels.push(kernel);
-          console.log(chalk.green(`✅ GPU ${i + 1} KawPow kernel initialized`));
         }
       }
 
       if (this.gpuKernels.length > 0) {
-        console.log(chalk.green(`🎯 Successfully initialized ${this.gpuKernels.length} KawPow GPU kernel(s)`));
+        console.log(chalk.green(`🎯 Successfully initialized ${this.gpuKernels.length} GPU kernel(s)`));
         return true;
       } else {
-        console.log(chalk.red('❌ Failed to initialize any KawPow GPU kernels'));
+        console.log(chalk.red('❌ Failed to initialize any GPU kernels'));
         return false;
       }
     } catch (error) {
-      console.log(chalk.red('❌ Error initializing KawPow GPU kernels:'), error.message);
+      console.log(chalk.red('❌ Error initializing GPU kernels:'), error.message);
       return false;
     }
   }
 
   async createKawPowKernel(gpuIndex) {
     try {
-      console.log(chalk.blue(`🔧 Creating real GPU.js KawPow kernel for GPU ${gpuIndex}...`));
-      
       // Create GPU instance for this GPU
       const gpu = new GPU({
         mode: 'gpu',
@@ -359,11 +350,20 @@ class AdvancedGPUMiner {
       case 'debug':
         this.toggleDebugLogs();
         break;
+      case 'selection':
+        this.showGPUSelection();
+        break;
+      case 'performance':
+        this.togglePerformanceMode();
+        break;
       default:
         console.log(chalk.red(`❌ Unknown gpu-mine command: ${subCmd}`));
-        console.log(chalk.yellow('Available commands: detect, init, start, stop, status, config, benchmark, log, monitor, tune, optimize, recreate, set, cache, debug'));
+        console.log(chalk.yellow('Available commands: detect, init, start, stop, status, config, benchmark, log, monitor, tune, optimize, recreate, set, cache, debug, selection, performance'));
         console.log(chalk.cyan('💡 Use "gpu-mine log" to toggle regular mining logs'));
         console.log(chalk.cyan('💡 Use "gpu-mine debug" to toggle debug information'));
+        console.log(chalk.cyan('💡 Use "gpu-mine start" to auto-initialize and select GPUs for mining'));
+        console.log(chalk.cyan('💡 Use "gpu-mine selection" to view current GPU selection'));
+        console.log(chalk.cyan('💡 Use "gpu-mine performance" to toggle performance mode (reduces lag)'));
     }
   }
 
@@ -373,12 +373,87 @@ class AdvancedGPUMiner {
       return;
     }
 
+    // Auto-initialize if no kernels are available
     if (this.gpuKernels.length === 0) {
-      console.log(chalk.red('❌ No KawPow GPU kernels available. Run "gpu-mine init" first.'));
+      console.log('');
+      console.log(chalk.blue('💻 GPU kernel initialization...'));
+      console.log(chalk.blue('────────────────────────────────────────────────────────────────────────────────'));
+      
+      const initSuccess = await this.initializeAdvancedKernels();
+      if (!initSuccess) {
+        console.log(chalk.red('❌ Failed to auto-initialize GPU kernels. Please run "gpu-mine init" manually.'));
+        return;
+      }
+      
+      console.log(chalk.green('✅ Auto-initialization completed successfully!'));
+      console.log('');
+    }
+
+    // Prompt for wallet address and GPU selection
+    console.log('');
+    console.log(chalk.blue('💰 MINING CONFIGURATION'));
+    console.log(chalk.blue('────────────────────────────────────────────────────────────────────────────────'));
+    
+    const readline = require('readline');
+    const rl = readline.createInterface({
+      input: process.stdin,
+      output: process.stdout
+    });
+
+    // Get wallet address from user
+    const walletAddress = await new Promise((resolve) => {
+      rl.question(chalk.cyan('💰 Enter wallet address for mining rewards: '), (answer) => {
+        resolve(answer.trim());
+      });
+    });
+
+    if (!walletAddress) {
+      console.log(chalk.red('❌ No wallet address provided.'));
+      return;
+    } else {
+      this.miningAddress = walletAddress;
+    }
+
+    // Get GPU selection from user
+    const gpuSelection = await new Promise((resolve) => {
+      rl.question(chalk.cyan(`🎮 Select GPU(s) to use (1-${this.availableGPUs}, comma-separated for multiple): `), (answer) => {
+        resolve(answer.trim());
+      });
+    });
+
+    rl.close();
+
+    // Parse GPU selection
+    let selectedGPUs = [];
+    if (gpuSelection) {
+      const gpuNumbers = gpuSelection.split(',').map(s => s.trim());
+      for (const num of gpuNumbers) {
+        const gpuIndex = parseInt(num) - 1; // Convert to 0-based index
+        if (gpuIndex >= 0 && gpuIndex < this.availableGPUs) {
+          selectedGPUs.push(gpuIndex);
+        } else {
+          console.log(chalk.yellow(`⚠️  Invalid GPU number: ${num}, skipping...`));
+        }
+      }
+    }
+
+    // If no valid GPUs selected, use all available
+    if (selectedGPUs.length === 0) {
+      selectedGPUs = Array.from({length: this.availableGPUs}, (_, i) => i);
+      console.log(chalk.blue(`💡 Using all available GPUs: ${selectedGPUs.map(i => i + 1).join(', ')}`));
+    } else {
+      console.log(chalk.green(`✅ Selected GPUs: ${selectedGPUs.map(i => i + 1).join(', ')}`));
+    }
+
+    // Filter kernels to only use selected GPUs
+    this.activeGPUKernels = this.gpuKernels.filter((_, index) => selectedGPUs.includes(index));
+    if (this.activeGPUKernels.length === 0) {
+      console.log(chalk.red('❌ No valid GPU kernels selected. Cannot start mining.'));
       return;
     }
 
-    console.log(chalk.blue(`Using mining address: ${this.miningAddress}`));
+    console.log('');
+    console.log('');
 
     this.isMining = true;
     this.startTime = Date.now();
@@ -387,11 +462,13 @@ class AdvancedGPUMiner {
     this.lastUpdateTime = Date.now();
     this.hashRate = 0;
     this.recentHashRate = 0;
+    this.blocksMined = 0; // Reset blocks mined counter for new mining session
     
-    console.log(chalk.green('🚀 KawPow GPU mining started!'));
-    console.log(chalk.blue(`Mining address: ${this.miningAddress}`));
-    console.log(chalk.blue(`Active GPUs: ${this.gpuKernels.length}`));
-    console.log(chalk.blue(`Algorithm: KawPow (ProgPoW + Keccak256)`));
+    console.log(chalk.green('🚀 MINING STARTED SUCCESSFULLY!'));
+    console.log(chalk.blue('────────────────────────────────────────────────────────────────────────────────'));
+    console.log(chalk.white(`💰 Mining Address: ${this.miningAddress}`));
+    console.log(chalk.white(`🎮 Active GPUs: ${this.activeGPUKernels.length} (${selectedGPUs.map(i => i + 1).join(', ')})`));
+    console.log(chalk.white(`🔧 Algorithm: KawPow (ProgPoW + Keccak256)`));
 
     // Start performance monitoring for real-time hash rate updates
     this.startPerformanceMonitoring();
@@ -451,11 +528,12 @@ class AdvancedGPUMiner {
     }
 
     // Update individual GPU metrics with more sophisticated calculations
-    this.gpuKernels.forEach(kernel => {
+    const kernelsToUpdate = this.activeGPUKernels || this.gpuKernels;
+    kernelsToUpdate.forEach(kernel => {
       if (kernel.isActive) {
         if (elapsed > 0) {
           // Calculate GPU hash rate based on actual performance
-          const baseRate = this.hashRate / this.gpuKernels.length;
+          const baseRate = this.hashRate / kernelsToUpdate.length;
           
           // Add performance variation based on GPU type and configuration
           let performanceMultiplier = 1.0;
@@ -484,10 +562,10 @@ class AdvancedGPUMiner {
   }
 
   startPerformanceMonitoring() {
-    // Update hash rate every 500ms for more responsive real-time monitoring
+    // Update hash rate every 2 seconds to reduce lag during mining
     this.performanceInterval = setInterval(() => {
       this.updatePerformanceMetrics();
-    }, 500);
+    }, 2000);
   }
 
   stopPerformanceMonitoring() {
@@ -516,14 +594,17 @@ class AdvancedGPUMiner {
         const elapsed = (Date.now() - this.startTime) / 1000;
         console.log(chalk.cyan(`\n⏱️  Mining Time: ${elapsed.toFixed(1)}s`));
         console.log(chalk.cyan(`🔢 Total Hashes: ${this.totalHashes.toLocaleString()}`));
+        console.log(chalk.cyan(`🏆 Blocks Mined: ${this.blocksMined}`));
         
         // Show GPU utilization if using real GPU kernels
-        const activeGPUKernels = this.gpuKernels.filter(k => !k.isCPUFallback && k.isActive);
+        const kernelsToShow = this.activeGPUKernels || this.gpuKernels;
+        const activeGPUKernels = kernelsToShow.filter(k => !k.isCPUFallback && k.isActive);
         if (activeGPUKernels.length > 0) {
           console.log(chalk.green(`🚀 Active GPU Kernels: ${activeGPUKernels.length}`));
           activeGPUKernels.forEach((kernel, index) => {
             const utilization = Math.min(100, (kernel.hashRate / 1000) * 100); // Rough utilization estimate
-            console.log(chalk.cyan(`  GPU ${index + 1}: ${utilization.toFixed(1)}% utilization`));
+            const gpuNumber = this.activeGPUKernels ? (this.activeGPUKernels.indexOf(kernel) + 1) : (index + 1);
+            console.log(chalk.cyan(`  GPU ${gpuNumber}: ${utilization.toFixed(1)}% utilization`));
           });
         }
       }
@@ -560,74 +641,120 @@ class AdvancedGPUMiner {
   }
 
   showAdvancedStatus() {
-    console.log(chalk.blue('\n🔧 KawPow GPU Mining Status:'));
-    console.log(chalk.white(`Status: ${this.isMining ? '🟢 Running' : '🔴 Stopped'}`));
-    console.log(chalk.white(`Algorithm: KawPow (ProgPoW + Keccak256)`));
-    console.log(chalk.white(`Available GPUs: ${this.availableGPUs}`));
-    console.log(chalk.white(`Active Kernels: ${this.gpuKernels.filter(k => k.isActive).length}`));
+    // Header with beautiful separator
+    console.log(chalk.blue('\n╔══════════════════════════════════════════════════════════════════════════════╗'));
+    console.log(chalk.blue('║                    🚀 KAWPOW GPU MINING STATUS DASHBOARD                     ║'));
+    console.log(chalk.blue('╚══════════════════════════════════════════════════════════════════════════════╝'));
     
-    // Show both overall and recent hash rates for better monitoring
-    if (this.hashRate > 0) {
-      console.log(chalk.white(`Overall Hash Rate: ${this.formatHashRate(this.hashRate)}`));
-    }
-    if (this.recentHashRate !== undefined) {
-      console.log(chalk.green(`Real-time Hash Rate: ${this.formatHashRate(this.recentHashRate)}`));
+    // Main Status Section
+    console.log(chalk.blue('\n📊 MAIN STATUS'));
+    console.log(chalk.blue('────────────────────────────────────────────────────────────────────────────────'));
+    
+    const statusIcon = this.isMining ? '🟢' : '🔴';
+    const statusText = this.isMining ? 'RUNNING' : 'STOPPED';
+    console.log(chalk.white(`${statusIcon} Status:    ${chalk.bold(statusText)}`));
+    console.log(chalk.white(`🔧 Algorithm: ${chalk.cyan('KawPow (ProgPoW + Keccak256)')}`));
+    
+    // GPU Overview
+    console.log(chalk.blue('\n🎮 GPU OVERVIEW'));
+    console.log(chalk.blue('────────────────────────────────────────────────────────────────────────────────'));
+    console.log(chalk.white(`📱 Available GPUs: ${chalk.green(this.availableGPUs)}`));
+    console.log(chalk.white(`⚡ Active Kernels: ${chalk.green(this.gpuKernels.filter(k => k.isActive).length)}`));
+    
+    // Show selected GPUs if mining is active
+    if (this.isMining && this.activeGPUKernels) {
+      const selectedGPUIndices = this.activeGPUKernels.map((_, index) => index + 1);
+      console.log(chalk.white(`🎯 Selected GPUs:  ${chalk.green(selectedGPUIndices.join(', '))}`));
     }
     
-    // Show performance details
+    // Mining Progress Section
     if (this.isMining && this.startTime) {
+      console.log(chalk.blue('\n⏱️  MINING PROGRESS'));
+      console.log(chalk.blue('────────────────────────────────────────────────────────────────────────────────'));
+      
       const elapsed = (Date.now() - this.startTime) / 1000;
-      console.log(chalk.cyan(`⏱️  Mining Time: ${elapsed.toFixed(1)}s`));
-      console.log(chalk.cyan(`🔢 Total Hashes: ${this.totalHashes.toLocaleString()}`));
-      console.log(chalk.cyan(`📊 Batch Size: ${this.gpuConfig.batchSize.toLocaleString()}`));
-      console.log(chalk.cyan(`🎯 Max Attempts: ${this.gpuConfig.maxAttempts.toLocaleString()}`));
-      console.log(chalk.cyan(`🏗️  Cache Size: ${this.gpuConfig.cacheSize.toLocaleString()}`));
-      console.log(chalk.cyan(`🔄 ProgPoW Lanes: ${this.gpuConfig.lanes}`));
-      console.log(chalk.cyan(`⚡ ProgPoW Rounds: ${this.gpuConfig.rounds}`));
-    }
-    
-    if (this.currentMiningBlock) {
-      console.log(chalk.white(`Current Block: #${this.currentMiningBlock.index}`));
-      console.log(chalk.white(`Current Nonce: ${this.currentMiningBlock.nonce.toLocaleString()}`));
-    }
-
-    // Show cache information
-    if (this.currentCache) {
-      console.log(chalk.cyan(`📦 Cache Status: Generated (${this.currentCache.length.toLocaleString()} entries)`));
-      if (this.cacheGenerationTime > 0) {
-        console.log(chalk.cyan(`⏱️  Cache Generation: ${this.cacheGenerationTime}ms`));
+      const hours = Math.floor(elapsed / 3600);
+      const minutes = Math.floor((elapsed % 3600) / 60);
+      const seconds = Math.floor(elapsed % 60);
+      
+      let timeDisplay = '';
+      if (hours > 0) timeDisplay += `${hours}h `;
+      if (minutes > 0) timeDisplay += `${minutes}m `;
+      timeDisplay += `${seconds}s`;
+      
+      console.log(chalk.white(`⏰ Mining Duration: ${chalk.cyan(timeDisplay)}`));
+      console.log(chalk.white(`🔢 Total Hashes:    ${chalk.cyan(this.totalHashes.toLocaleString())}`));
+      console.log(chalk.white(`🏆 Blocks Mined:    ${chalk.green(this.blocksMined)}`));
+      
+      if (this.currentMiningBlock) {
+        console.log(chalk.white(`📦 Current Block:   ${chalk.cyan(`#${this.currentMiningBlock.index}`)}`));
+        console.log(chalk.white(`🎲 Current Nonce:   ${chalk.cyan(this.currentMiningBlock.nonce.toLocaleString())}`));
       }
     }
     
-    // Show GPU memory and performance stats
+    // GPU Performance Statistics
     const activeGPUKernels = this.gpuKernels.filter(k => !k.isCPUFallback && k.isActive);
     if (activeGPUKernels.length > 0) {
-      console.log(chalk.blue('\n🚀 GPU Performance Statistics:'));
-      console.log(chalk.white(`Active GPU Kernels: ${activeGPUKernels.length}`));
-      console.log(chalk.white(`Total GPU Hash Rate: ${this.formatHashRate(this.calculateTotalHashRate())}`));
-      console.log(chalk.white(`GPU Threads per Kernel: ${this.gpuConfig.threads.toLocaleString()}`));
-      console.log(chalk.white(`Optimal Batch Size: ${this.gpuConfig.batchSize.toLocaleString()}`));
+      console.log(chalk.blue('\n🚀 GPU PERFORMANCE STATISTICS'));
+      console.log(chalk.blue('────────────────────────────────────────────────────────────────────────────────'));
+      console.log(chalk.white(`🎯 Active GPU Kernels:     ${chalk.green(activeGPUKernels.length)}`));
+      console.log(chalk.white(`⚡ Total GPU Hash Rate:    ${chalk.green(this.formatHashRate(this.calculateTotalHashRate()))}`));
+      if (this.hashRate > 0) {
+        console.log(chalk.white(`📈 Overall Hash Rate:      ${chalk.green(this.formatHashRate(this.hashRate))}`));
+      } else {
+        console.log(chalk.white(`📈 Overall Hash Rate:      ${chalk.gray('0 H/s')}`));
+      }
+      
+      if (this.recentHashRate !== undefined && this.recentHashRate > 0) {
+        console.log(chalk.white(`🚀 Real-time Hash Rate:    ${chalk.green(this.formatHashRate(this.recentHashRate))}`));
+      } else {
+        console.log(chalk.white(`🚀 Real-time Hash Rate:    ${chalk.gray('0 H/s')}`));
+      }
       
       // Calculate GPU efficiency
       if (this.hashRate > 0) {
         const gpuEfficiency = (this.calculateTotalHashRate() / this.hashRate) * 100;
-        console.log(chalk.green(`GPU Efficiency: ${gpuEfficiency.toFixed(1)}%`));
+        const efficiencyColor = gpuEfficiency > 80 ? chalk.green : gpuEfficiency > 60 ? chalk.yellow : chalk.red;
+        console.log(chalk.white(`📊 GPU Efficiency:         ${efficiencyColor(gpuEfficiency.toFixed(1) + '%')}`));
       }
     }
-
-    this.gpuKernels.forEach((kernel, index) => {
-      console.log(chalk.blue(`\nGPU ${index + 1}:`));
-      console.log(chalk.white(`  Status: ${kernel.isActive ? '🟢 Active' : '🔴 Inactive'}`));
-      console.log(chalk.white(`  Hash Rate: ${this.formatHashRate(kernel.hashRate)}`));
-      console.log(chalk.white(`  GPU Index: ${kernel.gpuIndex}`));
-      console.log(chalk.white(`  Type: ${kernel.isCPUFallback ? 'CPU Fallback' : 'Real GPU.js'}`));
+    
+    // Individual GPU Status
+    console.log(chalk.blue('\n🎮 INDIVIDUAL GPU STATUS'));
+    console.log(chalk.blue('────────────────────────────────────────────────────────────────────────────────'));
+    
+    const kernelsToShow = this.activeGPUKernels || this.gpuKernels;
+    kernelsToShow.forEach((kernel, index) => {
+      const gpuNumber = this.activeGPUKernels ? (this.activeGPUKernels.indexOf(kernel) + 1) : (index + 1);
+      const isActiveGPU = this.activeGPUKernels && this.activeGPUKernels.includes(kernel);
+      
+      // GPU header with status
+      const gpuStatus = kernel.isActive ? '🟢 ACTIVE' : '🔴 INACTIVE';
+      const gpuStatusColor = kernel.isActive ? chalk.green : chalk.red;
+      
+      console.log(chalk.blue(`\n  🎮 GPU ${gpuNumber}:`));
+      console.log(chalk.white(`    Status:            ${gpuStatusColor(gpuStatus)}`));
+      console.log(chalk.white(`    GPU Index:         ${chalk.cyan(kernel.gpuIndex)}`));
+      console.log(chalk.white(`    Hash Rate:         ${chalk.cyan(this.formatHashRate(kernel.hashRate))}`));
+      
+      const gpuType = kernel.isCPUFallback ? 'CPU Fallback' : 'Real GPU.js';
+      const typeColor = kernel.isCPUFallback ? chalk.yellow : chalk.green;
+      console.log(chalk.white(`    Type:              ${typeColor(gpuType)}`));
       
       if (!kernel.isCPUFallback && kernel.gpu) {
-        console.log(chalk.cyan(`  🚀 GPU.js Kernel: Active`));
-        console.log(chalk.cyan(`  🧵 Threads: ${this.gpuConfig.threads}`));
-        console.log(chalk.cyan(`  📦 Batch Size: ${this.gpuConfig.batchSize.toLocaleString()}`));
+        console.log(chalk.cyan(`    🧵 Threads:        ${chalk.white(this.gpuConfig.threads)}`));
+        console.log(chalk.cyan(`    📊 Batch Size:     ${chalk.white(this.gpuConfig.batchSize.toLocaleString())}`));
+        console.log(chalk.cyan(`    🏗️  Cache Size:    ${chalk.white(this.gpuConfig.cacheSize.toLocaleString())}`));
+        console.log(chalk.cyan(`    💾 Memory Usage:   ${chalk.white((this.currentCache.length * 4 / 1024).toFixed(2) + " KB")}`));
+        console.log(chalk.cyan(`    🔄 ProgPoW Lanes:  ${chalk.white(this.gpuConfig.lanes)}`));
+        console.log(chalk.cyan(`    ⚡ ProgPoW Rounds: ${chalk.white(this.gpuConfig.rounds)}`));
       }
     });
+    
+    // Footer
+    console.log(chalk.blue('\n────────────────────────────────────────────────────────────────────────────────'));
+    console.log(chalk.blue('💡 Use "gpu-mine monitor" for real-time updates | "gpu-mine performance" for lag-free mode'));
+    console.log(chalk.blue('────────────────────────────────────────────────────────────────────────────────'));
   }
 
   async configureAdvancedGPU() {
@@ -670,27 +797,46 @@ class AdvancedGPUMiner {
   }
 
   async showCacheInfo() {
+    // Header with beautiful separator
+    console.log(chalk.blue('\n╔══════════════════════════════════════════════════════════════════════════════╗'));
+    console.log(chalk.blue('║                        📦 KAWPOW CACHE DASHBOARD                             ║'));
+    console.log(chalk.blue('╚══════════════════════════════════════════════════════════════════════════════╝'));
+    
     if (!this.currentCache) {
+      console.log(chalk.blue('\n📊 CACHE STATUS'));
+      console.log(chalk.blue('────────────────────────────────────────────────────────────────────────────────'));
       console.log(chalk.yellow('⚠️  No cache generated yet. Start mining to generate cache.'));
+      console.log(chalk.cyan('💡 Cache will be automatically generated when you start mining'));
       return;
     }
 
-    console.log(chalk.blue('📦 KawPow Cache Information:'));
-    console.log(chalk.white(`Cache Size: ${this.currentCache.length} entries`));
-    console.log(chalk.white(`Memory Usage: ~${(this.currentCache.length * 4 / 1024).toFixed(2)} KB`));
-    console.log(chalk.white(`Generation Time: ${this.cacheGenerationTime}ms`));
+    // Cache Overview
+    console.log(chalk.blue('\n📊 CACHE OVERVIEW'));
+    console.log(chalk.blue('────────────────────────────────────────────────────────────────────────────────'));
+    console.log(chalk.white(`📦 Cache Entries: ${chalk.green(this.currentCache.length.toLocaleString())}`));
+    console.log(chalk.white(`💾 Memory Usage: ${chalk.cyan((this.currentCache.length * 4 / 1024).toFixed(2))} KB`));
     
+    if (this.cacheGenerationTime > 0) {
+      console.log(chalk.white(`⚡ Generation Time: ${chalk.cyan(this.cacheGenerationTime)}ms`));
+    }
+    
+    // Cache Details
     if (this.currentCache.length > 0) {
-      console.log(chalk.white(`First Entry: ${this.currentCache[0]}`));
-      console.log(chalk.white(`Memory Usage: ~${(this.currentCache.length * 4 / 1024).toFixed(2)} KB`));
-      console.log(chalk.white(`Generation Time: ${this.cacheGenerationTime}ms`));
+      console.log(chalk.blue('\n🔍 CACHE DETAILS'));
+      console.log(chalk.blue('────────────────────────────────────────────────────────────────────────────────'));
+      console.log(chalk.white(`📍 First Entry: ${chalk.cyan(this.currentCache[0])}`));
+      console.log(chalk.white(`📍 Last Entry: ${chalk.cyan(this.currentCache[this.currentCache.length - 1])}`));
       
-      if (this.currentCache.length > 0) {
-        console.log(chalk.white(`First Entry: ${this.currentCache[0]}`));
-        console.log(chalk.white(`Last Entry: ${this.currentCache[this.currentCache.length - 1]}`));
-        console.log(chalk.white(`Sample Entries: ${this.currentCache.slice(0, 5).join(', ')}...`));
+      if (this.currentCache.length > 5) {
+        const sampleEntries = this.currentCache.slice(0, 5);
+        console.log(chalk.white(`📋 Sample Entries: ${chalk.cyan(sampleEntries.join(', '))}...`));
       }
     }
+    
+    // Footer
+    console.log(chalk.blue('\n────────────────────────────────────────────────────────────────────────────────'));
+    console.log(chalk.blue('💡 Cache is automatically managed during mining | Use "gpu-mine status" for full info'));
+    console.log(chalk.blue('────────────────────────────────────────────────────────────────────────────────'));
   }
 
   toggleDebugLogs() {
@@ -722,7 +868,7 @@ class AdvancedGPUMiner {
       try {
         console.log(chalk.blue(`\n🧪 Testing batch size: ${batchSize.toLocaleString()}`));
         
-        const kernel = this.gpuKernels[0];
+        const kernel = this.activeGPUKernels[0] || this.gpuKernels[0];
         const batches = Math.ceil(iterations / batchSize);
         const startTime = Date.now();
         
@@ -890,12 +1036,17 @@ class AdvancedGPUMiner {
       }
     }
     
-    if (this.showMiningLogs) {
-      const maxSizeKB = (maxBlockSize / 1024).toFixed(2);
-      const currentSizeKB = (currentBlockSize / 1024).toFixed(2);
-      console.log(chalk.cyan(`📦 Selected ${selectedTransactions.length}/${pendingTransactions.length} transactions for block`));
-      console.log(chalk.cyan(`📏 Block size: ${currentSizeKB} KB / ${maxSizeKB} KB`));
-    }
+            if (this.showMiningLogs) {
+          const maxSizeKB = (maxBlockSize / 1024).toFixed(2);
+          const currentSizeKB = (currentBlockSize / 1024).toFixed(2);
+          console.log(chalk.blue('────────────────────────────────────────────────────────────────────────────────'));
+          console.log(chalk.blue('📦 TRANSACTION SELECTION'));
+          console.log(chalk.blue('────────────────────────────────────────────────────────────────────────────────'));
+          console.log(chalk.white(`📦 Selected ${chalk.green(selectedTransactions.length)}/${chalk.cyan(pendingTransactions.length)} transactions for block`));
+          console.log(chalk.white(`📏 Block size: ${chalk.cyan(currentSizeKB)} KB / ${chalk.cyan(maxSizeKB)} KB`));
+          console.log(chalk.white(`💰 Coinbase transaction included`));
+          console.log(chalk.blue('────────────────────────────────────────────────────────────────────────────────'));
+        }
     
     return selectedTransactions;
   }
@@ -915,9 +1066,15 @@ class AdvancedGPUMiner {
       
       this.cacheGenerationTime = Date.now() - startTime;
       
-      if (this.showMiningLogs) {
-        console.log(chalk.cyan(`📦 Generated KawPow cache: ${this.currentCache.length} entries in ${this.cacheGenerationTime}ms`));
-      }
+              if (this.showMiningLogs) {
+          console.log(chalk.blue('────────────────────────────────────────────────────────────────────────────────'));
+          console.log(chalk.blue('📦 CACHE GENERATION'));
+          console.log(chalk.blue('────────────────────────────────────────────────────────────────────────────────'));
+          console.log(chalk.white(`📦 Generated KawPow cache: ${chalk.green(this.currentCache.length.toLocaleString())} entries`));
+          console.log(chalk.white(`⏱️  Generation time: ${chalk.cyan(this.cacheGenerationTime)}ms`));
+          console.log(chalk.white(`💾 Memory usage: ${chalk.cyan((this.currentCache.length * 4 / 1024).toFixed(2))} KB`));
+          console.log(chalk.blue('────────────────────────────────────────────────────────────────────────────────'));
+        }
       
     } catch (error) {
       console.log(chalk.red('❌ Error generating KawPow cache:'), error.message);
@@ -936,25 +1093,42 @@ class AdvancedGPUMiner {
     // Mark that we're now mining this block
     this.isMiningBlock = height;
 
-    const mineBatch = () => {
+    const mineBatch = async () => {
       if (!this.isMining || !block || this.isMiningBlock !== height || !this.currentCache) {
         return; // Stop mining if conditions changed
       }
 
       try {
-        const kernel = this.gpuKernels[0];
-        if (!kernel || !kernel.isActive) {
-          throw new Error('No active KawPow GPU kernel available');
+        // Use multiple GPUs if available, otherwise fall back to single GPU
+        const kernels = this.activeGPUKernels;
+        if (!kernels || kernels.length === 0) {
+          throw new Error('No active KawPow GPU kernels available');
         }
+
+        // Distribute work across available GPUs
+        const kernel = kernels[0]; // For now, use first GPU - can be enhanced for multi-GPU distribution
+        // TODO: Implement proper work distribution across multiple GPUs for better performance
 
         // Process a batch of nonces with safety checks
         const nonceBatch = [];
         const startNonce = block.nonce || 0;
-        const safeBatchSize = this.gpuConfig.batchSize;
         
-        if (this.showMiningLogs) {
-          console.log(chalk.cyan(`🔍 Processing batch of ${safeBatchSize.toLocaleString()} nonces (${startNonce} to ${startNonce + safeBatchSize - 1})`));
-          console.log(chalk.blue(`🔄 Current block nonce: ${block.nonce}, Starting from: ${startNonce}`));
+        // Optimize batch size for performance mode
+        let safeBatchSize = this.gpuConfig.batchSize;
+        if (this.performanceMode) {
+          // Use smaller batches in performance mode for smoother operation
+          safeBatchSize = Math.min(safeBatchSize, 50000);
+        }
+        
+        // Only log every 10th batch to reduce console spam and improve performance
+        if (this.showMiningLogs && (this.totalHashes % (safeBatchSize * 10) === 0)) {
+          console.log(chalk.blue('────────────────────────────────────────────────────────────────────────────────'));
+          console.log(chalk.blue('🔍 MINING PROGRESS UPDATE'));
+          console.log(chalk.blue('────────────────────────────────────────────────────────────────────────────────'));
+          console.log(chalk.white(`📦 Processing batch of ${chalk.cyan(safeBatchSize.toLocaleString())} nonces`));
+          console.log(chalk.white(`   Range: ${chalk.cyan(startNonce.toLocaleString())} → ${chalk.cyan((startNonce + safeBatchSize - 1).toLocaleString())}`));
+          console.log(chalk.white(`🔄 Current block nonce: ${chalk.cyan(block.nonce.toLocaleString())}`));
+          console.log(chalk.blue('────────────────────────────────────────────────────────────────────────────────'));
         }
         
         for (let i = 0; i < safeBatchSize; i++) {
@@ -971,18 +1145,41 @@ class AdvancedGPUMiner {
         try {
           const headerHash = block.previousHash.substring(0, 16); // Simplified header hash
           
-          // Always use the process method from the kernel wrapper
-          hashResults = kernel.kernel.process(nonceBatch, this.currentCache, headerHash, block.index);
+          // Use setImmediate to prevent blocking the main thread
+          hashResults = await new Promise((resolve, reject) => {
+            setImmediate(() => {
+              try {
+                const results = kernel.kernel.process(nonceBatch, this.currentCache, headerHash, block.index);
+                resolve(results);
+              } catch (error) {
+                reject(error);
+              }
+            });
+          });
           
-          if (this.showMiningLogs) {
+          // Only log GPU processing status occasionally to reduce spam
+          if (this.showMiningLogs && (this.totalHashes % (safeBatchSize * 20) === 0)) {
+            console.log(chalk.blue('────────────────────────────────────────────────────────────────────────────────'));
+            console.log(chalk.blue('⚡ PROCESSING STATUS'));
+            console.log(chalk.blue('────────────────────────────────────────────────────────────────────────────────'));
+            
             if (kernel.isCPUFallback) {
-              console.log(chalk.cyan(`🔍 CPU fallback processed ${hashResults.length} nonces with KawPow`));
+              console.log(chalk.white(`🔍 CPU fallback processed ${chalk.cyan(hashResults.length.toLocaleString())} nonces`));
+              console.log(chalk.yellow(`⚠️  Using CPU fallback mode (GPU.js may not be available)`));
             } else {
-              console.log(chalk.cyan(`🔍 GPU processed ${hashResults.length} nonces with KawPow`));
+              console.log(chalk.white(`🚀 GPU processed ${chalk.cyan(hashResults.length.toLocaleString())} nonces`));
+              console.log(chalk.green(`✅ Real GPU acceleration active`));
             }
+            
+            console.log(chalk.blue('────────────────────────────────────────────────────────────────────────────────'));
           }
         } catch (kernelError) {
-          console.log(chalk.yellow(`⚠️  KawPow kernel error, reducing batch size and retrying: ${kernelError.message}`));
+          console.log(chalk.blue('────────────────────────────────────────────────────────────────────────────────'));
+          console.log(chalk.blue('⚠️  KERNEL ERROR - RECOVERING'));
+          console.log(chalk.blue('────────────────────────────────────────────────────────────────────────────────'));
+          console.log(chalk.yellow(`❌ KawPow kernel error: ${kernelError.message}`));
+          console.log(chalk.cyan(`🔄 Reducing batch size and retrying...`));
+          console.log(chalk.blue('────────────────────────────────────────────────────────────────────────────────'));
           
           // Reduce batch size and retry with smaller batch
           const reducedBatchSize = Math.max(1000, Math.floor(this.gpuConfig.batchSize / 2));
@@ -991,12 +1188,26 @@ class AdvancedGPUMiner {
           try {
             const headerHash = block.previousHash.substring(0, 16);
             
-            // Always use the process method from the kernel wrapper
-            hashResults = kernel.kernel.process(reducedNonceBatch, this.currentCache, headerHash, block.index);
+            // Use setImmediate for retry as well to prevent blocking
+            hashResults = await new Promise((resolve, reject) => {
+              setImmediate(() => {
+                try {
+                  const results = kernel.kernel.process(reducedNonceBatch, this.currentCache, headerHash, block.index);
+                  resolve(results);
+                } catch (error) {
+                  reject(error);
+                }
+              });
+            });
             
             // Update batch size for future use
             this.gpuConfig.batchSize = reducedBatchSize;
-            console.log(chalk.blue(`🔄 Adjusted batch size to ${reducedBatchSize.toLocaleString()} for stability`));
+            console.log(chalk.blue('────────────────────────────────────────────────────────────────────────────────'));
+            console.log(chalk.blue('⚙️  CONFIGURATION ADJUSTED'));
+            console.log(chalk.blue('────────────────────────────────────────────────────────────────────────────────'));
+            console.log(chalk.white(`🔄 Batch size adjusted to ${chalk.cyan(reducedBatchSize.toLocaleString())} for stability`));
+            console.log(chalk.green(`✅ Mining will continue with optimized settings`));
+            console.log(chalk.blue('────────────────────────────────────────────────────────────────────────────────'));
             
           } catch (retryError) {
             throw new Error(`KawPow kernel failed even with reduced batch size: ${retryError.message}`);
@@ -1006,40 +1217,69 @@ class AdvancedGPUMiner {
         // Increment hash counter
         this.totalHashes += nonceBatch.length;
 
-        // Check GPU results for valid hashes using KawPow
-        for (let i = 0; i < nonceBatch.length; i++) {
-          const gpuResult = hashResults[i];
-          const nonce = nonceBatch[i];
+        // Check GPU results for valid hashes using KawPow - optimized for performance
+        let blockFound = false;
+        let foundNonce = null;
+        let foundHash = null;
+        
+        // Process in smaller chunks to prevent blocking
+        const chunkSize = Math.min(1000, nonceBatch.length);
+        for (let chunk = 0; chunk < nonceBatch.length; chunk += chunkSize) {
+          const endChunk = Math.min(chunk + chunkSize, nonceBatch.length);
           
-          // Convert GPU result to hash using KawPow
-          const kawPowHash = this.kawPowUtils.kawPowHash(block.index, block.previousHash, nonce, this.currentCache);
-          
-          // Check if this KawPow hash meets the target
-          if (this.kawPowUtils.verifyHash(kawPowHash, target)) {
-            // Found a valid nonce! Now create the actual block
-            block.nonce = nonce;
-            block.timestamp = Date.now();
+          for (let i = chunk; i < endChunk; i++) {
+            const gpuResult = hashResults[i];
+            const nonce = nonceBatch[i];
             
-            // For KawPow, we need to store the hash differently
-            block.hash = kawPowHash;
-            block.algorithm = 'kawpow'; // Ensure algorithm is set
+            // Convert GPU result to hash using KawPow
+            const kawPowHash = this.kawPowUtils.kawPowHash(block.index, block.previousHash, nonce, this.currentCache);
             
-            block.calculateMerkleRoot();
-            
-            if (this.showMiningLogs) {
-              console.log(chalk.blue('────────────────────────────────────────────────────────────────────────────────'));
-              console.log(chalk.green(`✅ Block found by KawPow GPU! Hash: ${block.hash.substring(0, 16)}...`));
-              console.log(chalk.blue(`🎉 Block #${block.index} mined with KawPow in ${Date.now() - this.startTime}ms!`));
-              console.log(chalk.cyan(`🔧 Algorithm: KawPow (ProgPoW + Keccak256)`));
+            // Check if this KawPow hash meets the target
+            if (this.kawPowUtils.verifyHash(kawPowHash, target)) {
+              blockFound = true;
+              foundNonce = nonce;
+              foundHash = kawPowHash;
+              break;
             }
-            
-            this.submitBlock(block);
-            this.isMiningBlock = null;
-            
-            // Continue to next block after a delay
-            setTimeout(() => this.mineBlocksAdvanced(), 1000);
-            return;
           }
+          
+          // Use setImmediate to prevent blocking between chunks
+          if (chunk + chunkSize < nonceBatch.length) {
+            await new Promise(resolve => setImmediate(resolve));
+          }
+          
+          if (blockFound) break;
+        }
+        
+        if (blockFound) {
+          // Found a valid nonce! Now create the actual block
+          block.nonce = foundNonce;
+          block.timestamp = Date.now();
+          
+          // For KawPow, we need to store the hash differently
+          block.hash = foundHash;
+          block.algorithm = 'kawpow'; // Ensure algorithm is set
+          
+          block.calculateMerkleRoot();
+          
+          if (this.showMiningLogs) {
+            console.log(chalk.blue('╔══════════════════════════════════════════════════════════════════════════════╗'));
+            console.log(chalk.blue('║                           🎉 BLOCK FOUND! 🎉                            ║'));
+            console.log(chalk.blue('╚══════════════════════════════════════════════════════════════════════════════╝'));
+            console.log(chalk.green(`✅ Block found by KawPow GPU!`));
+            console.log(chalk.white(`🔑 Hash: ${chalk.cyan(block.hash.substring(0, 16))}...`));
+            console.log(chalk.white(`📦 Block #${chalk.cyan(block.index)}`));
+            console.log(chalk.white(`⏱️  Mining Time: ${chalk.cyan((Date.now() - this.startTime).toLocaleString())}ms`));
+            console.log(chalk.white(`🔧 Algorithm: ${chalk.cyan('KawPow (ProgPoW + Keccak256)')}`));
+            console.log(chalk.blue('────────────────────────────────────────────────────────────────────────────────'));
+          }
+          
+          this.submitBlock(block);
+          this.isMiningBlock = null;
+          
+          // Continue to next block after a delay
+          setTimeout(() => this.mineBlocksAdvanced(), 1000);
+          return;
         }
 
         // Update block nonce for next batch
@@ -1047,16 +1287,32 @@ class AdvancedGPUMiner {
         
         // Log: Show nonce progression
         if (this.showMiningLogs) {
-          console.log(chalk.blue(`🔄 Updated block nonce to ${block.nonce} for next batch`));
+          console.log(chalk.blue('────────────────────────────────────────────────────────────────────────────────'));
+          console.log(chalk.blue('🔄 NONCE PROGRESSION'));
+          console.log(chalk.blue('────────────────────────────────────────────────────────────────────────────────'));
+          console.log(chalk.white(`🎲 Updated block nonce to ${chalk.cyan(block.nonce.toLocaleString())}`));
+          console.log(chalk.white(`📊 Total hashes processed: ${chalk.cyan(this.totalHashes.toLocaleString())}`));
+          console.log(chalk.blue('────────────────────────────────────────────────────────────────────────────────'));
         }
 
-        // Continue mining with next batch
+        // Continue mining with next batch - use setImmediate for better performance
         if (this.isMining && this.isMiningBlock === height) {
-          setImmediate(mineBatch);
+          // Add small delay in performance mode to prevent overwhelming the system
+          if (this.performanceMode) {
+            setTimeout(() => mineBatch(), 10); // 10ms delay for performance mode
+          } else {
+            setImmediate(mineBatch);
+          }
         }
 
       } catch (error) {
-        console.log(chalk.red('❌ KawPow GPU mining error:'), error.message);
+        console.log(chalk.blue('╔══════════════════════════════════════════════════════════════════════════════╗'));
+        console.log(chalk.blue('║                           ❌ MINING ERROR ❌                              ║'));
+        console.log(chalk.blue('╚══════════════════════════════════════════════════════════════════════════════╝'));
+        console.log(chalk.red(`❌ KawPow GPU mining error: ${error.message}`));
+        console.log(chalk.yellow(`🔄 Retrying in 1 second...`));
+        console.log(chalk.blue('────────────────────────────────────────────────────────────────────────────────'));
+        
         this.isMiningBlock = null;
         
         // Retry after error
@@ -1103,7 +1359,12 @@ class AdvancedGPUMiner {
         const nextBlock = await this.cli.makeApiRequest(`/api/blockchain/blocks/${nextBlockIndex}`);
         if (nextBlock) {
           if (this.showMiningLogs) {
-            console.log(chalk.yellow(`⏭️  Block #${nextBlockIndex} already mined by daemon, moving to next block`));
+            console.log(chalk.blue('────────────────────────────────────────────────────────────────────────────────'));
+            console.log(chalk.blue('⏭️  DAEMON SYNC UPDATE'));
+            console.log(chalk.blue('────────────────────────────────────────────────────────────────────────────────'));
+            console.log(chalk.yellow(`⚠️  Block #${chalk.cyan(nextBlockIndex)} already mined by daemon`));
+            console.log(chalk.cyan(`🔄 Moving to next block...`));
+            console.log(chalk.blue('────────────────────────────────────────────────────────────────────────────────'));
           }
           // Create a temporary block to calculate target with CORRECT index
           const tempBlock = new this.cli.Block(nextBlockIndex, Date.now(), [], '0', 0, status.difficulty);
@@ -1141,15 +1402,19 @@ class AdvancedGPUMiner {
 
     try {
       if (this.showMiningLogs) {
-        console.log(chalk.blue(`📤 Submitting KawPow block #${block.index} to daemon...`));
-        console.log(chalk.white(`Hash: ${block.hash.substring(0, 16)}...`));
-        console.log(chalk.white(`Nonce: ${block.nonce}`));
-        console.log(chalk.white(`Difficulty: ${block.difficulty}`));
-        console.log(chalk.cyan(`Algorithm: KawPow (ProgPoW + Keccak256)`));
+        console.log(chalk.blue('╔══════════════════════════════════════════════════════════════════════════════╗'));
+        console.log(chalk.blue('║                        📤 BLOCK SUBMISSION                               ║'));
+        console.log(chalk.blue('╚══════════════════════════════════════════════════════════════════════════════╝'));
+        console.log(chalk.white(`📦 Submitting KawPow block #${chalk.cyan(block.index)} to daemon...`));
+        console.log(chalk.white(`🔑 Hash: ${chalk.cyan(block.hash.substring(0, 16))}...`));
+        console.log(chalk.white(`🎲 Nonce: ${chalk.cyan(block.nonce.toLocaleString())}`));
+        console.log(chalk.white(`🎯 Difficulty: ${chalk.cyan(block.difficulty.toLocaleString())}`));
+        console.log(chalk.white(`🔧 Algorithm: ${chalk.cyan('KawPow (ProgPoW + Keccak256)')}`));
         
         // Create a temporary block to calculate target with CORRECT index
         const tempBlock = new this.cli.Block(block.index, Date.now(), [], '0', 0, block.difficulty);
-        console.log(chalk.white(`Target: ${tempBlock.calculateTarget().substring(0, 16)}...`));
+        console.log(chalk.white(`🎯 Target: ${chalk.cyan(tempBlock.calculateTarget().substring(0, 16))}...`));
+        console.log(chalk.blue('────────────────────────────────────────────────────────────────────────────────'));
       }
 
       // Validate block before submission
@@ -1178,19 +1443,31 @@ class AdvancedGPUMiner {
       };
 
       if(this.showMiningLogs) {
-        console.log(chalk.blue('KawPow hash verification:'), '✅ Valid');
-        console.log(chalk.blue('Merkle root:'), block.merkleRoot.substring(0, 16) + '...');
+        console.log(chalk.blue('────────────────────────────────────────────────────────────────────────────────'));
+        console.log(chalk.blue('🔍 BLOCK VERIFICATION'));
+        console.log(chalk.blue('────────────────────────────────────────────────────────────────────────────────'));
+        console.log(chalk.white(`🔍 KawPow hash verification: ${chalk.green('✅ Valid')}`));
+        console.log(chalk.white(`🌳 Merkle root: ${chalk.cyan(block.merkleRoot.substring(0, 16))}...`));
+        console.log(chalk.blue('────────────────────────────────────────────────────────────────────────────────'));
       }
 
       // Validate block
       const isValid = block.isValid();
       if (this.showMiningLogs) {
-        console.log(chalk.blue('Block validation:'), isValid ? '✅ Valid' : '❌ Invalid');
+        console.log(chalk.blue('────────────────────────────────────────────────────────────────────────────────'));
+        console.log(chalk.blue('✅ BLOCK VALIDATION'));
+        console.log(chalk.blue('────────────────────────────────────────────────────────────────────────────────'));
+        console.log(chalk.white(`🔍 Block validation: ${isValid ? chalk.green('✅ Valid') : chalk.red('❌ Invalid')}`));
+        console.log(chalk.blue('────────────────────────────────────────────────────────────────────────────────'));
       }
 
       if (!isValid) {
         if (this.showMiningLogs) {
-          console.log(chalk.red('❌ Block validation failed, not submitting'));
+          console.log(chalk.blue('╔══════════════════════════════════════════════════════════════════════════════╗'));
+          console.log(chalk.blue('║                           ❌ VALIDATION FAILED ❌                          ║'));
+          console.log(chalk.blue('╚══════════════════════════════════════════════════════════════════════════════╝'));
+          console.log(chalk.red(`❌ Block validation failed, not submitting`));
+          console.log(chalk.blue('────────────────────────────────────────────────────────────────────────────────'));
         }
         return;
       }
@@ -1198,9 +1475,16 @@ class AdvancedGPUMiner {
       const response = await this.cli.makeApiRequest('/api/blocks/submit', 'POST', { block: blockData });
       
       if (response && response.success) {
+        // Increment blocks mined counter
+        this.blocksMined++;
+        
         if (this.showMiningLogs) {
+          console.log(chalk.blue('╔══════════════════════════════════════════════════════════════════════════════╗'));
+          console.log(chalk.blue('║                           🎉 SUBMISSION SUCCESS! 🎉                        ║'));
+          console.log(chalk.blue('╚══════════════════════════════════════════════════════════════════════════════╝'));
           console.log(chalk.green(`✅ KawPow block #${block.index} submitted successfully!`));
-          console.log(chalk.white(`Hash: ${block.hash.substring(0, 16)}...`));
+          console.log(chalk.white(`🔑 Hash: ${chalk.cyan(block.hash.substring(0, 16))}...`));
+          console.log(chalk.cyan(`🔄 Syncing with daemon...`));
           console.log(chalk.blue('────────────────────────────────────────────────────────────────────────────────'));
         }
         
@@ -1210,20 +1494,31 @@ class AdvancedGPUMiner {
         
       } else {
         if (this.showMiningLogs) {
-          console.log(chalk.red('❌ Block submission failed:'), response ? response.error : 'Unknown error');
+          console.log(chalk.blue('╔══════════════════════════════════════════════════════════════════════════════╗'));
+          console.log(chalk.blue('║                           ❌ SUBMISSION FAILED ❌                           ║'));
+          console.log(chalk.blue('╚══════════════════════════════════════════════════════════════════════════════╝'));
+          console.log(chalk.red(`❌ Block submission failed: ${response ? response.error : 'Unknown error'}`));
+          console.log(chalk.yellow(`🔄 Mining will continue with next block...`));
           console.log(chalk.blue('────────────────────────────────────────────────────────────────────────────────'));
         }
       }
 
     } catch (error) {
       if (this.showMiningLogs) {
-        console.log(chalk.red('❌ Error submitting KawPow block:'), error.message);
+        console.log(chalk.blue('╔══════════════════════════════════════════════════════════════════════════════╗'));
+        console.log(chalk.blue('║                           ❌ SUBMISSION ERROR ❌                            ║'));
+        console.log(chalk.blue('╚══════════════════════════════════════════════════════════════════════════════╝'));
+        console.log(chalk.red(`❌ Error submitting KawPow block: ${error.message}`));
+        console.log(chalk.yellow(`🔄 Mining will continue with next block...`));
+        console.log(chalk.blue('────────────────────────────────────────────────────────────────────────────────'));
       }
     }
   }
 
   calculateTotalHashRate() {
-    return this.gpuKernels.reduce((total, kernel) => {
+    // Use active GPUs if available, otherwise fall back to all kernels
+    const kernelsToUse = this.activeGPUKernels || this.gpuKernels;
+    return kernelsToUse.reduce((total, kernel) => {
       return total + (kernel.isActive ? kernel.hashRate : 0);
     }, 0);
   }
@@ -1432,6 +1727,81 @@ class AdvancedGPUMiner {
       console.log(chalk.yellow('💡 Restart mining to apply new settings'));
     }
   }
+
+    showGPUSelection() {
+    // Header with beautiful separator
+    console.log(chalk.blue('\n╔══════════════════════════════════════════════════════════════════════════════╗'));
+    console.log(chalk.blue('║                        🎮 GPU SELECTION DASHBOARD                           ║'));
+    console.log(chalk.blue('╚══════════════════════════════════════════════════════════════════════════════╝'));
+    
+    if (!this.activeGPUKernels || this.activeGPUKernels.length === 0) {
+      console.log(chalk.blue('\n📊 SELECTION STATUS'));
+      console.log(chalk.blue('────────────────────────────────────────────────────────────────────────────────'));
+      console.log(chalk.yellow('⚠️  No GPUs currently selected for mining'));
+      console.log(chalk.cyan('💡 Run "gpu-mine start" to select GPUs'));
+      return;
+    }
+
+    // Selection Summary
+    console.log(chalk.blue('\n📊 SELECTION SUMMARY'));
+    console.log(chalk.blue('────────────────────────────────────────────────────────────────────────────────'));
+    console.log(chalk.green(`✅ ${this.activeGPUKernels.length} GPU(s) selected for mining`));
+    
+    // Individual GPU Details
+    console.log(chalk.blue('\n🎮 SELECTED GPU DETAILS'));
+    console.log(chalk.blue('────────────────────────────────────────────────────────────────────────────────'));
+    
+    this.activeGPUKernels.forEach((kernel, index) => {
+      const gpuNumber = index + 1;
+      const status = kernel.isActive ? '🟢 ACTIVE' : '🔴 INACTIVE';
+      const statusColor = kernel.isActive ? chalk.green : chalk.red;
+      const type = kernel.isCPUFallback ? 'CPU Fallback' : 'Real GPU.js';
+      const typeColor = kernel.isCPUFallback ? chalk.yellow : chalk.green;
+      
+      console.log(chalk.blue(`\n  🎮 GPU ${gpuNumber}:`));
+      console.log(chalk.white(`    Status: ${statusColor(status)}`));
+      console.log(chalk.white(`    Type: ${typeColor(type)}`));
+      
+      if (kernel.hashRate > 0) {
+        console.log(chalk.white(`    Hash Rate: ${chalk.cyan(this.formatHashRate(kernel.hashRate))}`));
+      } else {
+        console.log(chalk.white(`    Hash Rate: ${chalk.gray('0 H/s')}`));
+      }
+      
+      if (!kernel.isCPUFallback && kernel.gpu) {
+        console.log(chalk.cyan(`    🚀 GPU.js Kernel: Active`));
+        console.log(chalk.cyan(`    🧵 Threads: ${this.gpuConfig.threads.toLocaleString()}`));
+        console.log(chalk.cyan(`    📦 Batch Size: ${this.gpuConfig.batchSize.toLocaleString()}`));
+      }
+    });
+
+    // Performance Summary
+    console.log(chalk.blue('\n⚡ PERFORMANCE SUMMARY'));
+    console.log(chalk.blue('────────────────────────────────────────────────────────────────────────────────'));
+    console.log(chalk.white(`🎯 Total Active GPUs: ${chalk.green(this.activeGPUKernels.length)}`));
+    console.log(chalk.white(`⚡ Combined Hash Rate: ${chalk.green(this.formatHashRate(this.calculateTotalHashRate()))}`));
+    
+    // Footer
+    console.log(chalk.blue('\n────────────────────────────────────────────────────────────────────────────────'));
+    console.log(chalk.blue('💡 Use "gpu-mine status" for full mining status | "gpu-mine monitor" for real-time updates'));
+    console.log(chalk.blue('────────────────────────────────────────────────────────────────────────────────'));
+  }
+
+   togglePerformanceMode() {
+     this.performanceMode = !this.performanceMode;
+     
+     if (this.performanceMode) {
+       console.log(chalk.green('✅ Performance mode enabled - Reduced logging for better mining performance'));
+       console.log(chalk.cyan('💡 Mining will be smoother with minimal console output'));
+       
+       // Automatically reduce logging frequency in performance mode
+       this.showMiningLogs = false;
+       this.showMiningLogsDebug = false;
+     } else {
+       console.log(chalk.yellow('⏸️  Performance mode disabled - Normal logging restored'));
+       console.log(chalk.cyan('💡 You can now use "gpu-mine log" and "gpu-mine debug" normally'));
+     }
+   }
 }
 
 module.exports = AdvancedGPUMiner;
