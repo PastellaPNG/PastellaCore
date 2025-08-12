@@ -410,7 +410,6 @@ class APIServer {
   }
 
   getInfo(req, res) {
-    console.log(this.config);
     res.json({
         name: this.config.name,
         ticker: this.config.ticker,
