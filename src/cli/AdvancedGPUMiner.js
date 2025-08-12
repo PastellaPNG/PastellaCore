@@ -28,6 +28,7 @@ class AdvancedGPUMiner {
     this.lastUpdateTime = null;
     this.recentHashRate = 0;
     this.blocksMined = 0; // Track total blocks mined
+    this.totalFeesCollected = 0; // Track total fees collected during mining session
     this.miningAddress = '1Q66qLnTYFfLZBafed3RZqGCEG4pgtbCL4';
     
     // KawPow specific
@@ -356,14 +357,21 @@ class AdvancedGPUMiner {
       case 'performance':
         this.togglePerformanceMode();
         break;
+      case 'fees':
+        await this.showCurrentPendingFees();
+        break;
+      case 'earnings':
+        this.showMiningEarnings();
+        break;
       default:
         console.log(chalk.red(`❌ Unknown gpu-mine command: ${subCmd}`));
-        console.log(chalk.yellow('Available commands: detect, init, start, stop, status, config, benchmark, log, monitor, tune, optimize, recreate, set, cache, debug, selection, performance'));
+        console.log(chalk.yellow('Available commands: detect, init, start, stop, status, config, benchmark, log, monitor, tune, optimize, recreate, set, cache, debug, selection, performance, fees, earnings'));
         console.log(chalk.cyan('💡 Use "gpu-mine log" to toggle regular mining logs'));
         console.log(chalk.cyan('💡 Use "gpu-mine debug" to toggle debug information'));
         console.log(chalk.cyan('💡 Use "gpu-mine start" to auto-initialize and select GPUs for mining'));
         console.log(chalk.cyan('💡 Use "gpu-mine selection" to view current GPU selection'));
         console.log(chalk.cyan('💡 Use "gpu-mine performance" to toggle performance mode (reduces lag)'));
+        console.log(chalk.cyan('💡 Use "gpu-mine fees" to show current pending transaction fees'));
     }
   }
 
@@ -467,9 +475,9 @@ class AdvancedGPUMiner {
     console.log(chalk.green('🚀 MINING STARTED SUCCESSFULLY!'));
     console.log(chalk.blue('────────────────────────────────────────────────────────────────────────────────'));
     console.log(chalk.white(`💰 Mining Address: ${this.miningAddress}`));
-    console.log(chalk.white(`🎮 Active GPUs: ${this.activeGPUKernels.length} (${selectedGPUs.map(i => i + 1).join(', ')})`));
-    console.log(chalk.white(`🔧 Algorithm: KawPow (ProgPoW + Keccak256)`));
-
+    console.log(chalk.white(`🎮 Active GPUs:    ${this.activeGPUKernels.length} (${selectedGPUs.map(i => i + 1).join(', ')})`));
+    console.log(chalk.white(`🔧 Algorithm:      KawPow (ProgPoW + Keccak256)`));
+      
     // Start performance monitoring for real-time hash rate updates
     this.startPerformanceMonitoring();
     
@@ -682,13 +690,14 @@ class AdvancedGPUMiner {
       if (minutes > 0) timeDisplay += `${minutes}m `;
       timeDisplay += `${seconds}s`;
       
-      console.log(chalk.white(`⏰ Mining Duration: ${chalk.cyan(timeDisplay)}`));
-      console.log(chalk.white(`🔢 Total Hashes:    ${chalk.cyan(this.totalHashes.toLocaleString())}`));
-      console.log(chalk.white(`🏆 Blocks Mined:    ${chalk.green(this.blocksMined)}`));
+      console.log(chalk.white(`⏰ Mining Duration:      ${chalk.cyan(timeDisplay)}`));
+      console.log(chalk.white(`🔢 Total Hashes:         ${chalk.cyan(this.totalHashes.toLocaleString())}`));
+      console.log(chalk.white(`🏆 Blocks Mined:         ${chalk.green(this.blocksMined)}`));
+      console.log(chalk.white(`💸 Total Fees Collected: ${chalk.green(this.totalFeesCollected.toFixed(8))} PAS`));
       
       if (this.currentMiningBlock) {
-        console.log(chalk.white(`📦 Current Block:   ${chalk.cyan(`#${this.currentMiningBlock.index}`)}`));
-        console.log(chalk.white(`🎲 Current Nonce:   ${chalk.cyan(this.currentMiningBlock.nonce.toLocaleString())}`));
+        console.log(chalk.white(`📦 Current Block:        ${chalk.cyan(`#${this.currentMiningBlock.index}`)}`));
+        console.log(chalk.white(`🎲 Current Nonce:        ${chalk.cyan(this.currentMiningBlock.nonce.toLocaleString())}`));
       }
     }
     
@@ -717,6 +726,35 @@ class AdvancedGPUMiner {
         const efficiencyColor = gpuEfficiency > 80 ? chalk.green : gpuEfficiency > 60 ? chalk.yellow : chalk.red;
         console.log(chalk.white(`📊 GPU Efficiency:         ${efficiencyColor(gpuEfficiency.toFixed(1) + '%')}`));
       }
+    }
+    
+    // Mining Rewards Section
+    if (this.isMining) {
+      console.log(chalk.blue('\n💰 MINING REWARDS'));
+      console.log(chalk.blue('────────────────────────────────────────────────────────────────────────────────'));
+      const baseReward = this.cli.config.blockchain.coinbaseReward || 50;
+      console.log(chalk.white(`🏆 Base Mining Reward:   ${chalk.green(baseReward.toFixed(8))} PAS`));
+      
+      // Show current block fees if available
+      if (this.currentMiningBlock && this.currentMiningBlock.transactions && this.currentMiningBlock.transactions.length > 1) {
+        const currentBlockFees = this.currentMiningBlock.transactions.slice(1).reduce((total, tx) => {
+          return total + (tx.fee && typeof tx.fee === 'number' ? tx.fee : 0);
+        }, 0);
+        
+        if (currentBlockFees > 0) {
+          console.log(chalk.white(`💸 Current Block Fees:   ${chalk.green(currentBlockFees.toFixed(8))} PAS`));
+          console.log(chalk.white(`💰 Current Block Reward: ${chalk.green((baseReward + currentBlockFees).toFixed(8))} PAS`));
+        } else {
+          console.log(chalk.white(`💸 Current Block Fees:   ${chalk.gray('0.00000000')} PAS`));
+          console.log(chalk.white(`💰 Current Block Reward: ${chalk.green(baseReward.toFixed(8))} PAS`));
+        }
+      } else {
+        console.log(chalk.white(`💸 Current Block Fees:   ${chalk.gray('Calculating...')}`));
+        console.log(chalk.white(`💰 Current Block Reward: ${chalk.green(baseReward.toFixed(8))} PAS`));
+      }
+      
+      console.log(chalk.white(`📊 Pending Transactions: ${chalk.cyan('Check with "gpu-mine fees"')}`));
+      console.log(chalk.white(`💡 Total Potential:      ${chalk.green('Base + All Fees')}`));
     }
     
     // Individual GPU Status
@@ -1009,8 +1047,102 @@ class AdvancedGPUMiner {
   }
 
   /**
+   * Show total mining earnings for current session
+   */
+  showMiningEarnings() {
+    console.log(chalk.blue('╔══════════════════════════════════════════════════════════════════════════════╗'));
+    console.log(chalk.blue('║                           💰 MINING EARNINGS SUMMARY 💰                      ║'));
+    console.log(chalk.blue('╚══════════════════════════════════════════════════════════════════════════════╝'));
+    
+    if (!this.isMining) {
+      console.log(chalk.yellow('⚠️  Mining is not currently active'));
+      return;
+    }
+    
+    const baseReward = this.cli.config.blockchain.coinbaseReward || 50;
+    const totalBaseReward = this.blocksMined * baseReward;
+    const totalEarnings = totalBaseReward + this.totalFeesCollected;
+    
+    console.log(chalk.blue('────────────────────────────────────────────────────────────────────────────────'));
+    console.log(chalk.blue('📊 SESSION SUMMARY'));
+    console.log(chalk.blue('────────────────────────────────────────────────────────────────────────────────'));
+    console.log(chalk.white(`🏆 Blocks Mined:        ${chalk.green(this.blocksMined)}`));
+    console.log(chalk.white(`💰 Base Reward per Block: ${chalk.cyan(baseReward.toFixed(8))} PAS`));
+    console.log(chalk.white(`💵 Total Base Rewards:    ${chalk.green(totalBaseReward.toFixed(8))} PAS`));
+    console.log(chalk.white(`💸 Total Fees Collected:  ${chalk.green(this.totalFeesCollected.toFixed(8))} PAS`));
+    
+    console.log(chalk.blue('────────────────────────────────────────────────────────────────────────────────'));
+    console.log(chalk.blue('🎯 TOTAL EARNINGS'));
+    console.log(chalk.blue('────────────────────────────────────────────────────────────────────────────────'));
+    console.log(chalk.white(`💰 Total Session Earnings: ${chalk.green(totalEarnings.toFixed(8))} PAS`));
+    
+    if (this.totalFeesCollected > 0) {
+      const feePercentage = (this.totalFeesCollected / totalEarnings) * 100;
+      console.log(chalk.white(`📊 Fees as % of Total:    ${chalk.cyan(feePercentage.toFixed(2))}%`));
+    }
+    
+    console.log(chalk.blue('────────────────────────────────────────────────────────────────────────────────'));
+    console.log(chalk.cyan('💡 Use "gpu-mine fees" to see current pending fees'));
+    console.log(chalk.cyan('💡 Use "gpu-mine status" for detailed mining status'));
+    console.log(chalk.blue('────────────────────────────────────────────────────────────────────────────────'));
+  }
+
+  /**
+   * Show current pending fees in mempool
+   */
+  async showCurrentPendingFees() {
+    try {
+      const pendingResponse = await this.cli.makeApiRequest('/api/blockchain/transactions');
+      const pendingTransactions = pendingResponse.transactions || [];
+      
+      if (pendingTransactions.length > 0) {
+        const totalPendingFees = pendingTransactions.reduce((total, tx) => {
+          return total + (tx.fee && typeof tx.fee === 'number' ? tx.fee : 0);
+        }, 0);
+        
+        if (totalPendingFees > 0) {
+          console.log(chalk.white(`📊 Pending Transactions: ${chalk.cyan(pendingTransactions.length)}`));
+          console.log(chalk.white(`💸 Total Pending Fees: ${chalk.green(totalPendingFees.toFixed(8))} PAS`));
+          console.log(chalk.white(`🎯 Next Block Reward: ${chalk.green((this.cli.config.blockchain.coinbaseReward + totalPendingFees).toFixed(8))} PAS`));
+          
+          // Show individual pending transaction fees
+          console.log(chalk.blue('────────────────────────────────────────────────────────────────────────────────'));
+          console.log(chalk.blue('💸 PENDING FEES BREAKDOWN'));
+          console.log(chalk.blue('────────────────────────────────────────────────────────────────────────────────'));
+          pendingTransactions.forEach((tx, index) => {
+            if (tx.fee && typeof tx.fee === 'number' && tx.fee > 0) {
+              console.log(chalk.white(`  📄 Transaction ${index + 1}: ${chalk.cyan(tx.fee.toFixed(8))} PAS`));
+              if (tx.id) {
+                console.log(chalk.white(`     ID: ${chalk.gray(tx.id.substring(0, 16))}...`));
+              }
+              if (tx.timestamp) {
+                const age = Date.now() - tx.timestamp;
+                const ageMinutes = Math.floor(age / 60000);
+                console.log(chalk.white(`     Age: ${chalk.gray(ageMinutes > 0 ? `${ageMinutes}m old` : 'Just added')}`));
+              }
+            }
+          });
+        } else {
+          console.log(chalk.white(`📊 Pending Transactions: ${chalk.cyan(pendingTransactions.length)}`));
+          console.log(chalk.white(`💸 Total Pending Fees: ${chalk.gray('0.00000000')} PAS`));
+          console.log(chalk.white(`🎯 Next Block Reward: ${chalk.green((this.cli.config.blockchain.coinbaseReward).toFixed(8))} PAS`));
+        }
+      } else {
+        console.log(chalk.white(`📊 Pending Transactions: ${chalk.gray('0')}`));
+        console.log(chalk.white(`💸 Total Pending Fees: ${chalk.gray('0.00000000')} PAS`));
+        console.log(chalk.white(`🎯 Next Block Reward: ${chalk.green((this.cli.config.blockchain.coinbaseReward).toFixed(8))} PAS`));
+      }
+    } catch (error) {
+      console.log(chalk.white(`📊 Pending Transactions: ${chalk.red('Error fetching')}`));
+      console.log(chalk.white(`💸 Total Pending Fees: ${chalk.red('Unknown')}`));
+      console.log(chalk.white(`🎯 Next Block Reward: ${chalk.green((this.cli.config.blockchain.coinbaseReward).toFixed(8))} PAS`));
+    }
+  }
+
+  /**
    * Select transactions that fit within the block size limit from config
    * Prioritizes transactions by age (oldest first) and ensures block fits
+   * Also calculates total transaction fees and adds them to miner reward
    */
   selectTransactionsForBlock(pendingTransactions, coinbaseTransaction) {
     const maxBlockSize = this.cli.config.blockchain.maxBlockSize || 1024 * 1024; // Default to 1MB if not in config
@@ -1019,6 +1151,7 @@ class AdvancedGPUMiner {
     // Start with coinbase transaction size
     const coinbaseSize = JSON.stringify(coinbaseTransaction).length;
     let currentBlockSize = coinbaseSize;
+    let totalFees = 0; // Track total transaction fees
     
     // Sort transactions by age (oldest first) for fair processing
     const sortedTransactions = [...pendingTransactions].sort((a, b) => 
@@ -1032,23 +1165,60 @@ class AdvancedGPUMiner {
       if (currentBlockSize + txSize <= maxBlockSize) {
         selectedTransactions.push(tx);
         currentBlockSize += txSize;
+        
+        // Add transaction fee to total (if transaction has a fee)
+        if (tx.fee && typeof tx.fee === 'number' && tx.fee > 0) {
+          totalFees += tx.fee;
+        }
       } else {
         // Block is full, stop adding transactions
         break;
       }
     }
     
-            if (this.showMiningLogs) {
-          const maxSizeKB = (maxBlockSize / 1024).toFixed(2);
-          const currentSizeKB = (currentBlockSize / 1024).toFixed(2);
-          console.log(chalk.blue('────────────────────────────────────────────────────────────────────────────────'));
-          console.log(chalk.blue('📦 TRANSACTION SELECTION'));
-          console.log(chalk.blue('────────────────────────────────────────────────────────────────────────────────'));
-          console.log(chalk.white(`📦 Selected ${chalk.green(selectedTransactions.length)}/${chalk.cyan(pendingTransactions.length)} transactions for block`));
-          console.log(chalk.white(`📏 Block size: ${chalk.cyan(currentSizeKB)} KB / ${chalk.cyan(maxSizeKB)} KB`));
-          console.log(chalk.white(`💰 Coinbase transaction included`));
-          console.log(chalk.blue('────────────────────────────────────────────────────────────────────────────────'));
-        }
+    // Add total fees to the coinbase transaction (miner gets the fees!)
+    if (totalFees > 0) {
+      // Update the coinbase transaction output amount to include fees
+      if (coinbaseTransaction.outputs && coinbaseTransaction.outputs.length > 0) {
+        coinbaseTransaction.outputs[0].amount += totalFees;
+
+        // Recalculate transaction ID since amount changed
+        coinbaseTransaction.calculateId();
+      }
+    }
+    
+    if (this.showMiningLogs) {
+      const maxSizeKB = (maxBlockSize / 1024).toFixed(2);
+      const currentSizeKB = (currentBlockSize / 1024).toFixed(2);
+      console.log(chalk.blue('────────────────────────────────────────────────────────────────────────────────'));
+      console.log(chalk.blue('📦 TRANSACTION SELECTION'));
+      console.log(chalk.blue('────────────────────────────────────────────────────────────────────────────────'));
+      console.log(chalk.white(`📦 Selected ${chalk.green(selectedTransactions.length)}/${chalk.cyan(pendingTransactions.length)} transactions for block`));
+      console.log(chalk.white(`📏 Block size: ${chalk.cyan(currentSizeKB)} KB / ${chalk.cyan(maxSizeKB)} KB`));
+      console.log(chalk.white(`💰 Coinbase transaction included`));
+      
+      if (totalFees > 0) {
+        console.log(chalk.white(`💸 Total fees collected: ${chalk.green(totalFees.toFixed(8))} PAS`));
+        console.log(chalk.white(`🏆 Miner reward: ${chalk.green((coinbaseTransaction.outputs[0].amount).toFixed(8))} PAS (${(this.cli.config.blockchain.coinbaseReward || 50).toFixed(8)} + ${totalFees.toFixed(8)} fees)`));
+        
+        // Show individual transaction fees
+        console.log(chalk.blue('────────────────────────────────────────────────────────────────────────────────'));
+        console.log(chalk.blue('💸 TRANSACTION FEES BREAKDOWN'));
+        console.log(chalk.blue('────────────────────────────────────────────────────────────────────────────────'));
+        selectedTransactions.forEach((tx, index) => {
+          if (tx.fee && typeof tx.fee === 'number' && tx.fee > 0) {
+            console.log(chalk.white(`  📄 Transaction ${index + 1}: ${chalk.cyan(tx.fee.toFixed(8))} PAS`));
+            if (tx.id) {
+              console.log(chalk.white(`     ID: ${chalk.gray(tx.id.substring(0, 16))}...`));
+            }
+          }
+        });
+      } else {
+        console.log(chalk.white(`💸 Total fees collected: ${chalk.gray('0.00000000')} PAS`));
+        console.log(chalk.white(`🏆 Miner reward: ${chalk.green((coinbaseTransaction.outputs[0].amount).toFixed(8))} PAS (base reward only)`));
+      }
+      console.log(chalk.blue('────────────────────────────────────────────────────────────────────────────────'));
+    }
     
     return selectedTransactions;
   }
@@ -1479,6 +1649,14 @@ class AdvancedGPUMiner {
       if (response && response.success) {
         // Increment blocks mined counter
         this.blocksMined++;
+        
+        // Track fees collected from this block
+        if (block.transactions && block.transactions.length > 1) {
+          const blockFees = block.transactions.slice(1).reduce((total, tx) => {
+            return total + (tx.fee && typeof tx.fee === 'number' ? tx.fee : 0);
+          }, 0);
+          this.totalFeesCollected += blockFees;
+        }
         
         if (this.showMiningLogs) {
           console.log(chalk.blue('╔══════════════════════════════════════════════════════════════════════════════╗'));
