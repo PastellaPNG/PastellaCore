@@ -947,26 +947,26 @@ class Blockchain {
 
     // If we are starting up, return a difficulty guess
     if (timestamps.length <= 10) {
-      logger.info('DIFFICULTY', `[LWMA-${N}] Starting up, returning default difficulty: 10000`);
+      logger.debug('DIFFICULTY', `[LWMA-${N}] Starting up, returning default difficulty: 10000`);
       return 10000; // EXACT C++ behavior
     }
 
     // Don't have the full amount of blocks yet, starting up
     if (timestamps.length < N + 1) {
       N = timestamps.length - 1;
-      logger.info('DIFFICULTY', `[LWMA-${N}] Not enough blocks, using N=${N}`);
+      logger.debug('DIFFICULTY', `[LWMA-${N}] Not enough blocks, using N=${N}`);
     }
 
     // IMPORTANT: LWMA3 should only start adjusting after we have the full window (60 blocks)
     // This prevents premature difficulty adjustments and matches C++ behavior
     if (height < this.difficultyBlocks) {
-      logger.info('DIFFICULTY', `[LWMA-${N}] Not enough blocks for full window (${height + 1}/${this.difficultyBlocks + 1}), keeping current difficulty: ${this.difficulty}`);
+      logger.debug('DIFFICULTY', `[LWMA-${N}] Not enough blocks for full window (${height + 1}/${this.difficultyBlocks + 1}), keeping current difficulty: ${this.difficulty}`);
       return this.difficulty; // Keep current difficulty until we have full window
     }
 
-    logger.info('DIFFICULTY', `[LWMA-${N}] ✅ Full difficulty window reached! Starting LWMA3 adjustments from block ${this.difficultyBlocks + 1}`);
+    logger.debug('DIFFICULTY', `[LWMA-${N}] ✅ Full difficulty window reached! Starting LWMA3 adjustments from block ${this.difficultyBlocks + 1}`);
 
-    logger.info('DIFFICULTY', `[LWMA-${N}] Starting adjustment: height=${height}, N=${N}, T=${T}`);
+    logger.debug('DIFFICULTY', `[LWMA-${N}] Starting adjustment: height=${height}, N=${N}, T=${T}`);
 
     let L = 0; // Weighted sum (corresponds to C++ variable L)
     let sum_3_ST = 0; // Sum of last 3 solve times
@@ -1000,7 +1000,7 @@ class Blockchain {
       if (i <= 3 || i > N - 3) {
         const blockIdx = startIdx + i;
         const difficulty = this.chain[blockIdx]?.difficulty || 1;
-        logger.info('DIFFICULTY', `[LWMA-${N}] Block ${blockIdx}: ST=${ST}ms, difficulty=${difficulty}`);
+        logger.debug('DIFFICULTY', `[LWMA-${N}] Block ${blockIdx}: ST=${ST}ms, difficulty=${difficulty}`);
       }
     }
 
@@ -1019,17 +1019,17 @@ class Blockchain {
     // Special case: if last 3 blocks were very fast, increase difficulty by 8%
     if (sum_3_ST < (8 * T) / 10) {
       next_D = Math.max(next_D, Math.floor((prev_D * 108) / 100));
-      logger.info('DIFFICULTY', `[LWMA-${N}] Fast blocks detected, applying 8% increase`);
+      logger.debug('DIFFICULTY', `[LWMA-${N}] Fast blocks detected, applying 8% increase`);
     }
 
     // Never go below minimum
     next_D = Math.max(next_D, this.difficultyMinimum);
 
-    logger.info('DIFFICULTY', `[LWMA-${N}] Weighted sum (L): ${L}, Difficulty range: ${diffRange}`);
-    logger.info('DIFFICULTY', `[LWMA-${N}] Last 3 solve times: ${sum_3_ST}ms (threshold: ${(8 * T) / 10}ms)`);
-    logger.info('DIFFICULTY', `[LWMA-${N}] Previous difficulty: ${prev_D}, Calculated: ${next_D}`);
-    logger.info('DIFFICULTY', `[LWMA-${N}] Limits - Max: ${maxIncrease}, Min: ${maxDecrease}`);
-    logger.info('DIFFICULTY', `[LWMA-${N}] Difficulty adjusted: ${this.difficulty} → ${next_D}`);
+    logger.debug('DIFFICULTY', `[LWMA-${N}] Weighted sum (L): ${L}, Difficulty range: ${diffRange}`);
+    logger.debug('DIFFICULTY', `[LWMA-${N}] Last 3 solve times: ${sum_3_ST}ms (threshold: ${(8 * T) / 10}ms)`);
+    logger.debug('DIFFICULTY', `[LWMA-${N}] Previous difficulty: ${prev_D}, Calculated: ${next_D}`);
+    logger.debug('DIFFICULTY', `[LWMA-${N}] Limits - Max: ${maxIncrease}, Min: ${maxDecrease}`);
+    logger.debug('DIFFICULTY', `[LWMA-${N}] Difficulty adjusted: ${this.difficulty} → ${next_D}`);
 
     return next_D; // Return the new difficulty, not a change
   }
