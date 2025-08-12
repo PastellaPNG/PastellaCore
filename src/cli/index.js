@@ -154,6 +154,7 @@ class PastellaCLI {
       .option('--host <host>', 'API server host (default: localhost)', 'localhost')
       .option('--port <port>', 'API server port (default: 22000)', config.api.port.toString())
       .option('--data-dir <path>', 'Data directory path')
+      .option('--api-key <key>', 'API key for authenticated endpoints')
       .hook('preAction', (thisCommand) => {
         // Update API URL based on options
         const options = thisCommand.opts();
@@ -164,6 +165,11 @@ class PastellaCLI {
         // Update data directory if specified
         if (options.dataDir) {
           this.localBlockchain.dataDir = options.dataDir;
+        }
+
+        // Store API key if provided
+        if (options.apiKey) {
+          this.apiKey = options.apiKey;
         }
       });
 
@@ -224,27 +230,33 @@ class PastellaCLI {
         console.log(chalk.blue.bold('╚══════════════════════════════════════════════════════════╝'));
         console.log('');
         console.log(chalk.yellow.bold('📖 AVAILABLE COMMANDS:'));
-        console.log(chalk.cyan('  wallet <command>     - Wallet management'));
-        console.log(chalk.cyan('  gpu-mine <command>   - KawPow GPU mining'));
-        console.log(chalk.cyan('  chain <command>      - Blockchain operations'));
-        console.log(chalk.cyan('  network <command>    - Network management'));
-        console.log(chalk.cyan('  daemon <command>     - Daemon control'));
-        console.log(chalk.cyan('  connection           - Show connection info'));
-        console.log(chalk.cyan('  help                 - Show this help'));
+        console.log(chalk.cyan('  wallet <command>                                             - Wallet management'));
+        console.log(chalk.cyan('  gpu-mine <command>                                           - KawPow GPU mining'));
+        console.log(chalk.cyan('  chain <command>                                              - Blockchain operations'));
+        console.log(chalk.cyan('  network <command>                                            - Network management'));
+        console.log(chalk.cyan('  daemon <command>                                             - Daemon control'));
+        console.log(chalk.cyan('  connection                                                   - Show connection info'));
+        console.log(chalk.cyan('  help                                                         - Show this help'));
         console.log('');
         console.log(chalk.yellow.bold('💡 CHECKPOINT SYSTEM:'));
-        console.log(chalk.cyan('  chain validate checkpoint - Fast validation using checkpoints'));
-        console.log(chalk.cyan('  chain validate full      - Complete validation'));
-        console.log(chalk.cyan('  chain checkpoints list   - Show all checkpoints'));
-        console.log(chalk.cyan('  chain checkpoints add    - Add new checkpoint'));
-        console.log(chalk.cyan('  chain checkpoints update - Update all checkpoints'));
+        console.log(chalk.cyan('  chain validate checkpoint                                    - Fast validation using checkpoints'));
+        console.log(chalk.cyan('  chain validate full                                          - Complete validation'));
+        console.log(chalk.cyan('  chain checkpoints list                                       - Show all checkpoints'));
+        console.log(chalk.cyan('  chain checkpoints add                                        - Add new checkpoint'));
+        console.log(chalk.cyan('  chain checkpoints update                                     - Update all checkpoints'));
+        console.log('');
+        console.log(chalk.yellow.bold('🔐 AUTHENTICATION:'));
+        console.log(chalk.cyan('  Use --api-key <key> for authenticated endpoints'));
+        console.log(chalk.cyan('  Sensitive endpoints automatically authenticated when key provided'));
+        console.log(chalk.cyan('  Check API_AUTHENTICATION.md for details'));
         console.log('');
         console.log(chalk.yellow.bold('🔧 EXAMPLES:'));
-        console.log(chalk.cyan('  pastella wallet balance                    - Check wallet balance'));
-        console.log(chalk.cyan('  pastella gpu-mine start                   - Start GPU mining'));
-        console.log(chalk.cyan('  pastella chain validate checkpoint        - Fast validation'));
-        console.log(chalk.cyan('  pastella chain checkpoints add 100        - Add checkpoint at height 100'));
-        console.log(chalk.cyan('  pastella --host 192.168.1.100 chain status - Remote blockchain status'));
+        console.log(chalk.cyan('  pastella wallet balance                                      - Check wallet balance'));
+        console.log(chalk.cyan('  pastella gpu-mine start                                      - Start GPU mining'));
+        console.log(chalk.cyan('  pastella chain validate checkpoint                           - Fast validation'));
+        console.log(chalk.cyan('  pastella chain checkpoints add 100                           - Add checkpoint at height 100'));
+        console.log(chalk.cyan('  pastella --host 192.168.1.100 chain status                   - Remote blockchain status'));
+        console.log(chalk.cyan('  pastella --api-key my-key network message-validation-reset   - Reset with auth'));
         console.log('');
         console.log(chalk.yellow.bold('📚 FOR MORE HELP:'));
         console.log(chalk.cyan('  Run without arguments for interactive mode'));
@@ -330,6 +342,9 @@ class PastellaCLI {
         i++; // Skip the next argument since we consumed it
       } else if (arg === '--data-dir' && i + 1 < args.length) {
         this.localBlockchain.dataDir = args[i + 1];
+        i++; // Skip the next argument since we consumed it
+      } else if (arg === '--api-key' && i + 1 < args.length) {
+        this.apiKey = args[i + 1];
         i++; // Skip the next argument since we consumed it
       }
     }
