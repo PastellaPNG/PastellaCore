@@ -16,8 +16,13 @@ class AuthMiddleware {
    * @param {Function} next - Express next function
    */
   validateApiKey(req, res, next) {
+    // Debug logging
+    logger.debug('AUTH', `Validating API key for ${req.method} ${req.path}`);
+    logger.debug('AUTH', `Authentication enabled: ${this.enabled}, API key stored: ${this.apiKey ? this.apiKey.substring(0, 8) + '...' : 'none'}`);
+    
     // If authentication is not enabled, skip validation
     if (!this.enabled) {
+      logger.debug('AUTH', `Authentication disabled, skipping validation`);
       return next();
     }
 
@@ -25,6 +30,8 @@ class AuthMiddleware {
     const authHeader = req.headers.authorization;
     const apiKeyHeader = req.headers['x-api-key'];
     const queryApiKey = req.query.api_key;
+
+    logger.debug('AUTH', `Request headers: authorization=${authHeader ? 'present' : 'missing'}, x-api-key=${apiKeyHeader ? 'present' : 'missing'}, query api_key=${queryApiKey ? 'present' : 'missing'}`);
 
     let providedKey = null;
 

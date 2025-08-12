@@ -23,8 +23,8 @@ class APIServer {
     // Initialize rate limiter for DoS protection
     this.rateLimiter = new RateLimiter();
     
-    // Initialize authentication middleware
-    this.auth = new AuthMiddleware(config.api?.apiKey);
+    // Initialize authentication middleware (no API key initially)
+    this.auth = new AuthMiddleware();
     
     this.setupMiddleware();
     this.setupRoutes();
@@ -44,10 +44,12 @@ class APIServer {
     // Add authentication middleware for sensitive endpoints
     // These endpoints require a valid API key to prevent unauthorized access
     this.app.use('/api/blocks/submit', this.auth.validateApiKey.bind(this.auth));
+    this.app.use('/api/blocks/validate', this.auth.validateApiKey.bind(this.auth));
     this.app.use('/api/network/connect', this.auth.validateApiKey.bind(this.auth));
     this.app.use('/api/network/message-validation/reset', this.auth.validateApiKey.bind(this.auth));
     this.app.use('/api/network/partition-reset', this.auth.validateApiKey.bind(this.auth));
-    this.app.use('/api/rate-limits', this.auth.validateApiKey.bind(this.auth));
+    this.app.use('/api/blockchain/reset', this.auth.validateApiKey.bind(this.auth));
+    this.app.use('/api/rate-limits*', this.auth.validateApiKey.bind(this.auth));
     
     // Add error handling middleware
     this.app.use((error, req, res, next) => {
@@ -62,6 +64,9 @@ class APIServer {
   rateLimitMiddleware(req, res, next) {
     const clientIP = req.ip || req.connection.remoteAddress || req.headers['x-forwarded-for'] || 'unknown';
     const endpoint = req.path;
+    
+    // Debug logging for rate limiting
+    logger.debug('RATE_LIMITER', `Processing request: ${req.method} ${endpoint} from ${clientIP}`);
     
     // Check if request is allowed
     if (!this.rateLimiter.isAllowed(clientIP, endpoint)) {
@@ -89,6 +94,7 @@ class APIServer {
       'X-RateLimit-Reset': new Date(status.resetTime).toISOString()
     });
     
+    logger.debug('RATE_LIMITER', `Request allowed: ${req.method} ${endpoint} from ${clientIP}`);
     next();
   }
 
@@ -101,11 +107,11 @@ class APIServer {
       res.json({ message: 'Pastella API Server is running!', version: '1.0.0' });
     });
     
-    // Blockchain routes (always available)
+    // Blockchain routes
     this.app.get('/api/blockchain/status', this.getBlockchainStatus.bind(this));
     this.app.get('/api/blockchain/security', this.getSecurityReport.bind(this));
-    this.app.get('/api/blockchain/replay-protection', this.getReplayProtectionStats.bind(this));
-    this.app.post('/api/blockchain/reset', this.resetBlockchain.bind(this));
+    this.app.get('/api/blockchain/mempool', this.getReplayProtectionStats.bind(this));
+    this.app.post('/api/blockchain/reset', this.resetBlockchain.bind(this));                                // Behind Key
     this.app.get('/api/blockchain/blocks', this.getBlocks.bind(this));
     this.app.get('/api/blockchain/blocks/:index', this.getBlock.bind(this));
     this.app.get('/api/blockchain/latest', this.getLatestBlock.bind(this));
@@ -113,44 +119,55 @@ class APIServer {
     this.app.get('/api/blockchain/transactions/:txId', this.getTransaction.bind(this));
     this.app.post('/api/blockchain/transactions', this.submitTransaction.bind(this));
 
-    // Block submission routes (always available)
-    this.app.post('/api/blocks/submit', this.submitBlock.bind(this));
+    // Block submission routes
+    this.app.post('/api/blocks/submit', this.submitBlock.bind(this));                                       // Behind Key
     this.app.get('/api/blocks/pending', this.getPendingBlocks.bind(this));
-    this.app.post('/api/blocks/validate', this.validateBlock.bind(this));
+    this.app.post('/api/blocks/validate', this.validateBlock.bind(this));                                   // Behind Key
 
-    // Network routes (always available)
+    // Network routes
     this.app.get('/api/network/status', this.getNetworkStatus.bind(this));
     this.app.get('/api/network/peers', this.getPeers.bind(this));
-    this.app.post('/api/network/connect', this.connectToPeer.bind(this));
+    this.app.post('/api/network/connect', this.connectToPeer.bind(this));                                   // Behind Key
 
-    // Reputation routes (always available)
+    // Reputation routes
     this.app.get('/api/network/reputation', this.getReputationStats.bind(this));
     this.app.get('/api/network/reputation/:peerAddress', this.getPeerReputation.bind(this));
 
     // Message validation endpoints
     this.app.get('/api/network/message-validation', this.getMessageValidationStats.bind(this));
-    this.app.post('/api/network/message-validation/reset', this.resetMessageValidationStats.bind(this));
+    this.app.post('/api/network/message-validation/reset', this.resetMessageValidationStats.bind(this));    // Behind Key
     
     // Partition handling endpoints
     this.app.get('/api/network/partition-stats', this.getPartitionStats.bind(this));
-    this.app.post('/api/network/partition-reset', this.resetPartitionStats.bind(this));
+    this.app.post('/api/network/partition-reset', this.resetPartitionStats.bind(this));                     // Behind Key
 
-    // Daemon routes (always available)
+    // Daemon routes
     this.app.get('/api/daemon/status', this.getDaemonStatus.bind(this));
 
-    // Rate limiting management routes (admin only)
-    this.app.get('/api/rate-limits/stats', this.getRateLimitStats.bind(this));
-    this.app.post('/api/rate-limits/reset/:ip', this.resetRateLimitsForIP.bind(this));
-    this.app.post('/api/rate-limits/reset-all', this.resetAllRateLimits.bind(this));
+    // Rate limiting management routes (protected by API key)
+    this.app.get('/api/rate-limits/stats', this.getRateLimitStats.bind(this));                              // Behind Key
+    this.app.post('/api/rate-limits/reset/:ip', this.resetRateLimitsForIP.bind(this));                      // Behind Key
+    this.app.post('/api/rate-limits/reset-all', this.resetAllRateLimits.bind(this));                        // Behind Key
     
     // Utility routes (always available)
     this.app.get('/api/health', this.getHealth.bind(this));
     this.app.get('/api/info', this.getInfo.bind(this));
-    
-    // Test route
-    this.app.get('/api/test', (req, res) => {
-      res.json({ message: 'API server is working!', timestamp: new Date().toISOString() });
-    });
+  }
+
+  /**
+   * Set API key for authentication
+   * @param {string} apiKey - The API key to use for authentication
+   */
+  setApiKey(apiKey) {
+    if (apiKey && typeof apiKey === 'string' && apiKey.length > 0) {
+      this.auth.updateApiKey(apiKey);
+    } else {
+      // Don't clear the existing API key if called with invalid value
+      if (apiKey === null || apiKey === undefined) {
+        return;
+      }
+      this.auth.updateApiKey(null);
+    }
   }
 
   /**

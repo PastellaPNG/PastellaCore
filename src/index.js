@@ -175,6 +175,12 @@ class PastellaDaemon {
 
     // Start API server
     if (config.api.enabled !== false) {
+      // Set API key if provided via CLI
+      if (config.api?.apiKey) {
+        this.apiServer.setApiKey(config.api.apiKey);
+        logger.info('API', `API authentication enabled with key: ${config.api.apiKey.substring(0, 8)}...`);
+      }
+      
       this.apiServer.start();
       logger.info('API', `API Server: http://localhost:${config.api.port}`);
     }
