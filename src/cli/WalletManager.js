@@ -53,12 +53,19 @@ class WalletManager {
       case 'transactions':
         await this.showTransactionHistory();
         break;
+      case 'transaction-info':
+        if (args.length < 2) {
+          console.log(chalk.red('❌ Usage: wallet transaction-info <transaction-id>'));
+          return;
+        }
+        await this.showTransactionInfo(args[1]);
+        break;
       case 'save':
         await this.saveWallet();
         break;
       default:
         console.log(chalk.red(`❌ Unknown wallet command: ${command}`));
-        console.log(chalk.cyan('Available commands: create, load, unload, balance, send, info, sync, resync, save, transactions'));
+        console.log(chalk.cyan('Available commands: create, load, unload, balance, send, info, sync, resync, save, transactions, transaction-info'));
     }
   }
 
@@ -219,6 +226,15 @@ class WalletManager {
         return;
       }
 
+      // Show replay protection information immediately after creation
+      if (transaction.nonce && transaction.expiresAt) {
+        console.log(chalk.yellow('🛡️  Replay Protection Active:'));
+        console.log(chalk.cyan(`  Nonce: ${transaction.nonce.substring(0, 16)}...`));
+        console.log(chalk.cyan(`  Expires: ${new Date(transaction.expiresAt).toLocaleString()}`));
+        console.log(chalk.cyan(`  Sequence: ${transaction.sequence}`));
+        console.log('');
+      }
+
       // Submit transaction to daemon
       const response = await this.cli.makeApiRequest('/api/blockchain/transactions', 'POST', {
         transaction: transaction.toJSON()
@@ -229,6 +245,8 @@ class WalletManager {
       console.log(chalk.cyan(`Amount: ${amountNum} PAS`));
       console.log(chalk.cyan(`Fee: ${feeNum} PAS`));
       console.log(chalk.cyan(`To: ${address}`));
+      
+      // Replay protection already shown above
       
       // Add sent transaction to history
       const sentTransactionData = {
@@ -493,6 +511,132 @@ class WalletManager {
     }
   }
 
+  /**
+   * Read-only wallet sync that doesn't modify the local blockchain
+   * Used for resync operations to preserve pending transactions
+   */
+  async syncWalletWithDaemonReadOnly() {
+    try {
+      if (!this.cli.walletLoaded) {
+        console.log(chalk.red('❌ No wallet loaded. Use "wallet load" first.'));
+        return false;
+      }
+
+      // Get current blockchain height from daemon
+      const blockchainStatus = await this.cli.makeApiRequest('/api/blockchain/status');
+      const currentHeight = blockchainStatus.height;
+
+      console.log(chalk.cyan(`🔄 Reading daemon blockchain state (height: ${currentHeight})...`));
+
+      // Get blocks from daemon (read-only, don't add to local blockchain)
+      const response = await this.cli.makeApiRequest(`/api/blockchain/blocks?limit=${currentHeight}`);
+      const blocks = response.blocks;
+
+      // Track transactions for the wallet during sync
+      const walletTransactions = [];
+
+      // Process blocks (read-only, don't modify local blockchain)
+      for (const blockData of blocks) {
+        try {
+          const block = Block.fromJSON(blockData);
+          
+          // Check for wallet transactions in this block
+          block.transactions.forEach(tx => {
+            const walletAddress = this.cli.localWallet.getAddress();
+            const isInvolved = tx.outputs.some(output => output.address === walletAddress) ||
+                              tx.inputs.some(input => {
+                                // For inputs, we need to check if the previous output was to our address
+                                return false; // We'll focus on outputs for now
+                              });
+            
+            if (isInvolved) {
+              const receivedAmount = tx.outputs
+                .filter(output => output.address === walletAddress)
+                .reduce((sum, output) => sum + output.amount, 0);
+              
+              if (receivedAmount > 0) {
+                walletTransactions.push({
+                  type: 'received',
+                  amount: receivedAmount,
+                  blockHeight: block.index,
+                  txHash: tx.id,
+                  address: walletAddress,
+                  isCoinbase: tx.tag === 'COINBASE'
+                });
+                
+                // Add transaction to wallet history with processed data
+                const transactionData = {
+                  id: tx.id,
+                  type: 'received',
+                  amount: receivedAmount,
+                  blockHeight: block.index,
+                  txHash: tx.id,
+                  timestamp: block.timestamp,
+                  isCoinbase: tx.tag === 'COINBASE',
+                  address: walletAddress
+                };
+                this.cli.localWallet.addTransactionToHistory(transactionData);
+              }
+            }
+          });
+          
+          // IMPORTANT: DO NOT call addBlock() - this preserves the local blockchain
+          
+        } catch (error) {
+          console.log(chalk.red(`❌ Failed to process block ${blockData.index}: ${error.message}`));
+          return false;
+        }
+      }
+
+      // Display detailed transaction information
+      walletTransactions.forEach(tx => {
+        const blockInfo = ` | Block #${tx.blockHeight}`;
+        const hashInfo = ` | Hash: ${tx.txHash.substring(0, 16)}...`;
+        const addressInfo = tx.isCoinbase ? ` | From: coinbase` : ` | From: ${tx.address}`;
+        if (tx.isCoinbase) {
+          console.log(chalk.blue(`💰 Received ${tx.amount} PAS${blockInfo}${hashInfo}${addressInfo}`));
+        } else {
+          console.log(chalk.green(`💰 Received ${tx.amount} PAS${blockInfo}${hashInfo}${addressInfo}`));
+        }
+      });
+
+      // Calculate balance from processed transactions
+      let calculatedBalance = 0;
+      walletTransactions.forEach(tx => {
+        if (tx.type === 'received') {
+          calculatedBalance += tx.amount;
+        }
+      });
+      this.cli.localWallet.balance = calculatedBalance;
+      
+      // Update sync state with daemon blockchain state
+      this.cli.localWallet.updateSyncState(
+        currentHeight,
+        blocks[blocks.length - 1]?.hash || null,
+        walletTransactions.length
+      );
+
+      console.log(chalk.green(`✅ Wallet state synced with daemon! Balance: ${this.cli.localWallet.getBalance()} PAS`));
+      console.log(chalk.gray(`📊 Daemon height: ${currentHeight} blocks`));
+      
+      // Auto-save wallet with updated sync state
+      try {
+        this.cli.localWallet.saveWallet(this.cli.walletPath, this.cli.walletPassword);
+        console.log(chalk.cyan('💾 Wallet auto-saved with sync state'));
+      } catch (error) {
+        console.log(chalk.yellow(`⚠️  Failed to auto-save wallet: ${error.message}`));
+      }
+
+      return true;
+
+    } catch (error) {
+      console.log(chalk.red(`❌ Failed to sync wallet state: ${error.message}`));
+      return false;
+    }
+  }
+
+
+
   startWalletSync() {
     // Start periodic sync every 30 seconds
     this.cli.syncInterval = setInterval(async () => {
@@ -518,15 +662,61 @@ class WalletManager {
 
       console.log(chalk.cyan('🔄 Force resyncing wallet from beginning...'));
 
-      // Clear local blockchain and reinitialize
-      this.cli.localBlockchain.clearChain();
+      // Store pending transactions before resync
+      const pendingTransactions = [...this.cli.localBlockchain.pendingTransactions];
+      console.log(chalk.yellow(`⚠️  Preserving ${pendingTransactions.length} pending transactions during resync`));
+
+      // Get daemon blockchain status to ensure compatibility
+      const daemonStatus = await this.cli.makeApiRequest('/api/blockchain/status');
+      if (!daemonStatus) {
+        console.log(chalk.red('❌ Cannot connect to daemon. Check if daemon is running.'));
+        return;
+      }
+
+      console.log(chalk.cyan(`📊 Daemon blockchain: ${daemonStatus.height} blocks, difficulty: ${daemonStatus.difficulty}`));
+
+      // Instead of clearing the chain, load the daemon's blockchain parameters
+      // This ensures compatibility between CLI and daemon
+      try {
+        // Load daemon's blockchain data
+        const daemonResponse = await this.cli.makeApiRequest('/api/blockchain/blocks?limit=1');
+        if (daemonResponse && daemonResponse.blocks && daemonResponse.blocks.length > 0) {
+          const genesisBlock = daemonResponse.blocks[0];
+          console.log(chalk.cyan(`🔗 Daemon genesis block: ${genesisBlock.hash.substring(0, 16)}...`));
+          
+          // Check if our local blockchain is compatible
+          if (this.cli.localBlockchain.chain.length > 0) {
+            const localGenesis = this.cli.localBlockchain.chain[0];
+            if (localGenesis.hash !== genesisBlock.hash) {
+              console.log(chalk.yellow(`⚠️  Local and daemon genesis blocks differ - this is normal for fresh wallets`));
+            }
+          }
+        }
+      } catch (error) {
+        console.log(chalk.yellow(`⚠️  Could not verify daemon blockchain: ${error.message}`));
+      }
       
-      // Reset wallet sync state and clear transaction history
+      // Reset wallet sync state and clear transaction history (but keep blockchain)
       this.cli.localWallet.resetSyncState();
       this.cli.localWallet.clearTransactionHistory();
 
-      // Sync from beginning
-      await this.syncWalletWithDaemon();
+      // Sync wallet with daemon (read-only, don't modify local blockchain)
+      await this.syncWalletWithDaemonReadOnly();
+
+      // Restore pending transactions after sync
+      this.cli.localBlockchain.pendingTransactions = pendingTransactions;
+      console.log(chalk.green(`✅ Restored ${pendingTransactions.length} pending transactions`));
+
+      // Save the restored pending transactions to file
+      if (pendingTransactions.length > 0) {
+        try {
+          const blockchainPath = path.join(this.cli.localBlockchain.dataDir, 'blockchain.json');
+          this.cli.localBlockchain.saveToFile(blockchainPath);
+          console.log(chalk.green(`💾 Saved ${pendingTransactions.length} pending transactions to blockchain.json`));
+        } catch (saveError) {
+          console.log(chalk.red(`❌ Failed to save pending transactions: ${saveError.message}`));
+        }
+      }
 
       console.log(chalk.green('✅ Wallet resync completed'));
 
@@ -662,10 +852,81 @@ class WalletManager {
 
       process.stdin.on('keypress', handleKeypress);
 
-    } catch (error) {
-      console.log(chalk.red(`❌ Error: ${error.message}`));
+          } catch (error) {
+        console.log(chalk.red(`❌ Error: ${error.message}`));
+      }
     }
-  }
+
+    async showTransactionInfo(txId) {
+      try {
+        if (!this.cli.walletLoaded) {
+          console.log(chalk.red('❌ No wallet loaded. Use "wallet load" first.'));
+          return;
+        }
+
+        // Try to find transaction in local history first
+        const localHistory = this.cli.localWallet.getTransactionHistory();
+        const localTx = localHistory.find(tx => tx.id === txId);
+        
+        if (localTx) {
+          console.log(chalk.blue('📋 Transaction Information (Local):'));
+          console.log(chalk.cyan(`  ID: ${localTx.id}`));
+          console.log(chalk.cyan(`  Type: ${localTx.type.toUpperCase()}`));
+          console.log(chalk.cyan(`  Amount: ${localTx.amount} PAS`));
+          if (localTx.fee) console.log(chalk.cyan(`  Fee: ${localTx.fee} PAS`));
+          console.log(chalk.cyan(`  Address: ${localTx.address}`));
+          console.log(chalk.cyan(`  Block Height: ${localTx.blockHeight || 'Pending'}`));
+          console.log(chalk.cyan(`  Timestamp: ${new Date(localTx.timestamp).toLocaleString()}`));
+          console.log(chalk.cyan(`  Status: ${localTx.blockHeight ? 'Confirmed' : 'Pending'}`));
+          return;
+        }
+
+        // Try to get transaction from daemon
+        const connected = await this.cli.checkDaemonConnection();
+        if (connected) {
+          try {
+            const response = await this.cli.makeApiRequest(`/api/blockchain/transactions/${txId}`);
+            if (response) {
+              console.log(chalk.blue('📋 Transaction Information (Network):'));
+              console.log(chalk.cyan(`  ID: ${response.id}`));
+              console.log(chalk.cyan(`  Amount: ${response.outputs.reduce((sum, out) => sum + out.amount, 0)} PAS`));
+              console.log(chalk.cyan(`  Fee: ${response.fee} PAS`));
+              console.log(chalk.cyan(`  Timestamp: ${new Date(response.timestamp).toLocaleString()}`));
+              console.log(chalk.cyan(`  Tag: ${response.tag}`));
+              
+              // Show replay protection info if available
+              if (response.nonce && response.expiresAt) {
+                console.log(chalk.yellow('🛡️  Replay Protection:'));
+                console.log(chalk.cyan(`  Nonce: ${response.nonce.substring(0, 16)}...`));
+                console.log(chalk.cyan(`  Sequence: ${response.sequence || 0}`));
+                console.log(chalk.cyan(`  Expires: ${new Date(response.expiresAt).toLocaleString()}`));
+                
+                const now = Date.now();
+                const expiresAt = response.expiresAt;
+                if (now > expiresAt) {
+                  console.log(chalk.red('  Status: EXPIRED'));
+                } else {
+                  const timeLeft = expiresAt - now;
+                  const hoursLeft = Math.floor(timeLeft / (1000 * 60 * 60));
+                  console.log(chalk.green(`  Status: Valid (${hoursLeft} hours left)`));
+                }
+              } else {
+                console.log(chalk.red('  Replay Protection: NOT AVAILABLE'));
+              }
+            } else {
+              console.log(chalk.red('❌ Transaction not found on network'));
+            }
+          } catch (error) {
+            console.log(chalk.red('❌ Failed to fetch transaction from network'));
+          }
+        } else {
+          console.log(chalk.red('❌ Transaction not found locally and no network connection'));
+        }
+        
+      } catch (error) {
+        console.log(chalk.red(`❌ Error: ${error.message}`));
+      }
+    }
 }
 
 module.exports = WalletManager;

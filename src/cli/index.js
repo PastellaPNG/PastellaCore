@@ -245,6 +245,8 @@ class PastellaCLI {
         console.log(chalk.cyan('  chain checkpoints add                                        - Add new checkpoint'));
         console.log(chalk.cyan('  chain checkpoints update                                     - Update all checkpoints'));
         console.log(chalk.cyan('  chain security                                               - Show security report'));
+        console.log(chalk.cyan('  chain replay-protection                                      - Show replay protection status'));
+        console.log(chalk.cyan('  chain reset                                                  - Reset blockchain (WARNING: DESTRUCTIVE)'));
         console.log('');
         console.log(chalk.yellow.bold('🔐 AUTHENTICATION:'));
         console.log(chalk.cyan('  Use --api-key <key> for authenticated endpoints'));
@@ -253,6 +255,8 @@ class PastellaCLI {
         console.log('');
         console.log(chalk.yellow.bold('🔧 EXAMPLES:'));
         console.log(chalk.cyan('  pastella wallet balance                                      - Check wallet balance'));
+        console.log(chalk.cyan('  pastella wallet send <address> <amount>                        - Send coins with replay protection'));
+        console.log(chalk.cyan('  pastella wallet transaction-info <tx-id>                       - Show transaction details & protection'));
         console.log(chalk.cyan('  pastella gpu-mine start                                      - Start GPU mining'));
         console.log(chalk.cyan('  pastella chain validate checkpoint                           - Fast validation'));
         console.log(chalk.cyan('  pastella chain checkpoints add 100                           - Add checkpoint at height 100'));

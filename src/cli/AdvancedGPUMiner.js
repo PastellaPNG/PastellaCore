@@ -26,7 +26,7 @@ class AdvancedGPUMiner {
     this.lastHashCount = 0;
     this.lastUpdateTime = null;
     this.recentHashRate = 0;
-    this.miningAddress = '15gMoJgXNtpD4pma61gti3m8w2Lw9TopWD';
+    this.miningAddress = '1Q66qLnTYFfLZBafed3RZqGCEG4pgtbCL4';
     
     // KawPow specific
     this.kawPowUtils = new KawPowUtils();

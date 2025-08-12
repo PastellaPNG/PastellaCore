@@ -5,6 +5,8 @@ const AuthMiddleware = require('../utils/auth');
 const InputValidator = require('../utils/validation');
 const { TRANSACTION_TAGS } = require('../utils/constants');
 
+const logger = require('../utils/logger');
+
 class APIServer {
   constructor(blockchain, wallet, miner, p2pNetwork, port = 3002, config = {}) {
     this.blockchain = blockchain;
@@ -58,6 +60,8 @@ class APIServer {
     // Blockchain routes (always available)
     this.app.get('/api/blockchain/status', this.getBlockchainStatus.bind(this));
     this.app.get('/api/blockchain/security', this.getSecurityReport.bind(this));
+    this.app.get('/api/blockchain/replay-protection', this.getReplayProtectionStats.bind(this));
+    this.app.post('/api/blockchain/reset', this.resetBlockchain.bind(this));
     this.app.get('/api/blockchain/blocks', this.getBlocks.bind(this));
     this.app.get('/api/blockchain/blocks/:index', this.getBlock.bind(this));
     this.app.get('/api/blockchain/latest', this.getLatestBlock.bind(this));
@@ -159,6 +163,45 @@ class APIServer {
     try {
       const securityReport = this.blockchain.getSecurityReport();
       res.json(securityReport);
+    } catch (error) {
+      res.status(500).json({
+        error: error.message
+      });
+    }
+  }
+
+  getReplayProtectionStats(req, res) {
+    try {
+      const replayProtectionStats = this.blockchain.getReplayProtectionStats();
+      res.json(replayProtectionStats);
+    } catch (error) {
+      res.status(500).json({
+        error: error.message
+      });
+    }
+  }
+
+  resetBlockchain(req, res) {
+    try {
+      // Clear the blockchain and create new genesis block
+      this.blockchain.clearChain();
+      
+      // Create new genesis block with mandatory replay protection
+      const genesisConfig = {
+        premineAmount: 1000000, // 1 million PAS
+        premineAddress: 'genesis-address',
+        nonce: 0,
+        hash: null, // Will be calculated
+        algorithm: 'kawpow'
+      };
+      
+      this.blockchain.initializeBlockchain(genesisConfig, true);
+      
+      res.json({
+        success: true,
+        message: 'Blockchain reset successfully with mandatory replay protection',
+        genesisBlock: this.blockchain.chain[0]?.toJSON()
+      });
     } catch (error) {
       res.status(500).json({
         error: error.message
@@ -352,13 +395,29 @@ class APIServer {
         tag: (value) => {
           // Tag validation - just return the value as is
           return value;
+        },
+        nonce: (value) => {
+          // Nonce validation for replay protection
+          return InputValidator.validateString(value, { required: false, minLength: 1, maxLength: 100 });
+        },
+        expiresAt: (value) => {
+          // Expiration validation for replay protection
+          return InputValidator.validateNumber(value, { required: false, min: 0 });
+        },
+        sequence: (value) => {
+          // Sequence validation for replay protection
+          return InputValidator.validateNumber(value, { required: false, integer: true, min: 0 });
         }
       };
 
       const validatedTransaction = InputValidator.validateObject(transaction, transactionSchema);
       
       if (!validatedTransaction) {
-        return res.status(400).json({ error: 'Invalid transaction structure or data' });
+        logger.error('API', `Transaction validation failed for transaction ${transaction.id || 'unknown'}`);
+        return res.status(400).json({ 
+          error: 'Invalid transaction structure or data',
+          details: 'Check transaction format and required fields'
+        });
       }
 
       // Validate minimum fee if configured
@@ -373,7 +432,16 @@ class APIServer {
       }
 
       // Add transaction to mempool
-      const success = this.blockchain.addPendingTransaction(validatedTransaction);
+      let success;
+      try {
+        success = this.blockchain.addPendingTransaction(validatedTransaction);
+      } catch (error) {
+        logger.error('API', `Error in addPendingTransaction: ${error.message}`);
+        return res.status(500).json({ 
+          error: 'Failed to add transaction to mempool',
+          details: error.message
+        });
+      }
       
       if (!success) {
         return res.status(400).json({ error: 'Failed to add transaction to mempool' });
@@ -385,6 +453,7 @@ class APIServer {
         message: 'Transaction submitted successfully'
       });
     } catch (error) {
+      logger.error('API', `Unexpected error in submitTransaction: ${error.message}`);
       res.status(500).json({ error: error.message });
     }
   }

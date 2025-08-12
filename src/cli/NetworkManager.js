@@ -20,6 +20,12 @@ class NetworkManager {
       case 'security':
         await this.showSecurityReport();
         break;
+      case 'replay-protection':
+        await this.showReplayProtectionStatus();
+        break;
+      case 'reset':
+        await this.resetBlockchain();
+        break;
       case 'blocks':
         await this.showBlocks(args[1] || '10');
         break;
@@ -111,6 +117,68 @@ class NetworkManager {
       }
     } catch (error) {
       console.log(chalk.red('❌ Failed to get security report:'), error.message);
+    }
+  }
+
+  async showReplayProtectionStatus() {
+    try {
+      const connected = await this.cli.checkDaemonConnection();
+      if (!connected) {
+        console.log(chalk.red('❌ Cannot connect to daemon. Make sure the daemon is running.'));
+        return;
+      }
+
+      const response = await this.cli.makeApiRequest('/api/blockchain/replay-protection');
+      if (response) {
+        console.log(chalk.yellow('═══════════════════════════════════════════════════════════════'));
+        console.log(chalk.yellow.bold('                REPLAY ATTACK PROTECTION STATUS'));
+        console.log(chalk.yellow('═══════════════════════════════════════════════════════════════'));
+        console.log(chalk.cyan('  Protection Status:'), chalk.green('✅ ENABLED'));
+        console.log(chalk.cyan('  Total Pending Transactions:'), chalk.white(response.totalPending || 0));
+        console.log(chalk.cyan('  Valid Transactions:'), chalk.green(response.valid || 0));
+        console.log(chalk.cyan('  Expired Transactions:'), chalk.red(response.expired || 0));
+        console.log(chalk.cyan('  Expiring Soon (< 1 hour):'), chalk.yellow(response.expiringSoon || 0));
+        console.log(chalk.cyan('  Last Cleanup:'), chalk.white(response.lastCleanup || 'Never'));
+        
+        if (response.expired > 0) {
+          console.log(chalk.yellow('\n  🔄 Auto-cleanup will remove expired transactions'));
+        }
+        
+        if (response.expiringSoon > 0) {
+          console.log(chalk.yellow('\n  ⏰ Some transactions will expire soon'));
+        }
+        
+        console.log(chalk.yellow('═══════════════════════════════════════════════════════════════'));
+      }
+    } catch (error) {
+      console.log(chalk.red('❌ Failed to get replay protection status:'), error.message);
+    }
+  }
+
+  async resetBlockchain() {
+    try {
+      const connected = await this.cli.checkDaemonConnection();
+      if (!connected) {
+        console.log(chalk.red('❌ Cannot connect to daemon. Make sure the daemon is running.'));
+        return;
+      }
+
+      console.log(chalk.red('⚠️  WARNING: This will completely reset your blockchain!'));
+      console.log(chalk.red('⚠️  All blocks, transactions, and balances will be lost!'));
+      console.log(chalk.red('⚠️  This action cannot be undone!'));
+      console.log('');
+      
+      const response = await this.cli.makeApiRequest('/api/blockchain/reset', 'POST');
+      if (response && response.success) {
+        console.log(chalk.green('✅ Blockchain reset successfully!'));
+        console.log(chalk.cyan('  New genesis block created with mandatory replay protection'));
+        console.log(chalk.cyan('  All future transactions will require protection fields'));
+        console.log(chalk.cyan('  Start mining to build your new secure chain'));
+      } else {
+        console.log(chalk.red('❌ Failed to reset blockchain:'), response?.error || 'Unknown error');
+      }
+    } catch (error) {
+      console.log(chalk.red('❌ Failed to reset blockchain:'), error.message);
     }
   }
 
