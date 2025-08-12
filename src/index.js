@@ -90,7 +90,7 @@ class PastellaDaemon {
     // Load or create blockchain
     const blockchainPath = path.join(currentConfig.storage.dataDir, currentConfig.storage.blockchainFile);
     try {
-      if (!this.blockchain.loadFromFile(blockchainPath, currentConfig)) {
+      if (!(await this.blockchain.loadFromFile(blockchainPath, currentConfig))) {
         // Check if file exists but validation failed
         if (fs.existsSync(blockchainPath)) {
           logger.error('BLOCKCHAIN', 'Existing blockchain file found but validation failed!');
