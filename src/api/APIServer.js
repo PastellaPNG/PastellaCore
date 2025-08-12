@@ -4,6 +4,7 @@ const path = require('path');
 const AuthMiddleware = require('../utils/auth');
 const InputValidator = require('../utils/validation');
 const { TRANSACTION_TAGS } = require('../utils/constants');
+const RateLimiter = require('../utils/rateLimiter');
 
 const logger = require('../utils/logger');
 
@@ -18,6 +19,9 @@ class APIServer {
     this.app = express();
     this.server = null;
     this.isRunning = false;
+    
+    // Initialize rate limiter for DoS protection
+    this.rateLimiter = new RateLimiter();
     
     // Initialize authentication middleware
     this.auth = new AuthMiddleware(config.api?.apiKey);
@@ -34,18 +38,58 @@ class APIServer {
     this.app.use(express.json());
     this.app.use(express.urlencoded({ extended: true }));
     
+    // Add rate limiting middleware for DoS protection
+    this.app.use(this.rateLimitMiddleware.bind(this));
+    
     // Add authentication middleware for sensitive endpoints
     // These endpoints require a valid API key to prevent unauthorized access
     this.app.use('/api/blocks/submit', this.auth.validateApiKey.bind(this.auth));
     this.app.use('/api/network/connect', this.auth.validateApiKey.bind(this.auth));
     this.app.use('/api/network/message-validation/reset', this.auth.validateApiKey.bind(this.auth));
     this.app.use('/api/network/partition-reset', this.auth.validateApiKey.bind(this.auth));
+    this.app.use('/api/rate-limits', this.auth.validateApiKey.bind(this.auth));
     
     // Add error handling middleware
     this.app.use((error, req, res, next) => {
       console.error(`❌ API Error: ${error.message}`);
       res.status(500).json({ error: error.message });
     });
+  }
+
+  /**
+   * Rate limiting middleware for DoS protection
+   */
+  rateLimitMiddleware(req, res, next) {
+    const clientIP = req.ip || req.connection.remoteAddress || req.headers['x-forwarded-for'] || 'unknown';
+    const endpoint = req.path;
+    
+    // Check if request is allowed
+    if (!this.rateLimiter.isAllowed(clientIP, endpoint)) {
+      const status = this.rateLimiter.getStatus(clientIP, endpoint);
+      
+      logger.warn('API', `Rate limited request from ${clientIP} for ${endpoint}`);
+      
+      return res.status(429).json({
+        error: 'Too Many Requests',
+        message: 'Rate limit exceeded. Please try again later.',
+        rateLimit: {
+          limit: status.limit,
+          remaining: status.remaining,
+          resetTime: new Date(status.resetTime).toISOString(),
+          timeUntilReset: status.timeUntilReset
+        }
+      });
+    }
+    
+    // Add rate limit headers to response
+    const status = this.rateLimiter.getStatus(clientIP, endpoint);
+    res.set({
+      'X-RateLimit-Limit': status.limit,
+      'X-RateLimit-Remaining': status.remaining,
+      'X-RateLimit-Reset': new Date(status.resetTime).toISOString()
+    });
+    
+    next();
   }
 
   /**
@@ -94,6 +138,11 @@ class APIServer {
     // Daemon routes (always available)
     this.app.get('/api/daemon/status', this.getDaemonStatus.bind(this));
 
+    // Rate limiting management routes (admin only)
+    this.app.get('/api/rate-limits/stats', this.getRateLimitStats.bind(this));
+    this.app.post('/api/rate-limits/reset/:ip', this.resetRateLimitsForIP.bind(this));
+    this.app.post('/api/rate-limits/reset-all', this.resetAllRateLimits.bind(this));
+    
     // Utility routes (always available)
     this.app.get('/api/health', this.getHealth.bind(this));
     this.app.get('/api/info', this.getInfo.bind(this));
@@ -818,6 +867,58 @@ class APIServer {
       });
     } catch (error) {
       logger.error('API', `Error resetting partition stats: ${error.message}`);
+      res.status(500).json({ error: 'Internal server error' });
+    }
+  }
+
+  // Rate limiting management endpoints
+  getRateLimitStats(req, res) {
+    try {
+      const stats = this.rateLimiter.getStats();
+      res.json({
+        success: true,
+        data: stats,
+        timestamp: new Date().toISOString()
+      });
+    } catch (error) {
+      logger.error('API', `Error getting rate limit stats: ${error.message}`);
+      res.status(500).json({ error: 'Internal server error' });
+    }
+  }
+
+  resetRateLimitsForIP(req, res) {
+    try {
+      const { ip } = req.params;
+      if (!ip || ip === 'unknown') {
+        return res.status(400).json({
+          error: 'Invalid IP address'
+        });
+      }
+
+      const resetCount = this.rateLimiter.resetForIP(ip);
+      res.json({
+        success: true,
+        message: `Rate limits reset for IP ${ip}`,
+        resetEndpoints: resetCount,
+        timestamp: new Date().toISOString()
+      });
+    } catch (error) {
+      logger.error('API', `Error resetting rate limits for IP: ${error.message}`);
+      res.status(500).json({ error: 'Internal server error' });
+    }
+  }
+
+  resetAllRateLimits(req, res) {
+    try {
+      const resetCount = this.rateLimiter.resetAll();
+      res.json({
+        success: true,
+        message: 'All rate limits reset successfully',
+        resetEntries: resetCount,
+        timestamp: new Date().toISOString()
+      });
+    } catch (error) {
+      logger.error('API', `Error resetting all rate limits: ${error.message}`);
       res.status(500).json({ error: 'Internal server error' });
     }
   }

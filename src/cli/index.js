@@ -246,6 +246,9 @@ class PastellaCLI {
         console.log(chalk.cyan('  chain checkpoints update                                     - Update all checkpoints'));
         console.log(chalk.cyan('  chain security                                               - Show security report'));
         console.log(chalk.cyan('  chain replay-protection                                      - Show replay protection status'));
+        console.log(chalk.cyan('  chain rate-limits                                            - Show rate limiting statistics'));
+        console.log(chalk.cyan('  chain rate-limits reset <ip>                                 - Reset rate limits for specific IP'));
+        console.log(chalk.cyan('  chain rate-limits reset-all                                  - Reset all rate limits'));
         console.log(chalk.cyan('  chain reset                                                  - Reset blockchain (WARNING: DESTRUCTIVE)'));
         console.log('');
         console.log(chalk.yellow.bold('🔐 AUTHENTICATION:'));

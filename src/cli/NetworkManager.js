@@ -23,6 +23,19 @@ class NetworkManager {
       case 'replay-protection':
         await this.showReplayProtectionStatus();
         break;
+      case 'rate-limits':
+        if (args[1] === 'reset') {
+          if (args[2] === 'all') {
+            await this.resetAllRateLimits();
+          } else if (args[2]) {
+            await this.resetRateLimitsForIP(args[2]);
+          } else {
+            await this.showRateLimitStats();
+          }
+        } else {
+          await this.showRateLimitStats();
+        }
+        break;
       case 'reset':
         await this.resetBlockchain();
         break;
@@ -152,6 +165,86 @@ class NetworkManager {
       }
     } catch (error) {
       console.log(chalk.red('❌ Failed to get replay protection status:'), error.message);
+    }
+  }
+
+  async showRateLimitStats() {
+    try {
+      const connected = await this.cli.checkDaemonConnection();
+      if (!connected) {
+        console.log(chalk.red('❌ Cannot connect to daemon. Make sure the daemon is running.'));
+        return;
+      }
+
+      const response = await this.cli.makeApiRequest('/api/rate-limits/stats');
+      if (response && response.success) {
+        const stats = response.data;
+        
+        console.log(chalk.blue('═══════════════════════════════════════════════════════════════'));
+        console.log(chalk.blue.bold('                    RATE LIMITING STATISTICS'));
+        console.log(chalk.blue('═══════════════════════════════════════════════════════════════'));
+        console.log(chalk.cyan('  Total Tracked IPs:'), chalk.white(stats.totalTrackedIPs || 0));
+        console.log(chalk.cyan('  Total Requests:'), chalk.white(stats.totalRequests || 0));
+        
+        if (stats.endpointStats && Object.keys(stats.endpointStats).length > 0) {
+          console.log(chalk.cyan('\n  📊 Endpoint Statistics:'));
+          for (const [endpoint, endpointData] of Object.entries(stats.endpointStats)) {
+            console.log(chalk.cyan(`    ${endpoint}:`));
+            console.log(chalk.white(`      Requests: ${endpointData.requests}`));
+            console.log(chalk.white(`      Unique IPs: ${endpointData.ips}`));
+          }
+        }
+        
+        console.log(chalk.blue('═══════════════════════════════════════════════════════════════'));
+        console.log(chalk.gray('💡 Use "chain rate-limits reset <ip>" to reset limits for specific IP'));
+        console.log(chalk.gray('💡 Use "chain rate-limits reset-all" to reset all limits'));
+      }
+    } catch (error) {
+      console.log(chalk.red('❌ Failed to get rate limit stats:'), error.message);
+    }
+  }
+
+  async resetRateLimitsForIP(ip) {
+    try {
+      const connected = await this.cli.checkDaemonConnection();
+      if (!connected) {
+        console.log(chalk.red('❌ Cannot connect to daemon. Make sure the daemon is running.'));
+        return;
+      }
+
+      console.log(chalk.yellow(`🔄 Resetting rate limits for IP: ${ip}`));
+      
+      const response = await this.cli.makeApiRequest(`/api/rate-limits/reset/${ip}`, 'POST');
+      if (response && response.success) {
+        console.log(chalk.green('✅ Rate limits reset successfully!'));
+        console.log(chalk.cyan(`  Reset ${response.resetEndpoints} endpoint(s) for IP ${ip}`));
+      } else {
+        console.log(chalk.red('❌ Failed to reset rate limits'));
+      }
+    } catch (error) {
+      console.log(chalk.red('❌ Failed to reset rate limits:'), error.message);
+    }
+  }
+
+  async resetAllRateLimits() {
+    try {
+      const connected = await this.cli.checkDaemonConnection();
+      if (!connected) {
+        console.log(chalk.red('❌ Cannot connect to daemon. Make sure the daemon is running.'));
+        return;
+      }
+
+      console.log(chalk.yellow('🔄 Resetting all rate limits...'));
+      
+      const response = await this.cli.makeApiRequest('/api/rate-limits/reset-all', 'POST');
+      if (response && response.success) {
+        console.log(chalk.green('✅ All rate limits reset successfully!'));
+        console.log(chalk.cyan(`  Reset ${response.resetEntries} entries`));
+      } else {
+        console.log(chalk.red('❌ Failed to reset all rate limits'));
+      }
+    } catch (error) {
+      console.log(chalk.red('❌ Failed to reset all rate limits:'), error.message);
     }
   }
 
