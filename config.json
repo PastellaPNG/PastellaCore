@@ -1,6 +1,7 @@
 {
   "name": "Pastella",
   "ticker": "PAS",
+  "decimals": 8,
   "network": {
     "port": 22000,
     "p2pPort": 23000,
@@ -38,7 +39,7 @@
   "wallet": {
     "enabled": false,
     "defaultFee": 0.001,
-    "minFee": 0.0001
+    "minFee": 0.00000100
   },
   "api": {
     "enabled": true,

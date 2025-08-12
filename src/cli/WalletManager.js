@@ -37,7 +37,9 @@ class WalletManager {
           console.log(chalk.red('❌ Usage: wallet send <address> <amount>'));
           return;
         }
-        await this.sendTransaction(args[1], args[2], this.cli.config?.wallet?.defaultFee || 0.001);
+        // Use defaultFee from config, fallback to 0.001 if not configured
+        const TRANSACTION_FEE = this.cli.config?.wallet?.defaultFee || 0.001;
+        await this.sendTransaction(args[1], args[2], TRANSACTION_FEE);
         break;
       case 'info':
         await this.showWalletInfo();
@@ -212,6 +214,11 @@ class WalletManager {
       // Create transaction
       const transaction = this.cli.localWallet.createTransaction(address, amountNum, feeNum, this.cli.localBlockchain);
       
+      if (!transaction) {
+        console.log(chalk.red('❌ Failed to create transaction.'));
+        return;
+      }
+
       // Submit transaction to daemon
       const response = await this.cli.makeApiRequest('/api/blockchain/transactions', 'POST', {
         transaction: transaction.toJSON()

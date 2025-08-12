@@ -17,12 +17,16 @@ class Blockchain {
     this.difficultyAlgorithm = 'lwma3'; // Default to LWMA-3 algorithm
     this.difficultyBlocks = 60; // Default number of blocks for LWMA calculation
     this.difficultyMinimum = 1; // Minimum difficulty floor
+    this.config = null; // Configuration for validation
   }
 
   /**
    * Initialize blockchain with genesis block
    */
   initialize(address, config = null, suppressLogging = false) {
+    // Store config for validation
+    this.config = config;
+    
     // Load configuration values
     if (config && config.blockchain) {
       // Use genesis difficulty as the starting difficulty
@@ -744,7 +748,8 @@ class Blockchain {
       latestBlock.index + 1,
       transactions,
       latestBlock.hash,
-      this.difficulty
+      this.difficulty,
+      this.config
     );
 
     logger.info('BLOCKCHAIN', `Mining block ${newBlock.index} with difficulty ${this.difficulty}`);

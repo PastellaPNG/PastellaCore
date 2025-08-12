@@ -26,7 +26,7 @@ class AdvancedGPUMiner {
     this.lastHashCount = 0;
     this.lastUpdateTime = null;
     this.recentHashRate = 0;
-    this.miningAddress = '1A29rMDZkeQWXUuL2yHanBzXeB6c9ZEe7q';
+    this.miningAddress = '15gMoJgXNtpD4pma61gti3m8w2Lw9TopWD';
     
     // KawPow specific
     this.kawPowUtils = new KawPowUtils();
@@ -619,7 +619,8 @@ class AdvancedGPUMiner {
           height,
           [coinbaseTransaction], // Include the coinbase transaction
           latestBlockFromDaemon.hash,
-          difficulty
+          difficulty,
+          this.cli.config
         );
         
         // Start with a fresh nonce for each new block

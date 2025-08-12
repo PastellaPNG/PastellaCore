@@ -112,6 +112,53 @@ class InputValidator {
   }
 
   /**
+   * Validate and sanitize a cryptocurrency amount with decimal precision
+   * @param {any} input - The amount input
+   * @param {Object} options - Validation options
+   * @param {number} decimals - Number of decimal places allowed (default: 8)
+   * @returns {number|null} - Validated amount or null if invalid
+   */
+  static validateAmount(input, options = {}, decimals = 8) {
+    const {
+      min = 0,
+      max = Infinity,
+      required = false
+    } = options;
+
+    // First validate as a regular number
+    const num = this.validateNumber(input, { min, max, required });
+    if (num === null) {
+      return null;
+    }
+
+    // Check decimal precision
+    const decimalPlaces = this.getDecimalPlaces(num);
+    if (decimalPlaces > decimals) {
+      logger.debug('VALIDATION', `Amount validation failed: too many decimal places (${decimalPlaces} > ${decimals})`);
+      return null;
+    }
+
+    return num;
+  }
+
+  /**
+   * Get the number of decimal places in a number
+   * @param {number} num - The number to check
+   * @returns {number} - Number of decimal places
+   */
+  static getDecimalPlaces(num) {
+    if (Math.floor(num) === num) return 0;
+    const str = num.toString();
+    if (str.indexOf('.') !== -1 && str.indexOf('e-') === -1) {
+      return str.split('.')[1].length;
+    } else if (str.indexOf('e-') !== -1) {
+      const match = str.match(/e-(\d+)/);
+      return match ? parseInt(match[1]) : 0;
+    }
+    return 0;
+  }
+
+  /**
    * Validate and sanitize an email address
    * @param {string} input - The email input
    * @param {Object} options - Validation options

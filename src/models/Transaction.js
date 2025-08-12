@@ -192,7 +192,7 @@ class Transaction {
   /**
    * Check if transaction is valid
    */
-  isValid() {
+  isValid(config = null) {
     if (this.outputs.length === 0) return false;
     if (!this.verify()) return false;
     
@@ -200,6 +200,13 @@ class Transaction {
     
     if (this.isCoinbase) {
       return outputAmount > 0;
+    }
+    
+    // Validate minimum fee if config is provided
+    if (config && config.wallet && config.wallet.minFee !== undefined) {
+      if (this.fee < config.wallet.minFee) {
+        return false;
+      }
     }
     
     // For non-coinbase transactions, we need to validate inputs properly

@@ -3,6 +3,7 @@ const cors = require('cors');
 const path = require('path');
 const AuthMiddleware = require('../utils/auth');
 const InputValidator = require('../utils/validation');
+const { TRANSACTION_TAGS } = require('../utils/constants');
 
 class APIServer {
   constructor(blockchain, wallet, miner, p2pNetwork, port = 3002, config = {}) {
@@ -279,27 +280,84 @@ class APIServer {
 
       // Validate transaction structure with InputValidator
       const transactionSchema = {
-        id: (value) => InputValidator.validateString(value, { required: true, minLength: 1, maxLength: 100 }),
-        inputs: (value) => InputValidator.validateArray(value, (input) => {
-          return InputValidator.validateObject(input, {
-            txHash: (v) => InputValidator.validateHash(v, { required: true }),
-            outputIndex: (v) => InputValidator.validateNumber(v, { required: true, integer: true, min: 0 }),
-            signature: (v) => InputValidator.validateString(v, { required: true, minLength: 1 }),
-            publicKey: (v) => InputValidator.validateString(v, { required: true, minLength: 1 })
-          });
-        }, { required: true, minLength: 1 }),
-        outputs: (value) => InputValidator.validateArray(value, (output) => {
-          return InputValidator.validateObject(output, {
-            address: (v) => InputValidator.validateAddress(v, { required: true }),
-            amount: (v) => InputValidator.validateNumber(v, { required: true, min: 0 }),
-            tag: (v) => InputValidator.validateString(v, { required: false, maxLength: 50 })
-          });
-        }, { required: true, minLength: 1 })
+        id: (value) => {
+          return InputValidator.validateString(value, { required: true, minLength: 1, maxLength: 100 });
+        },
+        inputs: (value) => {
+          return InputValidator.validateArray(value, (input) => {
+            const result = InputValidator.validateObject(input, {
+              txId: (v) => {
+                return InputValidator.validateHash(v, { required: true });
+              },
+              outputIndex: (v) => {
+                return InputValidator.validateNumber(v, { required: true, integer: true, min: 0 });
+              },
+              signature: (v) => {
+                return InputValidator.validateString(v, { required: true, minLength: 1 });
+              },
+              publicKey: (v) => {
+                return InputValidator.validateString(v, { required: true, minLength: 1 });
+              }
+            });
+            return result;
+          }, { required: true, minLength: 1 });
+        },
+        outputs: (value) => {
+          return InputValidator.validateArray(value, (output) => {
+            // First validate the required fields (address, amount)
+            const baseValidation = InputValidator.validateObject(output, {
+              address: (v) => {
+                return InputValidator.validateAddress(v, { required: true });
+              },
+              amount: (v) => {
+                return InputValidator.validateAmount(v, { required: true, min: 0 }, this.config.decimals || 8);
+              }
+            });
+            
+            if (!baseValidation) {
+              return null;
+            }
+            
+            // Add the tag field to the validated output
+            const result = {
+              ...baseValidation,
+              tag: TRANSACTION_TAGS.TRANSACTION
+            };
+            
+            return result;
+          }, { required: true, minLength: 1 });
+        },
+        fee: (value) => {
+          return InputValidator.validateNumber(value, { required: true, min: 0 });
+        },
+        timestamp: (value) => {
+          return InputValidator.validateNumber(value, { required: true, min: 0 });
+        },
+        isCoinbase: (value) => {
+          // Boolean validation - just return the value as is
+          return value;
+        },
+        tag: (value) => {
+          // Tag validation - just return the value as is
+          return value;
+        }
       };
 
       const validatedTransaction = InputValidator.validateObject(transaction, transactionSchema);
+      
       if (!validatedTransaction) {
         return res.status(400).json({ error: 'Invalid transaction structure or data' });
+      }
+
+      // Validate minimum fee if configured
+      if (this.config.wallet && this.config.wallet.minFee !== undefined) {
+        if (!validatedTransaction.fee || validatedTransaction.fee < this.config.wallet.minFee) {
+          return res.status(400).json({ 
+            error: `Transaction fee must be at least ${this.config.wallet.minFee} PAS`,
+            minFee: this.config.wallet.minFee,
+            providedFee: validatedTransaction.fee || 0
+          });
+        }
       }
 
       // Add transaction to mempool

@@ -3,7 +3,7 @@ const { Transaction } = require('./Transaction');
 const logger = require('../utils/logger');
 
 class Block {
-  constructor(index, timestamp, transactions, previousHash, nonce = 0, difficulty = 4) {
+  constructor(index, timestamp, transactions, previousHash, nonce = 0, difficulty = 4, config = null) {
     this.index = index;                    // Block height
     this.timestamp = timestamp;            // Block timestamp
     this.transactions = transactions;      // Array of transactions
@@ -13,6 +13,7 @@ class Block {
     this.hash = null;                      // Block hash
     this.merkleRoot = null;                // Merkle root of transactions
     this.algorithm = 'kawpow';             // Mining algorithm (kawpow or sha256)
+    this.config = config;                  // Configuration for validation
   }
 
   /**
@@ -241,7 +242,7 @@ class Block {
   /**
    * Verify block transactions are valid
    */
-  hasValidTransactions() {
+  hasValidTransactions(config = null) {
     if (!this.transactions || this.transactions.length === 0) {
       return true; // Genesis block has no transactions
     }
@@ -251,7 +252,7 @@ class Block {
       
       // Check if transaction has isValid method (Transaction class instance)
       if (typeof transaction.isValid === 'function') {
-        if (!transaction.isValid()) {
+        if (!transaction.isValid(config)) {
           return false;
         }
       } else {
@@ -280,7 +281,7 @@ class Block {
     }
 
     // Check if transactions are valid
-    if (!this.hasValidTransactions()) {
+    if (!this.hasValidTransactions(this.config)) {
       return false;
     }
 
@@ -325,7 +326,7 @@ class Block {
       genesisTransactions = [coinbaseTransaction];
     }
 
-    const genesisBlock = new Block(0, genesisTimestamp, genesisTransactions, '0', 0, difficulty);
+    const genesisBlock = new Block(0, genesisTimestamp, genesisTransactions, '0', 0, difficulty, genesisConfig);
     
     // Use genesis config if available
     if (genesisConfig && genesisConfig.nonce !== undefined && genesisConfig.hash) {
@@ -346,8 +347,8 @@ class Block {
   /**
    * Create a new block
    */
-  static createBlock(index, transactions, previousHash, difficulty = 4) {
-    const block = new Block(index, Date.now(), transactions, previousHash, 0, difficulty);
+  static createBlock(index, transactions, previousHash, difficulty = 4, config = null) {
+    const block = new Block(index, Date.now(), transactions, previousHash, 0, difficulty, config);
     block.calculateMerkleRoot();
     
     // For KawPow mining, we need to set a temporary hash and ensure algorithm is set
