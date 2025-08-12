@@ -55,7 +55,7 @@ class Blockchain {
   initialize(address, config = null, suppressLogging = false) {
     // Store config for validation
     this.config = config;
-    
+
     // Load configuration values
     if (config && config.blockchain) {
       // Use genesis difficulty as the starting difficulty
@@ -221,13 +221,13 @@ class Blockchain {
       const target = block.calculateTarget();
       const targetNum = BigInt('0x' + target);
       const hashNum = BigInt('0x' + block.hash);
-      
+
       if (hashNum > targetNum) {
         logger.warn('BLOCKCHAIN', `Block ${block.index} does not meet difficulty requirement`);
         logger.warn('BLOCKCHAIN', `Hash: ${block.hash}, Target: ${target}`);
         return false;
       }
-      
+
       // MANDATORY PROTECTION: Reject ALL blocks with unprotected transactions (except genesis)
       if (block.index > 0) {
         for (const tx of block.transactions) {
@@ -238,10 +238,10 @@ class Blockchain {
           }
         }
       }
-      
+
       // Log successful validation
       logger.info('BLOCKCHAIN', `Block ${block.index} validation passed - Proof-of-work verified`);
-      
+
     } catch (error) {
       logger.error('BLOCKCHAIN', `Block ${block.index} proof-of-work validation error: ${error.message}`);
       return false;
@@ -288,7 +288,7 @@ class Blockchain {
       // Load checkpoints
       const checkpoints = this.loadCheckpoints();
       const validCheckpoints = checkpoints.filter(cp => cp.hash && cp.hash.length === 64);
-      
+
       if (validCheckpoints.length > 0) {
         logger.info('BLOCKCHAIN', `Found ${validCheckpoints.length} valid checkpoints for fast validation`);
       }
@@ -320,7 +320,7 @@ class Blockchain {
       // Find the highest checkpoint we can use
       let lastCheckpointHeight = 0;
       let lastCheckpointHash = '0';
-      
+
       for (const checkpoint of validCheckpoints) {
         if (checkpoint.height < this.chain.length && checkpoint.height > lastCheckpointHeight) {
           lastCheckpointHeight = checkpoint.height;
@@ -330,7 +330,7 @@ class Blockchain {
 
       if (lastCheckpointHeight > 0) {
         logger.info('BLOCKCHAIN', `Using checkpoint at height ${lastCheckpointHeight} for fast validation`);
-        
+
         // Verify checkpoint hash matches
         const checkpointBlock = this.chain[lastCheckpointHeight];
         if (checkpointBlock && checkpointBlock.hash === lastCheckpointHash) {
@@ -346,9 +346,9 @@ class Blockchain {
       const totalBlocks = this.chain.length;
       const progressInterval = 50; // Show progress every 50 blocks
       const startIndex = lastCheckpointHeight + 1;
-      
+
       logger.info('BLOCKCHAIN', `Starting detailed validation from block ${startIndex}`);
-      
+
       for (let i = startIndex; i < this.chain.length; i++) {
         try {
           const currentBlock = this.chain[i];
@@ -426,7 +426,7 @@ class Blockchain {
       // Read current checkpoints
       const checkpointsData = fs.readFileSync(checkpointsPath, 'utf8');
       const checkpoints = JSON.parse(checkpointsData);
-      
+
       // Update checkpoints with current blockchain hashes
       let updated = false;
       for (const checkpoint of checkpoints.checkpoints) {
@@ -445,7 +445,7 @@ class Blockchain {
       if (updated) {
         // Update metadata
         checkpoints.metadata.lastUpdated = new Date().toISOString();
-        
+
         // Write back to file
         fs.writeFileSync(checkpointsPath, JSON.stringify(checkpoints, null, 2));
         logger.info('BLOCKCHAIN', 'Checkpoints file updated successfully');
@@ -479,7 +479,7 @@ class Blockchain {
       // Read current checkpoints
       const checkpointsData = fs.readFileSync(checkpointsPath, 'utf8');
       const checkpoints = JSON.parse(checkpointsData);
-      
+
       // Check if checkpoint already exists at this height
       const existingIndex = checkpoints.checkpoints.findIndex(cp => cp.height === height);
       if (existingIndex !== -1) {
@@ -497,13 +497,13 @@ class Blockchain {
       };
 
       checkpoints.checkpoints.push(newCheckpoint);
-      
+
       // Sort checkpoints by height
       checkpoints.checkpoints.sort((a, b) => a.height - b.height);
-      
+
       // Update metadata
       checkpoints.metadata.lastUpdated = new Date().toISOString();
-      
+
       // Write back to file
       fs.writeFileSync(checkpointsPath, JSON.stringify(checkpoints, null, 2));
       logger.info('BLOCKCHAIN', `Added checkpoint at height ${height}: ${block.hash.substring(0, 16)}...`);
@@ -568,11 +568,11 @@ class Blockchain {
       // Validate all subsequent blocks with optimized duplicate checking
       const totalBlocks = this.chain.length;
       const progressInterval = Math.max(50, Math.floor(totalBlocks / 20)); // Dynamic progress interval
-      
-    for (let i = 1; i < this.chain.length; i++) {
+
+      for (let i = 1; i < this.chain.length; i++) {
         try {
-      const currentBlock = this.chain[i];
-      const previousBlock = this.chain[i - 1];
+          const currentBlock = this.chain[i];
+          const previousBlock = this.chain[i - 1];
 
           // Show progress every 50 blocks
           if (i % progressInterval === 0 || i === totalBlocks - 1) {
@@ -595,15 +595,15 @@ class Blockchain {
             logger.error('BLOCKCHAIN', `Block index sequence broken at index ${i}: expected ${previousBlock.index + 1}, got ${currentBlock.index}`);
             return false;
           }
-      
-      // Check if current block is valid
-      if (!currentBlock.isValid()) {
+
+          // Check if current block is valid
+          if (!currentBlock.isValid()) {
             logger.error('BLOCKCHAIN', `Block at index ${i} (${currentBlock.hash ? currentBlock.hash.substring(0, 16) : 'NO_HASH'}...) validation failed`);
-        return false;
-      }
-      
-      // Check if block is properly linked
-      if (currentBlock.previousHash !== previousBlock.hash) {
+            return false;
+          }
+
+          // Check if block is properly linked
+          if (currentBlock.previousHash !== previousBlock.hash) {
             logger.error('BLOCKCHAIN', `Block at index ${i} is not properly linked to previous block`);
             logger.error('BLOCKCHAIN', `  Expected previous hash: ${previousBlock.hash}`);
             logger.error('BLOCKCHAIN', `  Got previous hash: ${currentBlock.previousHash}`);
@@ -618,12 +618,12 @@ class Blockchain {
           seenHashes.add(currentBlock.hash);
         } catch (blockError) {
           logger.error('BLOCKCHAIN', `Error validating block at index ${i}: ${blockError.message}`);
-        return false;
+          return false;
+        }
       }
-    }
-    
+
       logger.info('BLOCKCHAIN', 'Blockchain validation completed successfully');
-    return true;
+      return true;
     } catch (error) {
       logger.error('BLOCKCHAIN', `Blockchain validation error: ${error.message}`);
       return false;
@@ -638,25 +638,25 @@ class Blockchain {
     // Calculate total proof-of-work for each chain
     const currentChainWork = this.calculateChainWork(this.chain);
     const newChainWork = this.calculateChainWork(newChain);
-    
+
     logger.info('BLOCKCHAIN', `Fork resolution: Current chain work: ${currentChainWork}, New chain work: ${newChainWork}`);
-    
+
     // Only accept chain with MORE proof-of-work, not just longer
     if (newChainWork > currentChainWork && this.isValidChain(newChain)) {
       logger.info('BLOCKCHAIN', `Replacing chain with higher proof-of-work chain (work: ${currentChainWork} → ${newChainWork})`);
-      
+
       // Store current pending transactions before replacing chain
       const currentPendingTransactions = [...this.pendingTransactions];
       logger.info('BLOCKCHAIN', `Preserving ${currentPendingTransactions.length} pending transactions during fork resolution`);
-      
+
       // Replace the chain
       this.chain = newChain;
       this.rebuildUTXOSet();
-      
+
       // Restore pending transactions (they might still be valid)
       this.pendingTransactions = currentPendingTransactions;
       logger.info('BLOCKCHAIN', `Restored ${this.pendingTransactions.length} pending transactions after fork resolution`);
-      
+
       return true;
     } else {
       logger.info('BLOCKCHAIN', `Rejecting fork: insufficient proof-of-work or invalid chain`);
@@ -670,15 +670,15 @@ class Blockchain {
    */
   calculateChainWork(chain) {
     if (!chain || chain.length === 0) return BigInt(0);
-    
+
     let totalWork = BigInt(0);
-    
+
     for (const block of chain) {
       try {
         const target = block.calculateTarget();
         const targetNum = BigInt('0x' + target);
         const maxTarget = BigInt('0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff');
-        
+
         // Calculate work as maxTarget / target (higher difficulty = more work)
         if (targetNum > 0) {
           const blockWork = maxTarget / targetNum;
@@ -689,7 +689,7 @@ class Blockchain {
         // Continue with other blocks
       }
     }
-    
+
     return totalWork;
   }
 
@@ -734,7 +734,7 @@ class Blockchain {
         const target = currentBlock.calculateTarget();
         const targetNum = BigInt('0x' + target);
         const hashNum = BigInt('0x' + currentBlock.hash);
-        
+
         if (hashNum > targetNum) {
           logger.warn('BLOCKCHAIN', `Chain replacement validation failed: block ${i} does not meet difficulty requirement`);
           return false;
@@ -744,7 +744,7 @@ class Blockchain {
         return false;
       }
     }
-    
+
     logger.info('BLOCKCHAIN', `Chain replacement validation passed for ${chain.length} blocks`);
     return true;
   }
@@ -778,7 +778,7 @@ class Blockchain {
       // Process blocks in batches for parallel validation
       const batchSize = 100;
       const batches = [];
-      
+
       for (let i = 1; i < this.chain.length; i += batchSize) {
         const batch = this.chain.slice(i, Math.min(i + batchSize, this.chain.length));
         batches.push({ startIndex: i, blocks: batch });
@@ -787,7 +787,7 @@ class Blockchain {
       // Validate batches sequentially but with optimized duplicate checking
       for (const batch of batches) {
         const { startIndex, blocks } = batch;
-        
+
         for (let j = 0; j < blocks.length; j++) {
           const currentBlock = blocks[j];
           const blockIndex = startIndex + j;
@@ -842,8 +842,8 @@ class Blockchain {
     let transactionInstance = transaction;
     if (typeof transaction === 'object' && !transaction.isValid) {
       try {
-      const { Transaction } = require('./Transaction');
-      transactionInstance = Transaction.fromJSON(transaction);
+        const { Transaction } = require('./Transaction');
+        transactionInstance = Transaction.fromJSON(transaction);
       } catch (error) {
         logger.error('BLOCKCHAIN', `Failed to convert transaction to Transaction instance: ${error.message}`);
         return false;
@@ -888,11 +888,11 @@ class Blockchain {
         return false;
       }
     }
-    
+
     if (transactionInstance.isValid()) {
       this.pendingTransactions.push(transactionInstance);
       logger.info('BLOCKCHAIN', `Transaction ${transactionInstance.id} added to pending pool with mandatory replay protection`);
-      
+
       // Save pending transactions to file so they persist across daemon restarts
       try {
         const blockchainPath = path.join(this.dataDir, 'blockchain.json');
@@ -901,10 +901,10 @@ class Blockchain {
         logger.error('BLOCKCHAIN', `Failed to save pending transactions: ${saveError.message}`);
         // Don't fail the transaction addition if saving fails
       }
-      
+
       return true;
     }
-    
+
     logger.warn('BLOCKCHAIN', 'Invalid transaction, not added to pending pool');
     return false;
   }
@@ -922,7 +922,7 @@ class Blockchain {
    */
   cleanupExpiredTransactions() {
     const initialCount = this.pendingTransactions.length;
-    
+
     this.pendingTransactions = this.pendingTransactions.filter(tx => {
       if (tx.isExpired && tx.isExpired()) {
         logger.debug('BLOCKCHAIN', `Removing expired transaction ${tx.id} from pending pool`);
@@ -930,12 +930,12 @@ class Blockchain {
       }
       return true;
     });
-    
+
     const removedCount = initialCount - this.pendingTransactions.length;
     if (removedCount > 0) {
       logger.info('BLOCKCHAIN', `Cleaned up ${removedCount} expired transactions from pending pool`);
     }
-    
+
     return removedCount;
   }
 
@@ -1384,7 +1384,7 @@ class Blockchain {
 
         // Load UTXO set
         try {
-    this.utxoSet = new Map(Object.entries(data.utxoSet));
+          this.utxoSet = new Map(Object.entries(data.utxoSet));
         } catch (utxoError) {
           logger.error('BLOCKCHAIN', `Failed to load UTXO set: ${utxoError.message}`);
           throw new Error(`UTXO set loading failed: ${utxoError.message}`);
@@ -1470,7 +1470,7 @@ class Blockchain {
    */
   getStatus() {
     const currentChainWork = this.calculateChainWork(this.chain);
-    
+
     return {
       length: this.chain.length,
       height: this.chain.length, // Add height for API consistency
@@ -1488,7 +1488,7 @@ class Blockchain {
    */
   getSecurityLevel(chainWork) {
     const workNum = Number(chainWork);
-    
+
     if (workNum < 1000) return 'LOW';
     if (workNum < 10000) return 'MEDIUM';
     if (workNum < 100000) return 'HIGH';
@@ -1502,11 +1502,11 @@ class Blockchain {
   getReplayProtectionStats() {
     const now = Date.now();
     const pendingTransactions = this.pendingTransactions;
-    
+
     let expiredCount = 0;
     let expiringSoonCount = 0; // Expires within 1 hour
     let validCount = 0;
-    
+
     pendingTransactions.forEach(tx => {
       if (tx.isExpired && tx.isExpired()) {
         expiredCount++;
@@ -1516,7 +1516,7 @@ class Blockchain {
         validCount++;
       }
     });
-    
+
     return {
       totalPending: pendingTransactions.length,
       expired: expiredCount,
@@ -1534,38 +1534,38 @@ class Blockchain {
     const currentChainWork = this.calculateChainWork(this.chain);
     const latestBlock = this.getLatestBlock();
     const recentBlocks = this.chain.slice(-10); // Last 10 blocks
-    
+
     // Calculate average block time
     let totalBlockTime = 0;
     let blockCount = 0;
-    
+
     for (let i = 1; i < recentBlocks.length; i++) {
       const timeDiff = recentBlocks[i].timestamp - recentBlocks[i - 1].timestamp;
       totalBlockTime += timeDiff;
       blockCount++;
     }
-    
+
     const avgBlockTime = blockCount > 0 ? totalBlockTime / blockCount : 0;
-    
+
     // Security assessments
     const securityIssues = [];
-    
+
     if (avgBlockTime < 5000) { // Less than 5 seconds
       securityIssues.push('SUSPICIOUS: Blocks are being mined too quickly (possible attack)');
     }
-    
+
     if (this.chain.length > 100 && currentChainWork < 1000) {
       securityIssues.push('WARNING: Chain has low proof-of-work despite length (possible attack)');
     }
-    
+
     // Check for difficulty manipulation
     const recentDifficulty = recentBlocks.slice(-5).map(b => b.difficulty);
     const difficultyVariance = Math.max(...recentDifficulty) - Math.min(...recentDifficulty);
-    
+
     if (difficultyVariance > this.difficulty * 0.5) {
       securityIssues.push('WARNING: Large difficulty variance detected (possible manipulation)');
     }
-    
+
     return {
       chainLength: this.chain.length,
       totalChainWork: currentChainWork.toString(),
@@ -1586,9 +1586,9 @@ class Blockchain {
    */
   getTotalSupply() {
     return this.chain.reduce((total, block) => {
-        return total + block.transactions.reduce((blockTotal, tx) => {
-          return blockTotal + tx.outputs.reduce((txTotal, output) => txTotal + output.amount, 0);
-        }, 0);
+      return total + block.transactions.reduce((blockTotal, tx) => {
+        return blockTotal + tx.outputs.reduce((txTotal, output) => txTotal + output.amount, 0);
+      }, 0);
     }, 0);
   }
 
@@ -1597,7 +1597,7 @@ class Blockchain {
    */
   async validateChain() {
     const chainLength = this.chain?.length || 0;
-    
+
     if (chainLength === 0) {
       return false;
     }
@@ -1612,7 +1612,7 @@ class Blockchain {
    */
   async validateChainWithLevel(level = 'auto') {
     const chainLength = this.chain?.length || 0;
-    
+
     if (chainLength === 0) {
       return false;
     }
@@ -1621,19 +1621,19 @@ class Blockchain {
       case 'lightning':
         logger.info('BLOCKCHAIN', 'Using lightning-fast validation (basic integrity only)');
         return this.isValidChainLightning();
-        
+
       case 'ultra-fast':
         logger.info('BLOCKCHAIN', 'Using ultra-fast validation (chain integrity + basic checks)');
         return this.isValidChainUltraFast();
-        
+
       case 'standard':
         logger.info('BLOCKCHAIN', 'Using standard validation (full block validation)');
         return this.isValidChain();
-        
+
       case 'full':
         logger.info('BLOCKCHAIN', 'Using full validation (including KawPow verification)');
         return this.isValidChain();
-        
+
       case 'auto':
       default:
         return this.validateChain();
@@ -1654,10 +1654,10 @@ class Blockchain {
 
       // Only check the most critical: chain linking and duplicates
       const seenHashes = new Set();
-      
+
       for (let i = 0; i < this.chain.length; i++) {
         const currentBlock = this.chain[i];
-        
+
         if (!currentBlock) {
           return false;
         }
@@ -1711,7 +1711,7 @@ class Blockchain {
       // Ultra-fast validation: only check chain integrity, not block proofs
       const totalBlocks = this.chain.length;
       const progressInterval = Math.max(500, Math.floor(totalBlocks / 40)); // More frequent progress
-      
+
       for (let i = 1; i < this.chain.length; i++) {
         const currentBlock = this.chain[i];
         const previousBlock = this.chain[i - 1];
