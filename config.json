@@ -4,8 +4,7 @@
   "network": {
     "port": 22000,
     "p2pPort": 23000,
-    "maxPeers": 10,
-    "peerDiscoveryTimeout": 5000,
+    "maxPeers": 80000,
     "minSeedConnections": 2,
     "seedNodes": [
       "ws://localhost:23000",
@@ -17,7 +16,6 @@
     "blockTime": 15000,
     "maxBlockSize": 1000000,
     "coinbaseReward": 50,
-    "halvingInterval": 210000,
     "difficultyAlgorithm": "lwma3",
     "difficultyBlocks": 60,
     "difficultyMinimum": 1,

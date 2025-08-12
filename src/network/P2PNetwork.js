@@ -23,7 +23,6 @@ class P2PNetwork {
     this.wss = null;
     this.isRunning = false;
     this.messageHandlers = new Map();
-    this.peerDiscoveryTimeout = 5000;
     this.maxPeers = 10;
     this.config = config;
     this.seedNodes = [];
