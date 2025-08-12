@@ -316,14 +316,7 @@ class APIServer {
     }
   }
 
-
-
-
-
-
-
-
-
+  
   // Network endpoints
   getNetworkStatus(req, res) {
     try {
