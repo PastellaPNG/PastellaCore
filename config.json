@@ -38,8 +38,7 @@
   "wallet": {
     "enabled": false,
     "defaultFee": 0.001,
-    "minFee": 0.0001,
-    "defaultPath": "./data/wallet.json"
+    "minFee": 0.0001
   },
   "api": {
     "enabled": true,
@@ -49,7 +48,6 @@
   },
   "storage": {
     "dataDir": "./data",
-    "walletFile": "wallet.json",
     "blockchainFile": "blockchain.json",
     "mempoolFile": "mempool.json"
   },
