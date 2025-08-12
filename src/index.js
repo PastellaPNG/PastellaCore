@@ -68,7 +68,6 @@ class PastellaDaemon {
     console.log(chalk.gray.bold('💾 STORAGE:'));
     console.log(chalk.gray('  • Data Directory: '), chalk.white.bold(currentConfig.storage.dataDir));
     console.log(chalk.gray('  • Blockchain File:'), chalk.white.bold(currentConfig.storage.blockchainFile));
-    console.log(chalk.gray('  • Wallet File:    '), chalk.white.bold(currentConfig.storage.walletFile));
     console.log(chalk.gray('  • Mempool File:   '), chalk.white.bold(currentConfig.storage.mempoolFile));
     console.log('');
   }
