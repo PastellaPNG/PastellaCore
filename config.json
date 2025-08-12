@@ -1,4 +1,6 @@
 {
+  "name": "Pastella",
+  "ticker": "PAS",
   "network": {
     "port": 22000,
     "p2pPort": 23000,
