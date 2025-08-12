@@ -410,17 +410,23 @@ class APIServer {
   }
 
   getInfo(req, res) {
+    console.log(this.config);
     res.json({
-        name: 'Pastella (PAS)',
+        name: this.config.name,
+        ticker: this.config.ticker,
         version: '1.0.0',
-        description: 'NodeJS Cryptocurrency Implementation',
-        features: [
-          'Proof of Work Mining',
-          'UTXO Model',
-          'P2P Networking',
-          'REST API',
-          'Wallet Management'
-        ]
+        uptime: process.uptime(),
+        apiPort: this.port,
+        p2pPort: this.p2pPort,
+        height: this.blockchain.chain.length,
+        difficulty: this.blockchain.difficulty,
+        pendingTransactions: this.blockchain.pendingTransactions.length,
+        blockTime: this.config.blockchain.blockTime,
+        coinbaseReward: this.config.blockchain.coinbaseReward,
+        premineReward: this.config.blockchain.genesis.premineAmount,
+        defaultFee: this.config.wallet.defaultFee,
+        minFee: this.config.wallet.minFee,
+        description: '',
     });
   }
 
