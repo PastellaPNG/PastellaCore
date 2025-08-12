@@ -136,6 +136,8 @@ class InteractiveMode {
     console.log(chalk.cyan('  chain checkpoints add <height>     - Add checkpoint at height'));
     console.log(chalk.cyan('  chain checkpoints update           - Update all checkpoints'));
     console.log(chalk.cyan('  chain checkpoints clear            - Clear all checkpoints'));
+    console.log(chalk.cyan('  chain checkpoints clear            - Clear all checkpoints'));
+    console.log(chalk.cyan('  chain security                     - Show security report'));
     console.log('');
     
     console.log(chalk.yellow.bold('🌐 NETWORK COMMANDS:'));

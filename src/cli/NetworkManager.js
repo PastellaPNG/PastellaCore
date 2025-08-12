@@ -17,6 +17,9 @@ class NetworkManager {
       case 'status':
         await this.showChainStatus();
         break;
+      case 'security':
+        await this.showSecurityReport();
+        break;
       case 'blocks':
         await this.showBlocks(args[1] || '10');
         break;
@@ -56,6 +59,13 @@ class NetworkManager {
       console.log(chalk.cyan(`Difficulty: ${response.difficulty}`));
       console.log(chalk.cyan(`Pending Transactions: ${response.pendingTransactions || 0}`));
       
+      if (response.chainWork) {
+        console.log(chalk.cyan(`Chain Work: ${response.chainWork}`));
+      }
+      if (response.securityLevel) {
+        console.log(chalk.cyan(`Security Level: ${response.securityLevel}`));
+      }
+      
       if (response.latestBlock) {
         console.log(chalk.cyan(`Latest Block: ${response.latestBlock.hash.substring(0, 16)}...`));
         console.log(chalk.cyan(`Block Time: ${new Date(response.latestBlock.timestamp).toLocaleString()}`));
@@ -63,6 +73,44 @@ class NetworkManager {
       
     } catch (error) {
       console.log(chalk.red(`❌ Error: ${error.message}`));
+    }
+  }
+
+  async showSecurityReport() {
+    try {
+      const connected = await this.cli.checkDaemonConnection();
+      if (!connected) {
+        console.log(chalk.red('❌ Cannot connect to daemon. Make sure the daemon is running.'));
+        return;
+      }
+
+      const response = await this.cli.makeApiRequest('/api/blockchain/security');
+      if (response) {
+        console.log(chalk.red('═══════════════════════════════════════════════════════════════'));
+        console.log(chalk.red.bold('                    SECURITY REPORT'));
+        console.log(chalk.red('═══════════════════════════════════════════════════════════════'));
+        console.log(chalk.cyan('  Chain Length:'), chalk.white(response.chainLength || 0));
+        console.log(chalk.cyan('  Total Chain Work:'), chalk.white(response.totalChainWork || 0));
+        console.log(chalk.cyan('  Security Level:'), chalk.white(response.securityLevel || 'UNKNOWN'));
+        console.log(chalk.cyan('  Average Block Time:'), chalk.white(`${response.averageBlockTime || 0}ms`));
+        console.log(chalk.cyan('  Current Difficulty:'), chalk.white(response.currentDifficulty || 0));
+        console.log(chalk.cyan('  Difficulty Variance:'), chalk.white(response.difficultyVariance || 0));
+        console.log(chalk.cyan('  Pending Transactions:'), chalk.white(response.pendingTransactions || 0));
+        
+        if (response.securityIssues && response.securityIssues.length > 0) {
+          console.log(chalk.red('\n  🚨 SECURITY ISSUES DETECTED:'));
+          response.securityIssues.forEach(issue => {
+            console.log(chalk.red(`    • ${issue}`));
+          });
+          console.log(chalk.red(`\n  Recommendation: ${response.recommendation}`));
+        } else {
+          console.log(chalk.green('\n  ✅ No security issues detected'));
+        }
+        
+        console.log(chalk.red('═══════════════════════════════════════════════════════════════'));
+      }
+    } catch (error) {
+      console.log(chalk.red('❌ Failed to get security report:'), error.message);
     }
   }
 

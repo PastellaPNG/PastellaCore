@@ -244,6 +244,7 @@ class PastellaCLI {
         console.log(chalk.cyan('  chain checkpoints list                                       - Show all checkpoints'));
         console.log(chalk.cyan('  chain checkpoints add                                        - Add new checkpoint'));
         console.log(chalk.cyan('  chain checkpoints update                                     - Update all checkpoints'));
+        console.log(chalk.cyan('  chain security                                               - Show security report'));
         console.log('');
         console.log(chalk.yellow.bold('🔐 AUTHENTICATION:'));
         console.log(chalk.cyan('  Use --api-key <key> for authenticated endpoints'));
