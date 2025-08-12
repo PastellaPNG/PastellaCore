@@ -247,6 +247,14 @@ class Block {
       return true; // Genesis block has no transactions
     }
 
+    // CRITICAL: First transaction must be coinbase
+    if (this.transactions.length > 0) {
+      const firstTx = this.transactions[0];
+      if (!firstTx.isCoinbase) {
+        return false; // First transaction must be coinbase
+      }
+    }
+
     for (let i = 0; i < this.transactions.length; i++) {
       const transaction = this.transactions[i];
       
@@ -259,6 +267,15 @@ class Block {
         // For plain objects loaded from JSON, do basic validation
         if (!transaction.id || !transaction.outputs || transaction.outputs.length === 0) {
           return false;
+        }
+        
+        // Additional validation for plain objects
+        if (i === 0 && !transaction.isCoinbase) {
+          return false; // First transaction must be coinbase
+        }
+        
+        if (i > 0 && transaction.isCoinbase) {
+          return false; // Only first transaction can be coinbase
         }
       }
     }

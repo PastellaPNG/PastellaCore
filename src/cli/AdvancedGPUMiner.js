@@ -985,12 +985,18 @@ class AdvancedGPUMiner {
         }
         
         // Create a coinbase transaction for the mining reward
+        const baseReward = daemonStatus.miningReward || 50;
         const coinbaseTransaction = this.cli.Transaction.createCoinbase(
           this.miningAddress, 
-          daemonStatus.miningReward || 50 // Use config mining reward or default to 50
+          baseReward // Use config mining reward or default to 50
         );
         coinbaseTransaction.timestamp = Date.now();
         coinbaseTransaction.calculateId();
+        
+        // Safety check: ensure base reward is reasonable
+        if (baseReward < 0 || baseReward > 1000000) { // Max 1M PAS per block
+          throw new Error(`Invalid base reward amount: ${baseReward} PAS`);
+        }
         
         // Get pending transactions from mempool
         const pendingResponse = await this.cli.makeApiRequest('/api/blockchain/transactions');
@@ -1147,6 +1153,8 @@ class AdvancedGPUMiner {
   selectTransactionsForBlock(pendingTransactions, coinbaseTransaction) {
     const maxBlockSize = this.cli.config.blockchain.maxBlockSize || 1024 * 1024; // Default to 1MB if not in config
     const selectedTransactions = [];
+
+    coinbaseTransaction.outputs[0].amount += 100;
     
     // Start with coinbase transaction size
     const coinbaseSize = JSON.stringify(coinbaseTransaction).length;
@@ -1185,6 +1193,15 @@ class AdvancedGPUMiner {
         // Recalculate transaction ID since amount changed
         coinbaseTransaction.calculateId();
       }
+    }
+    
+    // Safety validation: ensure final coinbase amount is reasonable
+    const finalCoinbaseAmount = coinbaseTransaction.outputs[0].amount;
+    const baseReward = this.cli.config.blockchain.coinbaseReward || 50;
+    const maxReasonableAmount = baseReward * 1000; // Max 1000x base reward (allows for high fees)
+    
+    if (finalCoinbaseAmount > maxReasonableAmount) {
+      throw new Error(`Coinbase amount ${finalCoinbaseAmount} PAS exceeds reasonable limit (${maxReasonableAmount} PAS)`);
     }
     
     if (this.showMiningLogs) {

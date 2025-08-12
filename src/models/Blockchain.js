@@ -144,7 +144,7 @@ class Blockchain {
 
     // Verify block
     if (!this.isValidBlock(block)) {
-      console.log('Invalid block, cannot add to chain');
+      logger.warn('BLOCKCHAIN', 'Block will not be added to the chain!');
       return false;
     }
 
@@ -239,6 +239,15 @@ class Blockchain {
         }
       }
 
+      // CRITICAL SECURITY: Validate coinbase transaction and transaction fees
+      if (block.index > 0) {
+        const validationResult = this.validateBlockTransactions(block);
+        if (!validationResult.valid) {
+          logger.error('BLOCKCHAIN', `Block ${block.index} REJECTED: ${validationResult.reason}`);
+          return false;
+        }
+      }
+
       // Log successful validation
       logger.info('BLOCKCHAIN', `Block ${block.index} validation passed - Proof-of-work verified`);
 
@@ -248,6 +257,170 @@ class Blockchain {
     }
 
     return true;
+  }
+
+  /**
+   * CRITICAL SECURITY: Validate block transactions including coinbase and fees
+   * This prevents miners from manipulating rewards and transaction amounts
+   */
+  validateBlockTransactions(block) {
+    try {
+      // Must have at least one transaction (coinbase)
+      if (!block.transactions || block.transactions.length === 0) {
+        return { valid: false, reason: 'Block must contain at least one transaction' };
+      }
+
+      // First transaction must be coinbase
+      const coinbaseTx = block.transactions[0];
+      if (!coinbaseTx || !coinbaseTx.isCoinbase) {
+        return { valid: false, reason: 'First transaction must be coinbase transaction' };
+      }
+
+      // Get expected coinbase reward from config
+      const expectedBaseReward = this.config?.blockchain?.coinbaseReward || 50;
+      
+      // Calculate total transaction fees from non-coinbase transactions
+      let totalFees = 0;
+      const nonCoinbaseTransactions = block.transactions.slice(1);
+      
+      for (const tx of nonCoinbaseTransactions) {
+        if (tx.isCoinbase) {
+          return { valid: false, reason: 'Only first transaction can be coinbase' };
+        }
+        
+        // Validate transaction fee
+        if (typeof tx.fee !== 'number' || tx.fee < 0) {
+          return { valid: false, reason: `Invalid transaction fee: ${tx.fee}` };
+        }
+        
+        // Check minimum fee if config is available
+        if (this.config?.wallet?.minFee !== undefined && tx.fee < this.config.wallet.minFee) {
+          return { valid: false, reason: `Transaction fee ${tx.fee} below minimum ${this.config.wallet.minFee}` };
+        }
+        
+        totalFees += tx.fee;
+      }
+
+      // Calculate expected total coinbase amount
+      const expectedTotalReward = expectedBaseReward + totalFees;
+      
+      // Get actual coinbase amount
+      const actualCoinbaseAmount = coinbaseTx.getOutputAmount ? coinbaseTx.getOutputAmount() : 
+                                  (coinbaseTx.outputs && coinbaseTx.outputs.length > 0 ? 
+                                   coinbaseTx.outputs.reduce((sum, output) => sum + (output.amount || 0), 0) : 0);
+
+      // CRITICAL: Validate coinbase amount matches expected reward + fees
+      if (Math.abs(actualCoinbaseAmount - expectedTotalReward) > 0.00000001) { // Allow for floating point precision
+        logger.error('BLOCKCHAIN', `COINBASE MANIPULATION DETECTED in block ${block.index}!`);
+        logger.error('BLOCKCHAIN', `Expected: ${expectedTotalReward} PAS (${expectedBaseReward} base + ${totalFees} fees)`);
+        logger.error('BLOCKCHAIN', `Actual: ${actualCoinbaseAmount} PAS`);
+        logger.error('BLOCKCHAIN', `Difference: ${Math.abs(actualCoinbaseAmount - expectedTotalReward)} PAS`);
+        return { 
+          valid: false, 
+          reason: `Coinbase amount manipulation detected. Expected: ${expectedTotalReward} PAS, Actual: ${actualCoinbaseAmount} PAS` 
+        };
+      }
+
+      // Validate individual transaction amounts and UTXOs
+      for (const tx of nonCoinbaseTransactions) {
+        const validationResult = this.validateTransaction(tx);
+        if (!validationResult.valid) {
+          return { valid: false, reason: `Transaction ${tx.id} validation failed: ${validationResult.reason}` };
+        }
+      }
+
+      logger.info('BLOCKCHAIN', `Block ${block.index} transaction validation passed - Coinbase: ${actualCoinbaseAmount} PAS (${expectedBaseReward} + ${totalFees} fees)`);
+      return { valid: true, reason: 'All transactions validated successfully' };
+
+    } catch (error) {
+      logger.error('BLOCKCHAIN', `Transaction validation error in block ${block.index}: ${error.message}`);
+      return { valid: false, reason: `Validation error: ${error.message}` };
+    }
+  }
+
+  /**
+   * Find a specific UTXO by transaction hash and output index
+   */
+  findUTXO(txHash, outputIndex) {
+    for (const utxo of this.utxos) {
+      if (utxo.txHash === txHash && utxo.outputIndex === outputIndex) {
+        return utxo;
+      }
+    }
+    return null;
+  }
+
+  /**
+   * Check if a UTXO is already spent
+   */
+  isUTXOSpent(txHash, outputIndex) {
+    // Check if this UTXO exists in our current UTXO set
+    return !this.findUTXO(txHash, outputIndex);
+  }
+
+  /**
+   * Validate individual transaction including UTXO checks
+   */
+  validateTransaction(transaction) {
+    try {
+      // Basic transaction validation
+      if (!transaction || !transaction.id) {
+        return { valid: false, reason: 'Invalid transaction structure' };
+      }
+
+      // Check if transaction is expired
+      if (transaction.isExpired && transaction.isExpired()) {
+        return { valid: false, reason: 'Transaction has expired' };
+      }
+
+      // Validate outputs
+      if (!transaction.outputs || transaction.outputs.length === 0) {
+        return { valid: false, reason: 'Transaction has no outputs' };
+      }
+
+      // Calculate total output amount
+      const totalOutputAmount = transaction.outputs.reduce((sum, output) => sum + (output.amount || 0), 0);
+      if (totalOutputAmount <= 0) {
+        return { valid: false, reason: 'Transaction output amount must be positive' };
+      }
+
+      // For non-coinbase transactions, validate inputs and UTXOs
+      if (!transaction.isCoinbase) {
+        if (!transaction.inputs || transaction.inputs.length === 0) {
+          return { valid: false, reason: 'Non-coinbase transaction must have inputs' };
+        }
+
+        // Calculate total input amount from UTXOs
+        let totalInputAmount = 0;
+        for (const input of transaction.inputs) {
+          const utxo = this.findUTXO(input.txHash, input.outputIndex);
+          if (!utxo) {
+            return { valid: false, reason: `Input UTXO not found: ${input.txHash}:${input.outputIndex}` };
+          }
+          
+          // Check if UTXO is already spent
+          if (this.isUTXOSpent(input.txHash, input.outputIndex)) {
+            return { valid: false, reason: `UTXO already spent: ${input.txHash}:${input.outputIndex}` };
+          }
+          
+          totalInputAmount += utxo.amount;
+        }
+
+        // Validate input/output balance (input must cover output + fee)
+        if (totalInputAmount < (totalOutputAmount + transaction.fee)) {
+          return { 
+            valid: false, 
+            reason: `Insufficient input amount. Input: ${totalInputAmount}, Output: ${totalOutputAmount}, Fee: ${transaction.fee}` 
+          };
+        }
+      }
+
+      return { valid: true, reason: 'Transaction validation passed' };
+
+    } catch (error) {
+      logger.error('BLOCKCHAIN', `Transaction validation error: ${error.message}`);
+      return { valid: false, reason: `Validation error: ${error.message}` };
+    }
   }
 
   /**

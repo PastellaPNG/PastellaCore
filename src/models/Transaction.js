@@ -309,7 +309,13 @@ class Transaction {
     const outputAmount = this.getOutputAmount();
     
     if (this.isCoinbase) {
-      return outputAmount > 0;
+      // CRITICAL: Validate coinbase transaction amount
+      if (outputAmount <= 0) {
+        return false;
+      }
+      
+      // Additional coinbase validation can be done at blockchain level
+      return true;
     }
     
     // Validate minimum fee if config is provided
@@ -319,10 +325,22 @@ class Transaction {
       }
     }
     
-    // For non-coinbase transactions, we need to validate inputs properly
-    // This would require blockchain context to check UTXOs
-    // For now, we'll just check that outputs are valid
-    return outputAmount > 0;
+    // Validate fee is a positive number
+    if (typeof this.fee !== 'number' || this.fee < 0) {
+      return false;
+    }
+    
+    // For non-coinbase transactions, validate inputs and outputs
+    if (this.inputs.length === 0) {
+      return false; // Must have inputs
+    }
+    
+    // Validate output amount is positive
+    if (outputAmount <= 0) {
+      return false;
+    }
+    
+    return true;
   }
 
   /**
