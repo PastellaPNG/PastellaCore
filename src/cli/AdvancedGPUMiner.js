@@ -1153,8 +1153,6 @@ class AdvancedGPUMiner {
   selectTransactionsForBlock(pendingTransactions, coinbaseTransaction) {
     const maxBlockSize = this.cli.config.blockchain.maxBlockSize || 1024 * 1024; // Default to 1MB if not in config
     const selectedTransactions = [];
-
-    coinbaseTransaction.outputs[0].amount += 100;
     
     // Start with coinbase transaction size
     const coinbaseSize = JSON.stringify(coinbaseTransaction).length;
