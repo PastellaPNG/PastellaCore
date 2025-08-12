@@ -100,7 +100,10 @@ class PastellaCLI {
           '/api/blocks/submit',
           '/api/network/connect',
           '/api/network/message-validation/reset',
-          '/api/network/partition-reset'
+          '/api/network/partition-reset',
+          '/api/rate-limits/stats',
+          '/api/rate-limits/reset',
+          '/api/blockchain/reset'
         ];
         
         if (sensitiveEndpoints.includes(endpoint)) {
