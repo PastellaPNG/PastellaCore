@@ -57,6 +57,7 @@ class APIServer {
     
     // Blockchain routes (always available)
     this.app.get('/api/blockchain/status', this.getBlockchainStatus.bind(this));
+    this.app.get('/api/blockchain/security', this.getSecurityReport.bind(this));
     this.app.get('/api/blockchain/blocks', this.getBlocks.bind(this));
     this.app.get('/api/blockchain/blocks/:index', this.getBlock.bind(this));
     this.app.get('/api/blockchain/latest', this.getLatestBlock.bind(this));
@@ -147,6 +148,17 @@ class APIServer {
     try {
       const status = this.blockchain.getStatus();
       res.json(status);
+    } catch (error) {
+      res.status(500).json({
+        error: error.message
+      });
+    }
+  }
+
+  getSecurityReport(req, res) {
+    try {
+      const securityReport = this.blockchain.getSecurityReport();
+      res.json(securityReport);
     } catch (error) {
       res.status(500).json({
         error: error.message

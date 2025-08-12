@@ -6,7 +6,7 @@ const logger = require('../utils/logger');
 const { TRANSACTION_TAGS } = require('../utils/constants');
 
 /**
- * ULTRA-OPTIMIZED BLOCKCHAIN CLASS
+ * ULTRA-OPTIMIZED & SECURE BLOCKCHAIN CLASS
  * 
  * PERFORMANCE IMPROVEMENTS:
  * - O(1) duplicate detection using Set (was O(n²))
@@ -16,6 +16,13 @@ const { TRANSACTION_TAGS } = require('../utils/constants');
  * - Early termination on critical failures
  * - ULTRA-FAST validation (skips expensive operations)
  * - LIGHTNING validation (basic integrity only)
+ * 
+ * SECURITY IMPROVEMENTS:
+ * - 51% attack protection via proof-of-work validation
+ * - Enhanced fork resolution with chain work calculation
+ * - Security monitoring and attack detection
+ * - Comprehensive block validation
+ * - UTXO double-spend protection
  * 
  * SPEED IMPROVEMENT: 
  * - Small chains: 2-5x faster
@@ -148,7 +155,7 @@ class Blockchain {
     // Apply the new difficulty (replace, don't add)
     if (newDifficulty !== this.difficulty) {
       this.difficulty = newDifficulty;
-      logger.info('BLOCKCHAIN', `Difficulty adjusted: ${oldDifficulty} → ${this.difficulty}`);
+      logger.debug('BLOCKCHAIN', `Difficulty adjusted: ${oldDifficulty} → ${this.difficulty}`);
     }
 
     // Update UTXO set
@@ -163,7 +170,7 @@ class Blockchain {
 
       // Log difficulty change if it occurred
       if (newDifficulty !== oldDifficulty) {
-        logger.info('BLOCKCHAIN', `Difficulty adjusted: ${oldDifficulty} → ${this.difficulty}`);
+        logger.debug('BLOCKCHAIN', `Difficulty adjusted: ${oldDifficulty} → ${this.difficulty}`);
       }
     }
 
@@ -175,31 +182,52 @@ class Blockchain {
   }
 
   /**
-   * Validate a block
+   * Validate a block with enhanced security checks
    */
   isValidBlock(block) {
     const latestBlock = this.getLatestBlock();
 
     // Check if block already exists in chain
     if (this.chain.some(existingBlock => existingBlock.hash === block.hash)) {
+      logger.warn('BLOCKCHAIN', 'Block already exists in chain');
       return false; // Block already exists, silently skip
     }
 
     // Check if block is properly linked
     if (latestBlock && block.previousHash !== latestBlock.hash) {
-      console.log('Block is not properly linked to previous block');
+      logger.warn('BLOCKCHAIN', 'Block is not properly linked to previous block');
       return false;
     }
 
     // Check if block index is correct
     if (latestBlock && block.index !== latestBlock.index + 1) {
-      console.log('Block index is incorrect');
+      logger.warn('BLOCKCHAIN', 'Block index is incorrect');
       return false;
     }
 
-    // Validate block itself
+    // Validate block itself (includes proof-of-work validation)
     if (!block.isValid()) {
-      console.log('Block validation failed');
+      logger.warn('BLOCKCHAIN', 'Block validation failed');
+      return false;
+    }
+
+    // Enhanced security: verify proof-of-work meets current difficulty
+    try {
+      const target = block.calculateTarget();
+      const targetNum = BigInt('0x' + target);
+      const hashNum = BigInt('0x' + block.hash);
+      
+      if (hashNum > targetNum) {
+        logger.warn('BLOCKCHAIN', `Block ${block.index} does not meet difficulty requirement`);
+        logger.warn('BLOCKCHAIN', `Hash: ${block.hash}, Target: ${target}`);
+        return false;
+      }
+      
+      // Log successful validation
+      logger.info('BLOCKCHAIN', `Block ${block.index} validation passed - Proof-of-work verified`);
+      
+    } catch (error) {
+      logger.error('BLOCKCHAIN', `Block ${block.index} proof-of-work validation error: ${error.message}`);
       return false;
     }
 
@@ -587,22 +615,65 @@ class Blockchain {
   }
 
   /**
-   * Resolve forks using longest chain rule
+   * Resolve forks using proof-of-work validation (51% attack protection)
+   * This prevents attackers from creating longer chains without sufficient proof-of-work
    */
   resolveForks(newChain) {
-    if (newChain.length > this.chain.length && this.isValidChain(newChain)) {
-      console.log('Replacing chain with longer valid chain');
+    // Calculate total proof-of-work for each chain
+    const currentChainWork = this.calculateChainWork(this.chain);
+    const newChainWork = this.calculateChainWork(newChain);
+    
+    logger.info('BLOCKCHAIN', `Fork resolution: Current chain work: ${currentChainWork}, New chain work: ${newChainWork}`);
+    
+    // Only accept chain with MORE proof-of-work, not just longer
+    if (newChainWork > currentChainWork && this.isValidChain(newChain)) {
+      logger.info('BLOCKCHAIN', `Replacing chain with higher proof-of-work chain (work: ${currentChainWork} → ${newChainWork})`);
       this.chain = newChain;
       this.rebuildUTXOSet();
       return true;
+    } else {
+      logger.info('BLOCKCHAIN', `Rejecting fork: insufficient proof-of-work or invalid chain`);
     }
     return false;
   }
 
   /**
-   * Validate a chain (for chain replacement) - optimized version
+   * Calculate total proof-of-work for a chain (51% attack protection)
+   * This ensures that longer chains must have proportionally more computational work
+   */
+  calculateChainWork(chain) {
+    if (!chain || chain.length === 0) return BigInt(0);
+    
+    let totalWork = BigInt(0);
+    
+    for (const block of chain) {
+      try {
+        const target = block.calculateTarget();
+        const targetNum = BigInt('0x' + target);
+        const maxTarget = BigInt('0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff');
+        
+        // Calculate work as maxTarget / target (higher difficulty = more work)
+        if (targetNum > 0) {
+          const blockWork = maxTarget / targetNum;
+          totalWork += blockWork;
+        }
+      } catch (error) {
+        logger.warn('BLOCKCHAIN', `Error calculating work for block ${block.index}: ${error.message}`);
+        // Continue with other blocks
+      }
+    }
+    
+    return totalWork;
+  }
+
+  /**
+   * Validate a chain (for chain replacement) - optimized version with proof-of-work validation
    */
   isValidChainForReplacement(chain) {
+    if (!chain || chain.length === 0) {
+      return false;
+    }
+
     // OPTIMIZATION: Early termination on critical failures
     for (let i = 1; i < chain.length; i++) {
       const currentBlock = chain[i];
@@ -610,14 +681,33 @@ class Blockchain {
 
       // Check linking first (most common failure point)
       if (currentBlock.previousHash !== previousBlock.hash) {
+        logger.warn('BLOCKCHAIN', `Chain replacement validation failed: block ${i} not properly linked`);
         return false;
       }
 
-      // Then check block validity
+      // Check block validity (includes proof-of-work validation)
       if (!currentBlock.isValid()) {
+        logger.warn('BLOCKCHAIN', `Chain replacement validation failed: block ${i} invalid`);
+        return false;
+      }
+
+      // Additional security: verify proof-of-work meets difficulty requirement
+      try {
+        const target = currentBlock.calculateTarget();
+        const targetNum = BigInt('0x' + target);
+        const hashNum = BigInt('0x' + currentBlock.hash);
+        
+        if (hashNum > targetNum) {
+          logger.warn('BLOCKCHAIN', `Chain replacement validation failed: block ${i} does not meet difficulty requirement`);
+          return false;
+        }
+      } catch (error) {
+        logger.warn('BLOCKCHAIN', `Chain replacement validation failed: block ${i} proof-of-work validation error: ${error.message}`);
         return false;
       }
     }
+    
+    logger.info('BLOCKCHAIN', `Chain replacement validation passed for ${chain.length} blocks`);
     return true;
   }
 
@@ -1264,13 +1354,84 @@ class Blockchain {
    * Get blockchain status
    */
   getStatus() {
+    const currentChainWork = this.calculateChainWork(this.chain);
+    
     return {
       length: this.chain.length,
       height: this.chain.length, // Add height for API consistency
       latestBlock: this.getLatestBlock()?.hash,
       pendingTransactions: this.pendingTransactions.length,
       difficulty: this.difficulty,
-      totalSupply: this.getTotalSupply()
+      totalSupply: this.getTotalSupply(),
+      chainWork: currentChainWork.toString(), // Total proof-of-work for security monitoring
+      securityLevel: this.getSecurityLevel(currentChainWork) // Security assessment
+    };
+  }
+
+  /**
+   * Get security level assessment based on total chain work
+   */
+  getSecurityLevel(chainWork) {
+    const workNum = Number(chainWork);
+    
+    if (workNum < 1000) return 'LOW';
+    if (workNum < 10000) return 'MEDIUM';
+    if (workNum < 100000) return 'HIGH';
+    if (workNum < 1000000) return 'VERY_HIGH';
+    return 'EXTREME';
+  }
+
+  /**
+   * Security monitoring and attack detection
+   */
+  getSecurityReport() {
+    const currentChainWork = this.calculateChainWork(this.chain);
+    const latestBlock = this.getLatestBlock();
+    const recentBlocks = this.chain.slice(-10); // Last 10 blocks
+    
+    // Calculate average block time
+    let totalBlockTime = 0;
+    let blockCount = 0;
+    
+    for (let i = 1; i < recentBlocks.length; i++) {
+      const timeDiff = recentBlocks[i].timestamp - recentBlocks[i - 1].timestamp;
+      totalBlockTime += timeDiff;
+      blockCount++;
+    }
+    
+    const avgBlockTime = blockCount > 0 ? totalBlockTime / blockCount : 0;
+    
+    // Security assessments
+    const securityIssues = [];
+    
+    if (avgBlockTime < 5000) { // Less than 5 seconds
+      securityIssues.push('SUSPICIOUS: Blocks are being mined too quickly (possible attack)');
+    }
+    
+    if (this.chain.length > 100 && currentChainWork < 1000) {
+      securityIssues.push('WARNING: Chain has low proof-of-work despite length (possible attack)');
+    }
+    
+    // Check for difficulty manipulation
+    const recentDifficulty = recentBlocks.slice(-5).map(b => b.difficulty);
+    const difficultyVariance = Math.max(...recentDifficulty) - Math.min(...recentDifficulty);
+    
+    if (difficultyVariance > this.difficulty * 0.5) {
+      securityIssues.push('WARNING: Large difficulty variance detected (possible manipulation)');
+    }
+    
+    return {
+      chainLength: this.chain.length,
+      totalChainWork: currentChainWork.toString(),
+      securityLevel: this.getSecurityLevel(currentChainWork),
+      averageBlockTime: Math.round(avgBlockTime),
+      currentDifficulty: this.difficulty,
+      difficultyVariance,
+      securityIssues,
+      lastBlockHash: latestBlock?.hash || 'None',
+      lastBlockTimestamp: latestBlock?.timestamp || 0,
+      pendingTransactions: this.pendingTransactions.length,
+      recommendation: securityIssues.length > 0 ? 'IMMEDIATE ATTENTION REQUIRED' : 'SECURE'
     };
   }
 
