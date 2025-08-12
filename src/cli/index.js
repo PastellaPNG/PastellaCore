@@ -176,7 +176,7 @@ class PastellaCLI {
     // Chain commands
     this.program
       .command('chain')
-      .description('Blockchain commands')
+      .description('Blockchain commands (status, blocks, validation, checkpoints)')
       .argument('[command]', 'Chain command to execute')
       .action(async (command) => {
         await this.networkManager.handleChainCommand(command);
@@ -198,6 +198,45 @@ class PastellaCLI {
       .argument('[command]', 'Daemon command to execute')
       .action(async (command) => {
         await this.networkManager.handleDaemonCommand(command);
+      });
+
+    // Help command
+    this.program
+      .command('help')
+      .description('Show detailed help information')
+      .action(async () => {
+        console.log(chalk.blue.bold('╔══════════════════════════════════════════════════════════╗'));
+        console.log(chalk.blue.bold('║                    PASTELLA CLI HELP                     ║'));
+        console.log(chalk.blue.bold('╚══════════════════════════════════════════════════════════╝'));
+        console.log('');
+        console.log(chalk.yellow.bold('📖 AVAILABLE COMMANDS:'));
+        console.log(chalk.cyan('  wallet <command>     - Wallet management'));
+        console.log(chalk.cyan('  gpu-mine <command>   - KawPow GPU mining'));
+        console.log(chalk.cyan('  chain <command>      - Blockchain operations'));
+        console.log(chalk.cyan('  network <command>    - Network management'));
+        console.log(chalk.cyan('  daemon <command>     - Daemon control'));
+        console.log(chalk.cyan('  connection           - Show connection info'));
+        console.log(chalk.cyan('  help                 - Show this help'));
+        console.log('');
+        console.log(chalk.yellow.bold('💡 CHECKPOINT SYSTEM:'));
+        console.log(chalk.cyan('  chain validate checkpoint - Fast validation using checkpoints'));
+        console.log(chalk.cyan('  chain validate full      - Complete validation'));
+        console.log(chalk.cyan('  chain checkpoints list   - Show all checkpoints'));
+        console.log(chalk.cyan('  chain checkpoints add    - Add new checkpoint'));
+        console.log(chalk.cyan('  chain checkpoints update - Update all checkpoints'));
+        console.log('');
+        console.log(chalk.yellow.bold('🔧 EXAMPLES:'));
+        console.log(chalk.cyan('  pastella wallet balance                    - Check wallet balance'));
+        console.log(chalk.cyan('  pastella gpu-mine start                   - Start GPU mining'));
+        console.log(chalk.cyan('  pastella chain validate checkpoint        - Fast validation'));
+        console.log(chalk.cyan('  pastella chain checkpoints add 100        - Add checkpoint at height 100'));
+        console.log(chalk.cyan('  pastella --host 192.168.1.100 chain status - Remote blockchain status'));
+        console.log('');
+        console.log(chalk.yellow.bold('📚 FOR MORE HELP:'));
+        console.log(chalk.cyan('  Run without arguments for interactive mode'));
+        console.log(chalk.cyan('  Type "help" in interactive mode for detailed commands'));
+        console.log(chalk.cyan('  Check CHECKPOINTS_README.md for checkpoint system details'));
+        console.log('');
       });
 
     // Connection info command
@@ -242,7 +281,7 @@ class PastellaCLI {
         await this.interactiveMode.start();
       } else {
         // Check if only global options are provided (no command)
-        const hasCommand = args.some(arg => ['wallet', 'mine', 'chain', 'network', 'daemon', 'connection'].includes(arg));
+        const hasCommand = args.some(arg => ['wallet', 'mine', 'chain', 'network', 'daemon', 'connection', 'help'].includes(arg));
         
         if (!hasCommand) {
           // Only global options provided, parse them manually and start interactive mode
