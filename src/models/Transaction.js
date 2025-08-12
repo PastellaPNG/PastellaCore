@@ -101,10 +101,22 @@ class Transaction {
     this.timestamp = Date.now();       // Transaction timestamp
     this.isCoinbase = false;           // Whether this is a coinbase transaction
     this.tag = tag;                    // Transaction tag (STAKING, GOVERNANCE, COINBASE, TRANSACTION, PREMINE)
+    
+    // REPLAY ATTACK PROTECTION
+    this.nonce = this.generateNonce(); // Unique nonce for replay protection
+    this.expiresAt = this.timestamp + (24 * 60 * 60 * 1000); // 24 hour expiration
+    this.sequence = 0;                 // Sequence number for input ordering
   }
 
   /**
-   * Calculate transaction hash
+   * Generate unique nonce for replay attack protection
+   */
+  generateNonce() {
+    return Date.now().toString(36) + Math.random().toString(36).substr(2) + Math.random().toString(36).substr(2);
+  }
+
+  /**
+   * Calculate transaction hash with replay attack protection
    */
   calculateId() {
     const data = JSON.stringify({
@@ -120,7 +132,10 @@ class Transaction {
       fee: this.fee,
       timestamp: this.timestamp,
       isCoinbase: this.isCoinbase,
-      tag: this.tag
+      tag: this.tag,
+      nonce: this.nonce,           // Include nonce for replay protection
+      expiresAt: this.expiresAt,   // Include expiration for replay protection
+      sequence: this.sequence      // Include sequence for input ordering
     });
     
     this.id = CryptoUtils.doubleHash(data);
@@ -128,7 +143,7 @@ class Transaction {
   }
 
   /**
-   * Get data to sign for transaction
+   * Get data to sign for transaction with replay attack protection
    */
   getDataToSign() {
     return JSON.stringify({
@@ -143,7 +158,10 @@ class Transaction {
       fee: this.fee,
       tag: this.tag,
       timestamp: this.timestamp,
-      isCoinbase: this.isCoinbase
+      isCoinbase: this.isCoinbase,
+      nonce: this.nonce,           // Include nonce in signature
+      expiresAt: this.expiresAt,   // Include expiration in signature
+      sequence: this.sequence      // Include sequence in signature
     });
   }
 
@@ -170,6 +188,87 @@ class Transaction {
   }
 
   /**
+   * Check if transaction has expired (replay attack protection)
+   */
+  isExpired() {
+    return Date.now() > this.expiresAt;
+  }
+
+  /**
+   * Check if transaction is valid and not expired
+   */
+  isValidAndNotExpired() {
+    if (this.isExpired()) {
+      return false;
+    }
+    return this.verify();
+  }
+
+  /**
+   * Get replay attack protection info
+   */
+  getReplayProtectionInfo() {
+    return {
+      nonce: this.nonce,
+      expiresAt: this.expiresAt,
+      sequence: this.sequence,
+      isExpired: this.isExpired(),
+      timeUntilExpiry: Math.max(0, this.expiresAt - Date.now())
+    };
+  }
+
+  /**
+   * Check if this transaction is a replay of another transaction
+   * @param {Array} existingTransactions - Array of existing transactions to check against
+   * @returns {boolean} - True if this is a replay attack
+   */
+  isReplayAttack(existingTransactions) {
+    if (!existingTransactions || !Array.isArray(existingTransactions)) {
+      return false;
+    }
+    
+    // Check for duplicate nonce (same sender, same nonce = replay attack)
+    const duplicateNonce = existingTransactions.find(tx => 
+      tx.id !== this.id && 
+      tx.nonce === this.nonce &&
+      this.hasSameSender(tx)
+    );
+    
+    if (duplicateNonce) {
+      return true;
+    }
+    
+    // Check for duplicate transaction ID (exact same transaction)
+    const duplicateId = existingTransactions.find(tx => tx.id === this.id);
+    if (duplicateId) {
+      return true;
+    }
+    
+    return false;
+  }
+
+  /**
+   * Check if this transaction has the same sender as another transaction
+   * @param {Transaction} otherTx - Transaction to compare with
+   * @returns {boolean} - True if same sender
+   */
+  hasSameSender(otherTx) {
+    if (!otherTx || !otherTx.inputs || !this.inputs) {
+      return false;
+    }
+    
+    // Compare public keys from inputs to determine if same sender
+    const thisPublicKeys = this.inputs.map(input => input.publicKey).sort();
+    const otherPublicKeys = otherTx.inputs.map(input => input.publicKey).sort();
+    
+    if (thisPublicKeys.length !== otherPublicKeys.length) {
+      return false;
+    }
+    
+    return thisPublicKeys.every((pk, index) => pk === otherPublicKeys[index]);
+  }
+
+  /**
    * Calculate total input amount
    */
   getInputAmount() {
@@ -190,10 +289,21 @@ class Transaction {
   }
 
   /**
-   * Check if transaction is valid
+   * Check if transaction is valid with MANDATORY replay attack protection
    */
   isValid(config = null) {
     if (this.outputs.length === 0) return false;
+    
+    // MANDATORY PROTECTION: ALL non-coinbase transactions must have replay protection
+    if (!this.isCoinbase && (!this.nonce || !this.expiresAt)) {
+      return false; // Reject unprotected transactions
+    }
+    
+    // REPLAY ATTACK PROTECTION: Check if transaction has expired
+    if (this.isExpired()) {
+      return false;
+    }
+    
     if (!this.verify()) return false;
     
     const outputAmount = this.getOutputAmount();
@@ -242,7 +352,10 @@ class Transaction {
       fee: this.fee,
       timestamp: this.timestamp,
       isCoinbase: this.isCoinbase,
-      tag: this.tag
+      tag: this.tag,
+      nonce: this.nonce,           // Include replay protection fields
+      expiresAt: this.expiresAt,
+      sequence: this.sequence
     };
   }
 
@@ -269,6 +382,18 @@ class Transaction {
       transaction.id = data.id;
       transaction.timestamp = data.timestamp || Date.now();
       transaction.isCoinbase = data.isCoinbase || false;
+      
+      // Load replay protection fields if they exist
+      if (data.nonce) {
+        transaction.nonce = data.nonce;
+      }
+      if (data.expiresAt) {
+        transaction.expiresAt = data.expiresAt;
+      }
+      if (data.sequence !== undefined) {
+        transaction.sequence = data.sequence;
+      }
+      
       return transaction;
     } catch (error) {
       throw new Error(`Failed to create transaction from JSON: ${error.message}`);

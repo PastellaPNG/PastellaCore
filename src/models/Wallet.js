@@ -327,8 +327,13 @@ class Wallet {
             outputs.push(new TransactionOutput(this.address, change));
         }
 
-        // Create transaction with tag
+        // Create transaction with tag (automatically includes replay protection)
         const transaction = new Transaction(inputs, outputs, fee, tag);
+        
+        // Verify replay protection fields are present
+        if (!transaction.nonce || !transaction.expiresAt) {
+            throw new Error('Transaction creation failed: Missing replay protection fields');
+        }
         
         // Sign the transaction
         const txData = transaction.getDataToSign();

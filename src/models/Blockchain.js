@@ -23,6 +23,11 @@ const { TRANSACTION_TAGS } = require('../utils/constants');
  * - Security monitoring and attack detection
  * - Comprehensive block validation
  * - UTXO double-spend protection
+ * - MANDATORY transaction replay attack protection
+ * - Nonce-based transaction uniqueness (REQUIRED)
+ * - Transaction expiration system (REQUIRED)
+ * - Duplicate transaction detection
+ * - NO SUPPORT for unprotected transactions
  * 
  * SPEED IMPROVEMENT: 
  * - Small chains: 2-5x faster
@@ -221,6 +226,17 @@ class Blockchain {
         logger.warn('BLOCKCHAIN', `Block ${block.index} does not meet difficulty requirement`);
         logger.warn('BLOCKCHAIN', `Hash: ${block.hash}, Target: ${target}`);
         return false;
+      }
+      
+      // MANDATORY PROTECTION: Reject ALL blocks with unprotected transactions (except genesis)
+      if (block.index > 0) {
+        for (const tx of block.transactions) {
+          if (!tx.isCoinbase && (!tx.nonce || !tx.expiresAt)) {
+            logger.error('BLOCKCHAIN', `Block ${block.index} REJECTED: Contains unprotected transaction ${tx.id}`);
+            logger.error('BLOCKCHAIN', 'ALL non-coinbase transactions must include mandatory replay protection');
+            return false;
+          }
+        }
       }
       
       // Log successful validation
@@ -553,10 +569,10 @@ class Blockchain {
       const totalBlocks = this.chain.length;
       const progressInterval = Math.max(50, Math.floor(totalBlocks / 20)); // Dynamic progress interval
       
-      for (let i = 1; i < this.chain.length; i++) {
+    for (let i = 1; i < this.chain.length; i++) {
         try {
-          const currentBlock = this.chain[i];
-          const previousBlock = this.chain[i - 1];
+      const currentBlock = this.chain[i];
+      const previousBlock = this.chain[i - 1];
 
           // Show progress every 50 blocks
           if (i % progressInterval === 0 || i === totalBlocks - 1) {
@@ -579,15 +595,15 @@ class Blockchain {
             logger.error('BLOCKCHAIN', `Block index sequence broken at index ${i}: expected ${previousBlock.index + 1}, got ${currentBlock.index}`);
             return false;
           }
-
-          // Check if current block is valid
-          if (!currentBlock.isValid()) {
+      
+      // Check if current block is valid
+      if (!currentBlock.isValid()) {
             logger.error('BLOCKCHAIN', `Block at index ${i} (${currentBlock.hash ? currentBlock.hash.substring(0, 16) : 'NO_HASH'}...) validation failed`);
-            return false;
-          }
-
-          // Check if block is properly linked
-          if (currentBlock.previousHash !== previousBlock.hash) {
+        return false;
+      }
+      
+      // Check if block is properly linked
+      if (currentBlock.previousHash !== previousBlock.hash) {
             logger.error('BLOCKCHAIN', `Block at index ${i} is not properly linked to previous block`);
             logger.error('BLOCKCHAIN', `  Expected previous hash: ${previousBlock.hash}`);
             logger.error('BLOCKCHAIN', `  Got previous hash: ${currentBlock.previousHash}`);
@@ -602,12 +618,12 @@ class Blockchain {
           seenHashes.add(currentBlock.hash);
         } catch (blockError) {
           logger.error('BLOCKCHAIN', `Error validating block at index ${i}: ${blockError.message}`);
-          return false;
-        }
+        return false;
       }
-
+    }
+    
       logger.info('BLOCKCHAIN', 'Blockchain validation completed successfully');
-      return true;
+    return true;
     } catch (error) {
       logger.error('BLOCKCHAIN', `Blockchain validation error: ${error.message}`);
       return false;
@@ -628,8 +644,19 @@ class Blockchain {
     // Only accept chain with MORE proof-of-work, not just longer
     if (newChainWork > currentChainWork && this.isValidChain(newChain)) {
       logger.info('BLOCKCHAIN', `Replacing chain with higher proof-of-work chain (work: ${currentChainWork} → ${newChainWork})`);
+      
+      // Store current pending transactions before replacing chain
+      const currentPendingTransactions = [...this.pendingTransactions];
+      logger.info('BLOCKCHAIN', `Preserving ${currentPendingTransactions.length} pending transactions during fork resolution`);
+      
+      // Replace the chain
       this.chain = newChain;
       this.rebuildUTXOSet();
+      
+      // Restore pending transactions (they might still be valid)
+      this.pendingTransactions = currentPendingTransactions;
+      logger.info('BLOCKCHAIN', `Restored ${this.pendingTransactions.length} pending transactions after fork resolution`);
+      
       return true;
     } else {
       logger.info('BLOCKCHAIN', `Rejecting fork: insufficient proof-of-work or invalid chain`);
@@ -689,6 +716,17 @@ class Blockchain {
       if (!currentBlock.isValid()) {
         logger.warn('BLOCKCHAIN', `Chain replacement validation failed: block ${i} invalid`);
         return false;
+      }
+
+      // MANDATORY PROTECTION: Verify all non-coinbase transactions have replay protection
+      if (currentBlock.index > 0) {
+        for (const tx of currentBlock.transactions) {
+          if (!tx.isCoinbase && (!tx.nonce || !tx.expiresAt)) {
+            logger.warn('BLOCKCHAIN', `Chain replacement validation failed: block ${i} contains unprotected transaction ${tx.id}`);
+            logger.warn('BLOCKCHAIN', 'ALL non-coinbase transactions must include mandatory replay protection');
+            return false;
+          }
+        }
       }
 
       // Additional security: verify proof-of-work meets difficulty requirement
@@ -797,22 +835,77 @@ class Blockchain {
   }
 
   /**
-   * Add transaction to pending pool
+   * Add transaction to pending pool with MANDATORY replay attack protection
    */
   addPendingTransaction(transaction) {
     // Convert JSON transaction to Transaction instance if needed
     let transactionInstance = transaction;
     if (typeof transaction === 'object' && !transaction.isValid) {
+      try {
       const { Transaction } = require('./Transaction');
       transactionInstance = Transaction.fromJSON(transaction);
+      } catch (error) {
+        logger.error('BLOCKCHAIN', `Failed to convert transaction to Transaction instance: ${error.message}`);
+        return false;
+      }
     }
 
+    // MANDATORY PROTECTION: Reject ALL transactions without replay protection (except coinbase)
+    if (!transactionInstance.isCoinbase && (!transactionInstance.nonce || !transactionInstance.expiresAt)) {
+      logger.error('BLOCKCHAIN', `Transaction ${transactionInstance.id} REJECTED: Missing mandatory replay protection`);
+      logger.error('BLOCKCHAIN', 'ALL transactions must include nonce and expiration fields');
+      logger.error('BLOCKCHAIN', 'Use Transaction.createTransaction() to create protected transactions');
+      return false;
+    }
+
+    // Check if transaction already exists
+    if (this.pendingTransactions.some(tx => tx.id === transactionInstance.id)) {
+      logger.warn('BLOCKCHAIN', 'Transaction already exists in pending pool');
+      return false;
+    }
+
+    // REPLAY ATTACK PROTECTION: Check if transaction has expired
+    if (transactionInstance.isExpired && typeof transactionInstance.isExpired === 'function') {
+      if (transactionInstance.isExpired()) {
+        logger.warn('BLOCKCHAIN', `Transaction ${transactionInstance.id} has expired and cannot be added`);
+        return false;
+      }
+    }
+
+    // REPLAY ATTACK PROTECTION: Check for duplicate nonces from same sender
+    if (transactionInstance.isReplayAttack && typeof transactionInstance.isReplayAttack === 'function') {
+      if (transactionInstance.isReplayAttack(this.pendingTransactions)) {
+        logger.warn('BLOCKCHAIN', `Transaction ${transactionInstance.id} detected as replay attack`);
+        return false;
+      }
+    }
+
+    // REPLAY ATTACK PROTECTION: Check for duplicate nonces in confirmed blocks
+    const allConfirmedTransactions = this.chain.flatMap(block => block.transactions);
+    if (transactionInstance.isReplayAttack && typeof transactionInstance.isReplayAttack === 'function') {
+      if (transactionInstance.isReplayAttack(allConfirmedTransactions)) {
+        logger.warn('BLOCKCHAIN', `Transaction ${transactionInstance.id} detected as replay attack against confirmed transactions`);
+        return false;
+      }
+    }
+    
     if (transactionInstance.isValid()) {
       this.pendingTransactions.push(transactionInstance);
-      logger.debug('BLOCKCHAIN', `Transaction added to pending pool: ${transactionInstance.id}`);
+      logger.info('BLOCKCHAIN', `Transaction ${transactionInstance.id} added to pending pool with mandatory replay protection`);
+      
+      // Save pending transactions to file so they persist across daemon restarts
+      try {
+        const blockchainPath = path.join(this.dataDir, 'blockchain.json');
+        this.saveToFile(blockchainPath);
+      } catch (saveError) {
+        logger.error('BLOCKCHAIN', `Failed to save pending transactions: ${saveError.message}`);
+        // Don't fail the transaction addition if saving fails
+      }
+      
       return true;
     }
-    console.log('Invalid transaction, not added to pending pool');
+    
+    logger.warn('BLOCKCHAIN', 'Invalid transaction, not added to pending pool');
     return false;
   }
 
@@ -822,6 +915,28 @@ class Blockchain {
   removeFromPendingTransactions(transactions) {
     const txIds = transactions.map(tx => tx.id);
     this.pendingTransactions = this.pendingTransactions.filter(tx => !txIds.includes(tx.id));
+  }
+
+  /**
+   * Clean up expired transactions from pending pool (replay attack protection)
+   */
+  cleanupExpiredTransactions() {
+    const initialCount = this.pendingTransactions.length;
+    
+    this.pendingTransactions = this.pendingTransactions.filter(tx => {
+      if (tx.isExpired && tx.isExpired()) {
+        logger.debug('BLOCKCHAIN', `Removing expired transaction ${tx.id} from pending pool`);
+        return false;
+      }
+      return true;
+    });
+    
+    const removedCount = initialCount - this.pendingTransactions.length;
+    if (removedCount > 0) {
+      logger.info('BLOCKCHAIN', `Cleaned up ${removedCount} expired transactions from pending pool`);
+    }
+    
+    return removedCount;
   }
 
   /**
@@ -1269,7 +1384,7 @@ class Blockchain {
 
         // Load UTXO set
         try {
-          this.utxoSet = new Map(Object.entries(data.utxoSet));
+    this.utxoSet = new Map(Object.entries(data.utxoSet));
         } catch (utxoError) {
           logger.error('BLOCKCHAIN', `Failed to load UTXO set: ${utxoError.message}`);
           throw new Error(`UTXO set loading failed: ${utxoError.message}`);
@@ -1382,6 +1497,37 @@ class Blockchain {
   }
 
   /**
+   * Get replay attack protection statistics
+   */
+  getReplayProtectionStats() {
+    const now = Date.now();
+    const pendingTransactions = this.pendingTransactions;
+    
+    let expiredCount = 0;
+    let expiringSoonCount = 0; // Expires within 1 hour
+    let validCount = 0;
+    
+    pendingTransactions.forEach(tx => {
+      if (tx.isExpired && tx.isExpired()) {
+        expiredCount++;
+      } else if (tx.expiresAt && (tx.expiresAt - now) < 3600000) { // 1 hour
+        expiringSoonCount++;
+      } else {
+        validCount++;
+      }
+    });
+    
+    return {
+      totalPending: pendingTransactions.length,
+      expired: expiredCount,
+      expiringSoon: expiringSoonCount,
+      valid: validCount,
+      lastCleanup: this.lastCleanupTime || 'Never',
+      protectionEnabled: true
+    };
+  }
+
+  /**
    * Security monitoring and attack detection
    */
   getSecurityReport() {
@@ -1440,9 +1586,9 @@ class Blockchain {
    */
   getTotalSupply() {
     return this.chain.reduce((total, block) => {
-      return total + block.transactions.reduce((blockTotal, tx) => {
-        return blockTotal + tx.outputs.reduce((txTotal, output) => txTotal + output.amount, 0);
-      }, 0);
+        return total + block.transactions.reduce((blockTotal, tx) => {
+          return blockTotal + tx.outputs.reduce((txTotal, output) => txTotal + output.amount, 0);
+        }, 0);
     }, 0);
   }
 
