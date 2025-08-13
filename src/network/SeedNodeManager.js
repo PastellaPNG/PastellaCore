@@ -9,14 +9,14 @@ class SeedNodeManager {
     this.isSeedNode = false;
     this.seedNodeConfig = null;
     this.connectedSeedNodes = 0;
-    this.minSeedConnections = (config?.network?.minSeedConnections !== undefined) ? config.network.minSeedConnections : 2;
+    this.minSeedConnections = config?.network?.minSeedConnections !== undefined ? config.network.minSeedConnections : 2;
     this.port = port;
-    
+
     // Seed node reconnection tracking
     this.seedNodeConnections = new Map(); // Track connection status per seed node
     this.reconnectionInterval = null;
     this.reconnectionIntervalMs = 60000; // 60 seconds
-    
+
     this.loadSeedNodes(config);
   }
 
@@ -61,7 +61,7 @@ class SeedNodeManager {
    */
   initializeConnectionTracking() {
     const filteredSeedNodes = this.getFilteredSeedNodes();
-    
+
     if (filteredSeedNodes.length === 0) {
       logger.info('SEED_NODE_MANAGER', 'No external seed nodes available');
       this.minSeedConnections = 0;
@@ -101,11 +101,11 @@ class SeedNodeManager {
    */
   markSeedNodeAttempt(seedNode, success = false) {
     const now = Date.now();
-    this.seedNodeConnections.set(seedNode, { 
-      connected: success, 
-      lastAttempt: now 
+    this.seedNodeConnections.set(seedNode, {
+      connected: success,
+      lastAttempt: now,
     });
-    
+
     if (success) {
       this.connectedSeedNodes++;
     }
@@ -118,12 +118,15 @@ class SeedNodeManager {
     if (this.reconnectionInterval) {
       clearInterval(this.reconnectionInterval);
     }
-    
+
     this.reconnectionInterval = setInterval(() => {
       this.attemptSeedNodeReconnection();
     }, this.reconnectionIntervalMs);
-    
-    logger.debug('SEED_NODE_MANAGER', `Seed node reconnection process started (every ${this.reconnectionIntervalMs / 1000}s)`);
+
+    logger.debug(
+      'SEED_NODE_MANAGER',
+      `Seed node reconnection process started (every ${this.reconnectionIntervalMs / 1000}s)`
+    );
   }
 
   /**
@@ -144,42 +147,44 @@ class SeedNodeManager {
     if (!this.isSeedNode) {
       return;
     }
-    
+
     const now = Date.now();
     const disconnectedSeedNodes = [];
-    
+
     // Find disconnected seed nodes that haven't been attempted recently
     for (const [seedNode, status] of this.seedNodeConnections.entries()) {
-      if (!status.connected && (now - status.lastAttempt) >= this.reconnectionIntervalMs) {
+      if (!status.connected && now - status.lastAttempt >= this.reconnectionIntervalMs) {
         disconnectedSeedNodes.push(seedNode);
       }
     }
-    
+
     if (disconnectedSeedNodes.length === 0) {
       return; // No disconnected seed nodes to reconnect
     }
-    
+
     // Only log reconnection attempts at debug level to reduce spam
-    logger.debug('SEED_NODE_MANAGER', `Attempting to reconnect to ${disconnectedSeedNodes.length} disconnected seed nodes...`);
-    
+    logger.debug(
+      'SEED_NODE_MANAGER',
+      `Attempting to reconnect to ${disconnectedSeedNodes.length} disconnected seed nodes...`
+    );
+
     for (const seedNode of disconnectedSeedNodes) {
       try {
         const url = new URL(seedNode);
-        
+
         // Check if this is still our own port (in case config changed)
         if (url.port === this.port.toString()) {
           continue; // Skip self-connection
         }
-        
+
         // Update last attempt time
-        this.seedNodeConnections.set(seedNode, { 
-          connected: false, 
-          lastAttempt: now 
+        this.seedNodeConnections.set(seedNode, {
+          connected: false,
+          lastAttempt: now,
         });
-        
+
         // Note: Actual connection logic will be handled by the main P2PNetwork
         // This method just prepares the seed nodes for reconnection
-        
       } catch (error) {
         // Connection failed, keep as disconnected - only log at debug level
         logger.debug('SEED_NODE_MANAGER', `Reconnection preparation failed for ${seedNode}: ${error.message}`);
@@ -193,16 +198,16 @@ class SeedNodeManager {
   markSeedNodeAsDisconnected(peerAddress) {
     // Convert IPv6 localhost to IPv4 for comparison
     const normalizedPeerAddress = peerAddress.replace('::1', '127.0.0.1');
-    
+
     for (const [seedNode, status] of this.seedNodeConnections.entries()) {
       try {
         const url = new URL(seedNode);
         const seedNodeAddress = `${url.hostname === 'localhost' ? '127.0.0.1' : url.hostname}:${url.port}`;
-        
+
         if (seedNodeAddress === normalizedPeerAddress && status.connected) {
-          this.seedNodeConnections.set(seedNode, { 
-            connected: false, 
-            lastAttempt: Date.now() 
+          this.seedNodeConnections.set(seedNode, {
+            connected: false,
+            lastAttempt: Date.now(),
           });
           return true; // This was a seed node
         }
@@ -210,7 +215,7 @@ class SeedNodeManager {
         // Skip invalid URLs
       }
     }
-    
+
     return false; // This was not a seed node
   }
 
@@ -224,7 +229,7 @@ class SeedNodeManager {
       connectedSeedNodes: this.connectedSeedNodes,
       minSeedConnections: this.minSeedConnections,
       connectionStatus: Object.fromEntries(this.seedNodeConnections),
-      reconnectionActive: !!this.reconnectionInterval
+      reconnectionActive: !!this.reconnectionInterval,
     };
   }
 

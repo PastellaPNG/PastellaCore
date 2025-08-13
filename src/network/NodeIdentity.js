@@ -10,7 +10,7 @@ class NodeIdentity {
     this.publicKey = null;
     this.dataDir = dataDir;
     this.identityFile = path.join(dataDir, 'node-identity.json');
-    
+
     if (nodeId && privateKey) {
       this.publicKey = this.derivePublicKey(privateKey);
     } else {
@@ -47,20 +47,20 @@ class NodeIdentity {
   generateNewIdentity() {
     // Generate a unique node ID (32 bytes)
     this.nodeId = crypto.randomBytes(32).toString('hex');
-    
+
     // Generate ECDSA key pair for signing
     const keyPair = crypto.generateKeyPairSync('ec', {
       namedCurve: 'secp256k1',
       publicKeyEncoding: {
         type: 'spki',
-        format: 'pem'
+        format: 'pem',
       },
       privateKeyEncoding: {
         type: 'pkcs8',
-        format: 'pem'
-      }
+        format: 'pem',
+      },
     });
-    
+
     this.privateKey = keyPair.privateKey;
     this.publicKey = keyPair.publicKey;
   }
@@ -94,7 +94,7 @@ class NodeIdentity {
         nodeId: this.nodeId,
         privateKey: this.privateKey,
         publicKey: this.publicKey,
-        createdAt: new Date().toISOString()
+        createdAt: new Date().toISOString(),
       };
 
       fs.writeFileSync(this.identityFile, JSON.stringify(identityData, null, 2));
@@ -142,14 +142,14 @@ class NodeIdentity {
     const challengeData = {
       challenge,
       timestamp,
-      nodeId: this.nodeId
+      nodeId: this.nodeId,
     };
-    
+
     return {
       challenge,
       timestamp,
       nodeId: this.nodeId,
-      signature: this.sign(JSON.stringify(challengeData))
+      signature: this.sign(JSON.stringify(challengeData)),
     };
   }
 
@@ -162,7 +162,7 @@ class NodeIdentity {
       const expectedData = JSON.stringify({
         challenge,
         timestamp: response.timestamp,
-        nodeId: peerNodeId
+        nodeId: peerNodeId,
       });
 
       if (!this.verify(expectedData, response.signature, peerPublicKey)) {
@@ -200,14 +200,14 @@ class NodeIdentity {
     const responseData = {
       challenge,
       timestamp,
-      nodeId: this.nodeId
+      nodeId: this.nodeId,
     };
 
     return {
       challenge,
       timestamp,
       nodeId: this.nodeId,
-      signature: this.sign(JSON.stringify(responseData))
+      signature: this.sign(JSON.stringify(responseData)),
     };
   }
 
@@ -217,7 +217,7 @@ class NodeIdentity {
   getIdentityInfo() {
     return {
       nodeId: this.nodeId,
-      publicKey: this.publicKey
+      publicKey: this.publicKey,
     };
   }
 
@@ -261,13 +261,13 @@ class NodeIdentity {
       nodeId: this.nodeId,
       publicKey: this.publicKey,
       timestamp: Date.now(),
-      version: '1.0.0'
+      version: '1.0.0',
     };
 
     return {
       type: 'HANDSHAKE',
       data: handshakeData,
-      signature: this.sign(JSON.stringify(handshakeData))
+      signature: this.sign(JSON.stringify(handshakeData)),
     };
   }
 
@@ -282,7 +282,7 @@ class NodeIdentity {
       }
 
       const { data, signature } = handshake;
-      
+
       // Verify signature
       if (!this.verify(JSON.stringify(data), signature, data.publicKey)) {
         logger.warn('IDENTITY', 'Invalid handshake signature');

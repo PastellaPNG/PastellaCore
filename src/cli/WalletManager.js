@@ -18,7 +18,7 @@ class WalletManager {
     }
 
     const command = args[0];
-    
+
     switch (command) {
       case 'create':
         await this.createWallet();
@@ -65,7 +65,11 @@ class WalletManager {
         break;
       default:
         console.log(chalk.red(`❌ Unknown wallet command: ${command}`));
-        console.log(chalk.cyan('Available commands: create, load, unload, balance, send, info, sync, resync, save, transactions, transaction-info'));
+        console.log(
+          chalk.cyan(
+            'Available commands: create, load, unload, balance, send, info, sync, resync, save, transactions, transaction-info'
+          )
+        );
     }
   }
 
@@ -77,23 +81,23 @@ class WalletManager {
           name: 'walletName',
           message: 'Enter wallet name:',
           default: 'default',
-          validate: (input) => {
+          validate: input => {
             if (!input.trim()) {
               return 'Wallet name cannot be empty';
             }
             return true;
-          }
+          },
         },
         {
           type: 'password',
           name: 'password',
           message: 'Enter wallet password:',
-          validate: (input) => {
+          validate: input => {
             if (input.length < 6) {
               return 'Password must be at least 6 characters long';
             }
             return true;
-          }
+          },
         },
         {
           type: 'password',
@@ -104,15 +108,15 @@ class WalletManager {
               return 'Passwords do not match';
             }
             return true;
-          }
-        }
+          },
+        },
       ]);
 
       // Check if wallet file already exists
       const walletName = answers.walletName.endsWith('.wallet') ? answers.walletName : answers.walletName + '.wallet';
       const dataDir = this.cli.localBlockchain.dataDir || './data';
       const walletPath = path.join(process.cwd(), dataDir, walletName);
-      
+
       if (fs.existsSync(walletPath)) {
         console.log(chalk.red(`❌ Wallet file "${walletName}" already exists. Please choose a different name.`));
         return;
@@ -127,7 +131,6 @@ class WalletManager {
       console.log(chalk.cyan(`Address: ${this.cli.localWallet.getAddress()}`));
       console.log(chalk.cyan(`File: ${walletName}`));
       console.log(chalk.yellow('💡 Use "wallet load" to load your wallet'));
-
     } catch (error) {
       console.log(chalk.red(`❌ Error: ${error}`));
     }
@@ -153,7 +156,6 @@ class WalletManager {
       console.log(chalk.blue('💰 Wallet Balance:'));
       console.log(chalk.cyan(`Address: ${this.cli.localWallet.getAddress()}`));
       console.log(chalk.green(`Balance: ${balance} PAS`));
-
     } catch (error) {
       console.log(chalk.red(`❌ Error: ${error}`));
     }
@@ -183,7 +185,7 @@ class WalletManager {
         console.log(chalk.red('❌ Invalid amount. Must be a positive number.'));
         return;
       }
-      
+
       if (isNaN(feeNum) || feeNum < 0) {
         console.log(chalk.red('❌ Invalid fee. Must be a non-negative number.'));
         return;
@@ -191,7 +193,11 @@ class WalletManager {
 
       // Validate recipient address
       if (!this.cli.validateAddress(address)) {
-        console.log(chalk.red('❌ Invalid recipient address. Please enter a valid wallet address (26-35 characters, starts with 1 or 3).'));
+        console.log(
+          chalk.red(
+            '❌ Invalid recipient address. Please enter a valid wallet address (26-35 characters, starts with 1 or 3).'
+          )
+        );
         return;
       }
 
@@ -203,24 +209,24 @@ class WalletManager {
       console.log(chalk.cyan(`Fee: ${feeNum} PAS`));
       console.log(chalk.cyan(`Total: ${amountNum + feeNum} PAS`));
       console.log(chalk.cyan(`Balance: ${this.cli.localWallet.getBalance()} PAS`));
-      
+
       const confirmQuestion = {
         type: 'confirm',
         name: 'confirm',
         message: 'Are you sure you want to send this transaction?',
-        default: false
+        default: false,
       };
 
       const confirmation = await inquirer.prompt([confirmQuestion]);
-      
+
       if (!confirmation.confirm) {
         console.log(chalk.yellow('❌ Transaction cancelled.'));
         return;
       }
-      
+
       // Create transaction
       const transaction = this.cli.localWallet.createTransaction(address, amountNum, feeNum, this.cli.localBlockchain);
-      
+
       if (!transaction) {
         console.log(chalk.red('❌ Failed to create transaction.'));
         return;
@@ -237,17 +243,17 @@ class WalletManager {
 
       // Submit transaction to daemon
       const response = await this.cli.makeApiRequest('/api/blockchain/transactions', 'POST', {
-        transaction: transaction.toJSON()
+        transaction: transaction.toJSON(),
       });
-      
+
       console.log(chalk.green('✅ Transaction sent successfully!'));
       console.log(chalk.cyan(`Transaction ID: ${transaction.id}`));
       console.log(chalk.cyan(`Amount: ${amountNum} PAS`));
       console.log(chalk.cyan(`Fee: ${feeNum} PAS`));
       console.log(chalk.cyan(`To: ${address}`));
-      
+
       // Replay protection already shown above
-      
+
       // Add sent transaction to history
       const sentTransactionData = {
         id: transaction.id,
@@ -258,13 +264,12 @@ class WalletManager {
         txHash: transaction.id,
         timestamp: Date.now(),
         isCoinbase: false,
-        address: address
+        address: address,
       };
       this.cli.localWallet.addTransactionToHistory(sentTransactionData);
-      
+
       // Update wallet balance
       this.cli.localWallet.updateBalance(this.cli.localBlockchain);
-      
     } catch (error) {
       console.log(chalk.red(`❌ Error: ${error}`));
     }
@@ -282,10 +287,10 @@ class WalletManager {
       if (connected) {
         await this.syncWalletWithDaemon();
       }
-      
+
       const info = this.cli.localWallet.getInfo();
       const syncState = this.cli.localWallet.getSyncState();
-      
+
       console.log(chalk.blue('👛 Wallet Information:'));
       console.log(chalk.cyan(`Name: ${this.cli.walletName}`));
       console.log(chalk.cyan(`Address: ${info.address}`));
@@ -296,11 +301,18 @@ class WalletManager {
       console.log('');
       console.log(chalk.blue('📊 Sync Information:'));
       console.log(chalk.cyan(`Last Synced Height: ${syncState.lastSyncedHeight}`));
-      console.log(chalk.cyan(`Last Synced Hash: ${syncState.lastSyncedHash ? syncState.lastSyncedHash.substring(0, 16) + '...' : 'None'}`));
-      console.log(chalk.cyan(`Last Sync Time: ${syncState.lastSyncTime ? new Date(syncState.lastSyncTime).toLocaleString() : 'Never'}`));
+      console.log(
+        chalk.cyan(
+          `Last Synced Hash: ${syncState.lastSyncedHash ? syncState.lastSyncedHash.substring(0, 16) + '...' : 'None'}`
+        )
+      );
+      console.log(
+        chalk.cyan(
+          `Last Sync Time: ${syncState.lastSyncTime ? new Date(syncState.lastSyncTime).toLocaleString() : 'Never'}`
+        )
+      );
       console.log(chalk.cyan(`Total Transactions: ${syncState.totalTransactions}`));
       console.log(chalk.cyan(`Last Balance: ${syncState.lastBalance} PAS`));
-      
     } catch (error) {
       console.log(chalk.red(`❌ Error: ${error}`));
     }
@@ -313,13 +325,13 @@ class WalletManager {
           type: 'input',
           name: 'walletName',
           message: 'Enter wallet name:',
-          default: 'default'
+          default: 'default',
         },
         {
           type: 'password',
           name: 'password',
-          message: 'Enter wallet password:'
-        }
+          message: 'Enter wallet password:',
+        },
       ]);
 
       const walletName = answers.walletName.endsWith('.wallet') ? answers.walletName : answers.walletName + '.wallet';
@@ -333,7 +345,7 @@ class WalletManager {
 
       // Load wallet
       this.cli.localWallet.loadFromFile(walletPath, answers.password);
-      
+
       // Set wallet state
       this.cli.walletLoaded = true;
       this.cli.walletName = answers.walletName.replace('.wallet', '');
@@ -342,7 +354,7 @@ class WalletManager {
 
       // Sync with daemon
       await this.syncWalletWithDaemon();
-      
+
       // Start auto-sync
       this.startWalletSync();
 
@@ -351,7 +363,6 @@ class WalletManager {
       console.log(chalk.cyan(`Wallet File: ${walletName}`));
       console.log(chalk.cyan(`Address: ${this.cli.localWallet.getAddress()}`));
       console.log(chalk.cyan(`Balance: ${this.cli.localWallet.getBalance()} PAS`));
-
     } catch (error) {
       console.log(chalk.red(`❌ Error: ${error}`));
     }
@@ -369,7 +380,7 @@ class WalletManager {
 
       // Unload wallet
       this.cli.localWallet.unloadWallet();
-      
+
       // Clear wallet state
       this.cli.walletLoaded = false;
       this.cli.walletName = null;
@@ -377,7 +388,6 @@ class WalletManager {
       this.cli.walletPassword = null;
 
       console.log(chalk.green('✅ Wallet unloaded successfully!'));
-
     } catch (error) {
       console.log(chalk.red(`❌ Error: ${error}`));
     }
@@ -402,11 +412,15 @@ class WalletManager {
 
       const syncState = this.cli.localWallet.getSyncState();
       const startIndex = syncState.lastSyncedHeight + 1;
-      
+
       console.log('');
       console.log(chalk.cyan(`🔄 Syncing wallet with blockchain (${startIndex} → ${currentHeight})...`));
       if (syncState.lastSyncedHeight > 0) {
-        console.log(chalk.gray(`📊 Previous sync: ${syncState.lastSyncedHeight} blocks, ${syncState.totalTransactions} transactions`));
+        console.log(
+          chalk.gray(
+            `📊 Previous sync: ${syncState.lastSyncedHeight} blocks, ${syncState.totalTransactions} transactions`
+          )
+        );
       }
 
       // Get blocks from daemon
@@ -421,21 +435,22 @@ class WalletManager {
         if (blockData.index >= startIndex && blockData.index <= currentHeight) {
           try {
             const block = Block.fromJSON(blockData);
-            
+
             // Check for wallet transactions in this block before adding it
             block.transactions.forEach(tx => {
               const walletAddress = this.cli.localWallet.getAddress();
-              const isInvolved = tx.outputs.some(output => output.address === walletAddress) ||
-                                tx.inputs.some(input => {
-                                  // For inputs, we need to check if the previous output was to our address
-                                  return false; // We'll focus on outputs for now
-                                });
-              
+              const isInvolved =
+                tx.outputs.some(output => output.address === walletAddress) ||
+                tx.inputs.some(input => {
+                  // For inputs, we need to check if the previous output was to our address
+                  return false; // We'll focus on outputs for now
+                });
+
               if (isInvolved) {
                 const receivedAmount = tx.outputs
                   .filter(output => output.address === walletAddress)
                   .reduce((sum, output) => sum + output.amount, 0);
-                
+
                 if (receivedAmount > 0) {
                   walletTransactions.push({
                     type: 'received',
@@ -443,9 +458,9 @@ class WalletManager {
                     blockHeight: block.index,
                     txHash: tx.id,
                     address: walletAddress,
-                    isCoinbase: tx.tag === 'COINBASE'
+                    isCoinbase: tx.tag === 'COINBASE',
                   });
-                  
+
                   // Add transaction to wallet history with processed data
                   const transactionData = {
                     id: tx.id,
@@ -455,13 +470,13 @@ class WalletManager {
                     txHash: tx.id,
                     timestamp: block.timestamp,
                     isCoinbase: tx.tag === 'COINBASE',
-                    address: walletAddress
+                    address: walletAddress,
                   };
                   this.cli.localWallet.addTransactionToHistory(transactionData);
                 }
               }
             });
-            
+
             this.cli.localBlockchain.addBlock(block, true); // Suppress logging
           } catch (error) {
             console.log(chalk.red(`❌ Failed to process block ${blockData.index}: ${error}`));
@@ -484,7 +499,7 @@ class WalletManager {
 
       // Update wallet balance
       this.cli.localWallet.updateBalance(this.cli.localBlockchain);
-      
+
       // Update sync state with current blockchain state
       const latestBlock = this.cli.localBlockchain.getLatestBlock();
       this.cli.localWallet.updateSyncState(
@@ -495,7 +510,7 @@ class WalletManager {
 
       console.log(chalk.green(`✅ Wallet 100% synced! Balance: ${this.cli.localWallet.getBalance()} PAS`));
       console.log(chalk.gray(`📊 Sync progress: ${this.cli.localWallet.getSyncProgress(currentHeight)}%`));
-      
+
       // Auto-save wallet with updated sync state
       try {
         this.cli.localWallet.saveWallet(this.cli.walletPath, this.cli.walletPassword);
@@ -505,7 +520,6 @@ class WalletManager {
       }
 
       return true;
-
     } catch (error) {
       console.log(chalk.red(`❌ Failed to sync wallet: ${error}`));
       return false;
@@ -540,21 +554,22 @@ class WalletManager {
       for (const blockData of blocks) {
         try {
           const block = Block.fromJSON(blockData);
-          
+
           // Check for wallet transactions in this block
           block.transactions.forEach(tx => {
             const walletAddress = this.cli.localWallet.getAddress();
-            const isInvolved = tx.outputs.some(output => output.address === walletAddress) ||
-                              tx.inputs.some(input => {
-                                // For inputs, we need to check if the previous output was to our address
-                                return false; // We'll focus on outputs for now
-                              });
-            
+            const isInvolved =
+              tx.outputs.some(output => output.address === walletAddress) ||
+              tx.inputs.some(input => {
+                // For inputs, we need to check if the previous output was to our address
+                return false; // We'll focus on outputs for now
+              });
+
             if (isInvolved) {
               const receivedAmount = tx.outputs
                 .filter(output => output.address === walletAddress)
                 .reduce((sum, output) => sum + output.amount, 0);
-              
+
               if (receivedAmount > 0) {
                 walletTransactions.push({
                   type: 'received',
@@ -562,9 +577,9 @@ class WalletManager {
                   blockHeight: block.index,
                   txHash: tx.id,
                   address: walletAddress,
-                  isCoinbase: tx.tag === 'COINBASE'
+                  isCoinbase: tx.tag === 'COINBASE',
                 });
-                
+
                 // Add transaction to wallet history with processed data
                 const transactionData = {
                   id: tx.id,
@@ -574,15 +589,14 @@ class WalletManager {
                   txHash: tx.id,
                   timestamp: block.timestamp,
                   isCoinbase: tx.tag === 'COINBASE',
-                  address: walletAddress
+                  address: walletAddress,
                 };
                 this.cli.localWallet.addTransactionToHistory(transactionData);
               }
             }
           });
-          
+
           // IMPORTANT: DO NOT call addBlock() - this preserves the local blockchain
-          
         } catch (error) {
           console.log(chalk.red(`❌ Failed to process block ${blockData.index}: ${error}`));
           return false;
@@ -609,7 +623,7 @@ class WalletManager {
         }
       });
       this.cli.localWallet.balance = calculatedBalance;
-      
+
       // Update sync state with daemon blockchain state
       this.cli.localWallet.updateSyncState(
         currentHeight,
@@ -619,7 +633,7 @@ class WalletManager {
 
       console.log(chalk.green(`✅ Wallet state synced with daemon! Balance: ${this.cli.localWallet.getBalance()} PAS`));
       console.log(chalk.gray(`📊 Daemon height: ${currentHeight} blocks`));
-      
+
       // Auto-save wallet with updated sync state
       try {
         this.cli.localWallet.saveWallet(this.cli.walletPath, this.cli.walletPassword);
@@ -629,14 +643,11 @@ class WalletManager {
       }
 
       return true;
-
     } catch (error) {
       console.log(chalk.red(`❌ Failed to sync wallet state: ${error}`));
       return false;
     }
   }
-
-
 
   startWalletSync() {
     // Start periodic sync every 30 seconds
@@ -664,8 +675,9 @@ class WalletManager {
       console.log(chalk.cyan('🔄 Force resyncing wallet from beginning...'));
 
       // Store pending transactions before resync
-      const pendingTransactions = this.cli.localBlockchain.memoryPool ? 
-        [...this.cli.localBlockchain.memoryPool.getPendingTransactions()] : [];
+      const pendingTransactions = this.cli.localBlockchain.memoryPool
+        ? [...this.cli.localBlockchain.memoryPool.getPendingTransactions()]
+        : [];
       console.log(chalk.yellow(`⚠️  Preserving ${pendingTransactions.length} pending transactions during resync`));
 
       // Get daemon blockchain status to ensure compatibility
@@ -675,7 +687,9 @@ class WalletManager {
         return;
       }
 
-      console.log(chalk.cyan(`📊 Daemon blockchain: ${daemonStatus.height} blocks, difficulty: ${daemonStatus.difficulty}`));
+      console.log(
+        chalk.cyan(`📊 Daemon blockchain: ${daemonStatus.height} blocks, difficulty: ${daemonStatus.difficulty}`)
+      );
 
       // Clear the local blockchain to start fresh
       console.log(chalk.cyan('🧹 Clearing local blockchain for fresh sync...'));
@@ -716,7 +730,6 @@ class WalletManager {
       console.log(chalk.green(`✅ Local blockchain synced: ${blockchainHeight} blocks, ${utxoCount} UTXOs`));
 
       console.log(chalk.green('✅ Wallet resync completed'));
-
     } catch (error) {
       console.log(chalk.red(`❌ Error: ${error}`));
     }
@@ -731,7 +744,6 @@ class WalletManager {
 
       this.cli.localWallet.saveWallet(this.cli.walletPath, this.cli.walletPassword);
       console.log(chalk.green('✅ Wallet saved successfully!'));
-
     } catch (error) {
       console.log(chalk.red(`❌ Error: ${error}`));
     }
@@ -746,73 +758,77 @@ class WalletManager {
 
       const transactions = this.cli.localWallet.getTransactionHistory();
       const totalPages = this.cli.localWallet.getTransactionHistoryPages(10);
-      
+
       if (transactions.length === 0) {
         console.log(chalk.yellow('📋 No transactions found in wallet history.'));
         console.log(chalk.cyan('💡 Try syncing your wallet first with "wallet sync"'));
         return;
       }
 
-      console.log(chalk.blue(`📋 Wallet Transaction History (${transactions.length} transactions, ${totalPages} pages)`));
+      console.log(
+        chalk.blue(`📋 Wallet Transaction History (${transactions.length} transactions, ${totalPages} pages)`)
+      );
       console.log(chalk.gray('Use arrow keys to navigate, ESC to exit'));
       console.log('');
 
       let currentPage = 0;
       const pageSize = 10;
 
-             const showPage = () => {
-         // Clear screen and show header
-         console.clear();
-         console.log(chalk.blue.bold(`📋 Wallet Transaction History`));
-         console.log(chalk.gray(`${transactions.length} transactions • Page ${currentPage + 1} of ${totalPages}`));
-         console.log(chalk.gray('Use ← → to navigate, ESC to exit'));
-         console.log('');
+      const showPage = () => {
+        // Clear screen and show header
+        console.clear();
+        console.log(chalk.blue.bold(`📋 Wallet Transaction History`));
+        console.log(chalk.gray(`${transactions.length} transactions • Page ${currentPage + 1} of ${totalPages}`));
+        console.log(chalk.gray('Use ← → to navigate, ESC to exit'));
+        console.log('');
 
-         const pageTransactions = this.cli.localWallet.getTransactionHistoryPage(currentPage, pageSize);
-         
-         if (pageTransactions.length === 0) {
-           console.log(chalk.yellow('No transactions on this page.'));
-         } else {
-           pageTransactions.forEach((tx, index) => {
-             const globalIndex = currentPage * pageSize + index + 1;
-             const timestamp = tx.timestamp ? new Date(tx.timestamp).toLocaleString('en-US', {
-               month: 'short',
-               day: '2-digit',
-               hour: '2-digit',
-               minute: '2-digit'
-             }) : 'Unknown';
-             const amount = tx.amount || 0;
-             
-             // Determine transaction type and color
-             let type, color, direction;
-             if (tx.type === 'sent') {
-               type = 'SENT';
-               color = chalk.red;
-               direction = `→ ${tx.address.substring(0, 8)}...`;
-             } else if (tx.isCoinbase) {
-               type = 'COINBASE';
-               color = chalk.blue;
-               direction = '← coinbase';
-             } else {
-               type = 'RECEIVED';
-               color = chalk.green;
-               direction = `← ${tx.address.substring(0, 8)}...`;
-             }
-             
-             // Compact 2-line format
-             const line1 = `${chalk.cyan(`${globalIndex.toString().padStart(2)}.`)} ${color(type.padEnd(8))} ${color(`${amount} PAS`.padEnd(12))} ${direction.padEnd(20)} ${chalk.gray(`Block ${tx.blockHeight || 'Pending'}`)}`;
-             const line2 = `    ${chalk.gray(`Hash: ${tx.txHash ? tx.txHash.substring(0, 12) + '...' : 'Unknown'}`)} ${tx.fee ? chalk.yellow(`Fee: ${tx.fee} PAS`) : ''} ${chalk.gray(timestamp)}`;
-             
-             console.log(line1);
-             console.log(line2);
-             console.log('');
-           });
-         }
+        const pageTransactions = this.cli.localWallet.getTransactionHistoryPage(currentPage, pageSize);
 
-         // Footer navigation
-         console.log(chalk.gray('─'.repeat(80)));
-         console.log(chalk.gray(`← Previous page | → Next page | ESC Exit`));
-       };
+        if (pageTransactions.length === 0) {
+          console.log(chalk.yellow('No transactions on this page.'));
+        } else {
+          pageTransactions.forEach((tx, index) => {
+            const globalIndex = currentPage * pageSize + index + 1;
+            const timestamp = tx.timestamp
+              ? new Date(tx.timestamp).toLocaleString('en-US', {
+                  month: 'short',
+                  day: '2-digit',
+                  hour: '2-digit',
+                  minute: '2-digit',
+                })
+              : 'Unknown';
+            const amount = tx.amount || 0;
+
+            // Determine transaction type and color
+            let type, color, direction;
+            if (tx.type === 'sent') {
+              type = 'SENT';
+              color = chalk.red;
+              direction = `→ ${tx.address.substring(0, 8)}...`;
+            } else if (tx.isCoinbase) {
+              type = 'COINBASE';
+              color = chalk.blue;
+              direction = '← coinbase';
+            } else {
+              type = 'RECEIVED';
+              color = chalk.green;
+              direction = `← ${tx.address.substring(0, 8)}...`;
+            }
+
+            // Compact 2-line format
+            const line1 = `${chalk.cyan(`${globalIndex.toString().padStart(2)}.`)} ${color(type.padEnd(8))} ${color(`${amount} PAS`.padEnd(12))} ${direction.padEnd(20)} ${chalk.gray(`Block ${tx.blockHeight || 'Pending'}`)}`;
+            const line2 = `    ${chalk.gray(`Hash: ${tx.txHash ? tx.txHash.substring(0, 12) + '...' : 'Unknown'}`)} ${tx.fee ? chalk.yellow(`Fee: ${tx.fee} PAS`) : ''} ${chalk.gray(timestamp)}`;
+
+            console.log(line1);
+            console.log(line2);
+            console.log('');
+          });
+        }
+
+        // Footer navigation
+        console.log(chalk.gray('─'.repeat(80)));
+        console.log(chalk.gray(`← Previous page | → Next page | ESC Exit`));
+      };
 
       showPage();
 
@@ -848,82 +864,80 @@ class WalletManager {
       };
 
       process.stdin.on('keypress', handleKeypress);
-
-          } catch (error) {
-        console.log(chalk.red(`❌ Error: ${error}`));
-      }
+    } catch (error) {
+      console.log(chalk.red(`❌ Error: ${error}`));
     }
+  }
 
-    async showTransactionInfo(txId) {
-      try {
-        if (!this.cli.walletLoaded) {
-          console.log(chalk.red('❌ No wallet loaded. Use "wallet load" first.'));
-          return;
-        }
+  async showTransactionInfo(txId) {
+    try {
+      if (!this.cli.walletLoaded) {
+        console.log(chalk.red('❌ No wallet loaded. Use "wallet load" first.'));
+        return;
+      }
 
-        // Try to find transaction in local history first
-        const localHistory = this.cli.localWallet.getTransactionHistory();
-        const localTx = localHistory.find(tx => tx.id === txId);
-        
-        if (localTx) {
-          console.log(chalk.blue('📋 Transaction Information (Local):'));
-          console.log(chalk.cyan(`  ID: ${localTx.id}`));
-          console.log(chalk.cyan(`  Type: ${localTx.type.toUpperCase()}`));
-          console.log(chalk.cyan(`  Amount: ${localTx.amount} PAS`));
-          if (localTx.fee) console.log(chalk.cyan(`  Fee: ${localTx.fee} PAS`));
-          console.log(chalk.cyan(`  Address: ${localTx.address}`));
-          console.log(chalk.cyan(`  Block Height: ${localTx.blockHeight || 'Pending'}`));
-          console.log(chalk.cyan(`  Timestamp: ${new Date(localTx.timestamp).toLocaleString()}`));
-          console.log(chalk.cyan(`  Status: ${localTx.blockHeight ? 'Confirmed' : 'Pending'}`));
-          return;
-        }
+      // Try to find transaction in local history first
+      const localHistory = this.cli.localWallet.getTransactionHistory();
+      const localTx = localHistory.find(tx => tx.id === txId);
 
-        // Try to get transaction from daemon
-        const connected = await this.cli.checkDaemonConnection();
-        if (connected) {
-          try {
-            const response = await this.cli.makeApiRequest(`/api/blockchain/transactions/${txId}`);
-            if (response) {
-              console.log(chalk.blue('📋 Transaction Information (Network):'));
-              console.log(chalk.cyan(`  ID: ${response.id}`));
-              console.log(chalk.cyan(`  Amount: ${response.outputs.reduce((sum, out) => sum + out.amount, 0)} PAS`));
-              console.log(chalk.cyan(`  Fee: ${response.fee} PAS`));
-              console.log(chalk.cyan(`  Timestamp: ${new Date(response.timestamp).toLocaleString()}`));
-              console.log(chalk.cyan(`  Tag: ${response.tag}`));
-              
-              // Show replay protection info if available
-              if (response.nonce && response.expiresAt) {
-                console.log(chalk.yellow('🛡️  Replay Protection:'));
-                console.log(chalk.cyan(`  Nonce: ${response.nonce.substring(0, 16)}...`));
-                console.log(chalk.cyan(`  Sequence: ${response.sequence || 0}`));
-                console.log(chalk.cyan(`  Expires: ${new Date(response.expiresAt).toLocaleString()}`));
-                
-                const now = Date.now();
-                const expiresAt = response.expiresAt;
-                if (now > expiresAt) {
-                  console.log(chalk.red('  Status: EXPIRED'));
-                } else {
-                  const timeLeft = expiresAt - now;
-                  const hoursLeft = Math.floor(timeLeft / (1000 * 60 * 60));
-                  console.log(chalk.green(`  Status: Valid (${hoursLeft} hours left)`));
-                }
+      if (localTx) {
+        console.log(chalk.blue('📋 Transaction Information (Local):'));
+        console.log(chalk.cyan(`  ID: ${localTx.id}`));
+        console.log(chalk.cyan(`  Type: ${localTx.type.toUpperCase()}`));
+        console.log(chalk.cyan(`  Amount: ${localTx.amount} PAS`));
+        if (localTx.fee) console.log(chalk.cyan(`  Fee: ${localTx.fee} PAS`));
+        console.log(chalk.cyan(`  Address: ${localTx.address}`));
+        console.log(chalk.cyan(`  Block Height: ${localTx.blockHeight || 'Pending'}`));
+        console.log(chalk.cyan(`  Timestamp: ${new Date(localTx.timestamp).toLocaleString()}`));
+        console.log(chalk.cyan(`  Status: ${localTx.blockHeight ? 'Confirmed' : 'Pending'}`));
+        return;
+      }
+
+      // Try to get transaction from daemon
+      const connected = await this.cli.checkDaemonConnection();
+      if (connected) {
+        try {
+          const response = await this.cli.makeApiRequest(`/api/blockchain/transactions/${txId}`);
+          if (response) {
+            console.log(chalk.blue('📋 Transaction Information (Network):'));
+            console.log(chalk.cyan(`  ID: ${response.id}`));
+            console.log(chalk.cyan(`  Amount: ${response.outputs.reduce((sum, out) => sum + out.amount, 0)} PAS`));
+            console.log(chalk.cyan(`  Fee: ${response.fee} PAS`));
+            console.log(chalk.cyan(`  Timestamp: ${new Date(response.timestamp).toLocaleString()}`));
+            console.log(chalk.cyan(`  Tag: ${response.tag}`));
+
+            // Show replay protection info if available
+            if (response.nonce && response.expiresAt) {
+              console.log(chalk.yellow('🛡️  Replay Protection:'));
+              console.log(chalk.cyan(`  Nonce: ${response.nonce.substring(0, 16)}...`));
+              console.log(chalk.cyan(`  Sequence: ${response.sequence || 0}`));
+              console.log(chalk.cyan(`  Expires: ${new Date(response.expiresAt).toLocaleString()}`));
+
+              const now = Date.now();
+              const expiresAt = response.expiresAt;
+              if (now > expiresAt) {
+                console.log(chalk.red('  Status: EXPIRED'));
               } else {
-                console.log(chalk.red('  Replay Protection: NOT AVAILABLE'));
+                const timeLeft = expiresAt - now;
+                const hoursLeft = Math.floor(timeLeft / (1000 * 60 * 60));
+                console.log(chalk.green(`  Status: Valid (${hoursLeft} hours left)`));
               }
             } else {
-              console.log(chalk.red('❌ Transaction not found on network'));
+              console.log(chalk.red('  Replay Protection: NOT AVAILABLE'));
             }
-          } catch (error) {
-            console.log(chalk.red('❌ Failed to fetch transaction from network'));
+          } else {
+            console.log(chalk.red('❌ Transaction not found on network'));
           }
-        } else {
-          console.log(chalk.red('❌ Transaction not found locally and no network connection'));
+        } catch (error) {
+          console.log(chalk.red('❌ Failed to fetch transaction from network'));
         }
-        
-      } catch (error) {
-        console.log(chalk.red(`❌ Error: ${error}`));
+      } else {
+        console.log(chalk.red('❌ Transaction not found locally and no network connection'));
       }
+    } catch (error) {
+      console.log(chalk.red(`❌ Error: ${error}`));
     }
+  }
 }
 
 module.exports = WalletManager;

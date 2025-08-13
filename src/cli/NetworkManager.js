@@ -72,24 +72,23 @@ class NetworkManager {
       }
 
       const response = await this.cli.makeApiRequest('/api/blockchain/status');
-      
+
       console.log(chalk.blue('🔗 Blockchain Status:'));
       console.log(chalk.cyan(`Height: ${response.length}`));
       console.log(chalk.cyan(`Difficulty: ${response.difficulty}`));
       console.log(chalk.cyan(`Pending Transactions: ${response.pendingTransactions || 0}`));
-      
+
       if (response.chainWork) {
         console.log(chalk.cyan(`Chain Work: ${response.chainWork}`));
       }
       if (response.securityLevel) {
         console.log(chalk.cyan(`Security Level: ${response.securityLevel}`));
       }
-      
+
       if (response.latestBlock) {
         console.log(chalk.cyan(`Latest Block: ${response.latestBlock.hash.substring(0, 16)}...`));
         console.log(chalk.cyan(`Block Time: ${new Date(response.latestBlock.timestamp).toLocaleString()}`));
       }
-      
     } catch (error) {
       console.log(chalk.red(`❌ Error: ${error.message}`));
     }
@@ -110,24 +109,24 @@ class NetworkManager {
         console.log(chalk.red('═══════════════════════════════════════════════════════════════'));
         console.log(chalk.cyan('  Timestamp:'), chalk.white(response.timestamp));
         console.log('');
-        
+
         console.log(chalk.cyan('  Blockchain Status:'));
         console.log(chalk.white(`    Height: ${response.blockchain.height}`));
         console.log(chalk.white(`    Difficulty: ${response.blockchain.difficulty}`));
         console.log(chalk.white(`    Last Block: ${response.blockchain.lastBlockHash.substring(0, 16)}...`));
         console.log('');
-        
+
         console.log(chalk.cyan('  Consensus Status:'));
         console.log(chalk.white(`    Security Level: ${response.consensus.securityLevel}/100`));
         console.log(chalk.white(`    Network Partition: ${response.consensus.networkPartition ? '⚠️  YES' : '✅ NO'}`));
         console.log(chalk.white(`    Suspicious Miners: ${response.consensus.suspiciousMiners.length}`));
         console.log('');
-        
+
         if (response.threats.length > 0) {
           console.log(chalk.red('  🚨 ACTIVE THREATS:'));
           response.threats.forEach((threat, index) => {
-            const severityColor = threat.severity === 'HIGH' ? chalk.red : 
-                                threat.severity === 'MEDIUM' ? chalk.yellow : chalk.blue;
+            const severityColor =
+              threat.severity === 'HIGH' ? chalk.red : threat.severity === 'MEDIUM' ? chalk.yellow : chalk.blue;
             console.log(severityColor(`    ${index + 1}. [${threat.severity}] ${threat.type}`));
             console.log(chalk.white(`       ${threat.description}`));
             console.log(chalk.gray(`       Recommendation: ${threat.recommendation}`));
@@ -137,17 +136,17 @@ class NetworkManager {
           console.log(chalk.green('  ✅ No active threats detected'));
           console.log('');
         }
-        
+
         if (response.recommendations.length > 0) {
           console.log(chalk.cyan('  📋 SECURITY RECOMMENDATIONS:'));
           response.recommendations.forEach((rec, index) => {
-            const priorityColor = rec.priority === 'HIGH' ? chalk.red : 
-                                rec.priority === 'MEDIUM' ? chalk.yellow : chalk.blue;
+            const priorityColor =
+              rec.priority === 'HIGH' ? chalk.red : rec.priority === 'MEDIUM' ? chalk.yellow : chalk.blue;
             console.log(priorityColor(`    ${index + 1}. [${rec.priority}] ${rec.action}`));
             console.log(chalk.white(`       ${rec.description}`));
           });
         }
-        
+
         console.log(chalk.red('═══════════════════════════════════════════════════════════════'));
       }
     } catch (error) {
@@ -174,15 +173,15 @@ class NetworkManager {
         console.log(chalk.cyan('  Expired Transactions:'), chalk.red(response.expired || 0));
         console.log(chalk.cyan('  Expiring Soon (< 1 hour):'), chalk.yellow(response.expiringSoon || 0));
         console.log(chalk.cyan('  Last Cleanup:'), chalk.white(response.lastCleanup || 'Never'));
-        
+
         if (response.expired > 0) {
           console.log(chalk.yellow('\n  🔄 Auto-cleanup will remove expired transactions'));
         }
-        
+
         if (response.expiringSoon > 0) {
           console.log(chalk.yellow('\n  ⏰ Some transactions will expire soon'));
         }
-        
+
         console.log(chalk.yellow('═══════════════════════════════════════════════════════════════'));
       }
     } catch (error) {
@@ -201,13 +200,13 @@ class NetworkManager {
       const response = await this.cli.makeApiRequest('/api/rate-limits/stats');
       if (response && response.success) {
         const stats = response.data;
-        
+
         console.log(chalk.blue('═══════════════════════════════════════════════════════════════'));
         console.log(chalk.blue.bold('                    RATE LIMITING STATISTICS'));
         console.log(chalk.blue('═══════════════════════════════════════════════════════════════'));
         console.log(chalk.cyan('  Total Tracked IPs:'), chalk.white(stats.totalTrackedIPs || 0));
         console.log(chalk.cyan('  Total Requests:'), chalk.white(stats.totalRequests || 0));
-        
+
         if (stats.endpointStats && Object.keys(stats.endpointStats).length > 0) {
           console.log(chalk.cyan('\n  📊 Endpoint Statistics:'));
           for (const [endpoint, endpointData] of Object.entries(stats.endpointStats)) {
@@ -216,7 +215,7 @@ class NetworkManager {
             console.log(chalk.white(`      Unique IPs: ${endpointData.ips}`));
           }
         }
-        
+
         console.log(chalk.blue('═══════════════════════════════════════════════════════════════'));
         console.log(chalk.gray('💡 Use "chain rate-limits reset <ip>" to reset limits for specific IP'));
         console.log(chalk.gray('💡 Use "chain rate-limits reset-all" to reset all limits'));
@@ -235,7 +234,7 @@ class NetworkManager {
       }
 
       console.log(chalk.yellow(`🔄 Resetting rate limits for IP: ${ip}`));
-      
+
       const response = await this.cli.makeApiRequest(`/api/rate-limits/reset/${ip}`, 'POST');
       if (response && response.success) {
         console.log(chalk.green('✅ Rate limits reset successfully!'));
@@ -257,7 +256,7 @@ class NetworkManager {
       }
 
       console.log(chalk.yellow('🔄 Resetting all rate limits...'));
-      
+
       const response = await this.cli.makeApiRequest('/api/rate-limits/reset-all', 'POST');
       if (response && response.success) {
         console.log(chalk.green('✅ All rate limits reset successfully!'));
@@ -282,7 +281,7 @@ class NetworkManager {
       console.log(chalk.red('⚠️  All blocks, transactions, and balances will be lost!'));
       console.log(chalk.red('⚠️  This action cannot be undone!'));
       console.log('');
-      
+
       const response = await this.cli.makeApiRequest('/api/blockchain/reset', 'POST');
       if (response && response.success) {
         console.log(chalk.green('✅ Blockchain reset successfully!'));
@@ -306,7 +305,7 @@ class NetworkManager {
       }
 
       const response = await this.cli.makeApiRequest(`/api/blockchain/blocks?limit=${limit}`);
-      
+
       console.log(chalk.blue(`🔗 Recent blocks (${response.blocks.length}):`));
       response.blocks.forEach((block, index) => {
         console.log(chalk.cyan(`${block.index}. Block ${block.index}`));
@@ -316,7 +315,6 @@ class NetworkManager {
         console.log(`   Timestamp: ${new Date(block.timestamp).toLocaleString()}`);
         console.log('');
       });
-
     } catch (error) {
       console.log(chalk.red(`❌ Error: ${error.message}`));
     }
@@ -331,7 +329,7 @@ class NetworkManager {
       }
 
       const response = await this.cli.makeApiRequest(`/api/blockchain/blocks/${index}`);
-      
+
       console.log(chalk.blue(`🔗 Block ${response.index}:`));
       console.log(chalk.cyan(`Hash: ${response.hash}`));
       console.log(chalk.cyan(`Previous Hash: ${response.previousHash}`));
@@ -354,7 +352,7 @@ class NetworkManager {
       }
 
       const response = await this.cli.makeApiRequest('/api/blockchain/transactions');
-      
+
       if (response.transactions.length === 0) {
         console.log(chalk.yellow('No pending transactions.'));
         return;
@@ -417,15 +415,19 @@ class NetworkManager {
       case 'message-validation-reset':
         await this.resetMessageValidationStats();
         break;
-        case 'partition-stats':
-          await this.showPartitionStats();
-          break;
-        case 'partition-reset':
-          await this.resetPartitionStats();
-          break;
+      case 'partition-stats':
+        await this.showPartitionStats();
+        break;
+      case 'partition-reset':
+        await this.resetPartitionStats();
+        break;
       default:
         console.log(chalk.red(`❌ Unknown network command: ${subCmd}`));
-        console.log(chalk.cyan('Available commands: status, peers, connect, reputation, peer-reputation, identity, authenticated, message-validation, message-validation-reset, partition-stats, partition-reset'));
+        console.log(
+          chalk.cyan(
+            'Available commands: status, peers, connect, reputation, peer-reputation, identity, authenticated, message-validation, message-validation-reset, partition-stats, partition-reset'
+          )
+        );
     }
   }
 
@@ -438,13 +440,15 @@ class NetworkManager {
       }
 
       const response = await this.cli.makeApiRequest('/api/network/status');
-      
+
       console.log(chalk.blue('🌐 Network Status:'));
       console.log(chalk.cyan(`Status: ${response.isRunning ? 'Running' : 'Stopped'}`));
       console.log(chalk.cyan(`Port: ${response.port}`));
       console.log(chalk.cyan(`Peers: ${response.peerCount}/${response.maxPeers}`));
-      console.log(chalk.cyan(`Seed Nodes: ${response.connectedSeedNodes}/${response.minSeedConnections} (min required)`));
-      
+      console.log(
+        chalk.cyan(`Seed Nodes: ${response.connectedSeedNodes}/${response.minSeedConnections} (min required)`)
+      );
+
       // Show reputation information if available
       if (response.reputation) {
         console.log(chalk.cyan(`Reputation System: Active`));
@@ -453,7 +457,7 @@ class NetworkManager {
         console.log(chalk.red(`  Banned Peers: ${response.reputation.bannedPeers}`));
         console.log(chalk.cyan(`  Average Score: ${response.reputation.averageScore}`));
       }
-      
+
       // Show message validation information if available
       if (response.messageValidation) {
         console.log(chalk.cyan(`Message Validation: Active`));
@@ -462,18 +466,28 @@ class NetworkManager {
         console.log(chalk.cyan(`  Validation Rate: ${response.messageValidation.validationRate}%`));
         console.log(chalk.cyan(`  Supported Types: ${response.messageValidation.supportedMessageTypes}`));
       }
-      
+
       // Show partition handling information if available
       if (response.partitionHandling) {
-        const partitionStatus = response.partitionHandling.isPartitioned ? chalk.red('Partitioned') : chalk.green('Healthy');
+        const partitionStatus = response.partitionHandling.isPartitioned
+          ? chalk.red('Partitioned')
+          : chalk.green('Healthy');
         console.log(chalk.cyan(`Partition Handling: ${partitionStatus}`));
         console.log(chalk.cyan(`  Total Partitions: ${response.partitionHandling.totalPartitions}`));
-        console.log(chalk.cyan(`  Recovery Success Rate: ${response.partitionHandling.totalPartitions > 0 ? Math.round((response.partitionHandling.successfulRecoveries / response.partitionHandling.totalPartitions) * 100) : 0}%`));
+        console.log(
+          chalk.cyan(
+            `  Recovery Success Rate: ${response.partitionHandling.totalPartitions > 0 ? Math.round((response.partitionHandling.successfulRecoveries / response.partitionHandling.totalPartitions) * 100) : 0}%`
+          )
+        );
         if (response.partitionHandling.isPartitioned) {
-          console.log(chalk.red(`  Current Partition Duration: ${Math.round(response.partitionHandling.partitionDuration / 1000)}s`));
+          console.log(
+            chalk.red(
+              `  Current Partition Duration: ${Math.round(response.partitionHandling.partitionDuration / 1000)}s`
+            )
+          );
         }
       }
-      
+
       if (response.networkSyncStatus) {
         const syncStatus = response.networkSyncStatus;
         console.log(chalk.cyan(`Sync Status: ${syncStatus.isSyncing ? 'Syncing' : 'Idle'}`));
@@ -482,7 +496,7 @@ class NetworkManager {
         }
         console.log(chalk.cyan(`Sync Attempts: ${syncStatus.syncAttempts}/${syncStatus.maxSyncAttempts}`));
       }
-      
+
       if (response.seedNodes && response.seedNodes.length > 0) {
         console.log(chalk.cyan(`Available Seed Nodes: ${response.seedNodes.length}`));
         response.seedNodes.forEach((node, index) => {
@@ -503,7 +517,7 @@ class NetworkManager {
       }
 
       const response = await this.cli.makeApiRequest('/api/network/peers');
-      
+
       if (response.length === 0) {
         console.log(chalk.yellow('No peers connected.'));
         return;
@@ -515,27 +529,27 @@ class NetworkManager {
         const statusText = peer.readyState === 1 ? 'Connected' : 'Disconnected';
         const authColor = peer.authenticated ? chalk.green : chalk.red;
         const authText = peer.authenticated ? 'Authenticated' : 'Not Authenticated';
-        
+
         console.log(chalk.cyan(`${index + 1}. ${peer.url}`));
         console.log(`   Status: ${statusColor(statusText)}`);
         console.log(`   Authentication: ${authColor(authText)}`);
-        
+
         if (peer.authenticated && peer.nodeId) {
           console.log(`   Node ID: ${peer.nodeId.substring(0, 16)}...`);
           console.log(`   Authenticated: ${new Date(peer.authenticatedAt).toLocaleString()}`);
         }
-        
+
         // Show reputation information if available
         if (peer.reputation) {
-          const scoreColor = peer.reputation.score >= 150 ? chalk.green : 
-                           peer.reputation.score <= 50 ? chalk.red : chalk.yellow;
+          const scoreColor =
+            peer.reputation.score >= 150 ? chalk.green : peer.reputation.score <= 50 ? chalk.red : chalk.yellow;
           console.log(`   Reputation Score: ${scoreColor(peer.reputation.score)}`);
           console.log(`   Messages: ${peer.reputation.messageCount} (${peer.reputation.invalidMessageCount} invalid)`);
           if (peer.reputation.banned) {
             console.log(chalk.red(`   BANNED until ${new Date(peer.reputation.banExpiry).toLocaleString()}`));
           }
         }
-        
+
         console.log('');
       });
     } catch (error) {
@@ -553,9 +567,9 @@ class NetworkManager {
 
       await this.cli.makeApiRequest('/api/network/connect', 'POST', {
         host: host,
-        port: parseInt(port)
+        port: parseInt(port),
       });
-      
+
       console.log(chalk.green(`✅ Connecting to peer ${host}:${port}`));
     } catch (error) {
       console.log(chalk.red(`❌ Error: ${error.message}`));
@@ -588,27 +602,27 @@ class NetworkManager {
       }
 
       const response = await this.cli.makeApiRequest('/api/daemon/status');
-      
+
       console.log(chalk.blue('🚀 Daemon Status:'));
-      
+
       // Handle different response structures safely
       if (response && typeof response === 'object') {
         console.log(chalk.cyan(`Status: ${response.isRunning ? 'Running' : 'Stopped'}`));
-        
+
         if (response.api && typeof response.api === 'object') {
           console.log(chalk.cyan(`API Server: ${response.api.isRunning ? 'Running' : 'Stopped'}`));
           if (response.api.port) {
             console.log(chalk.cyan(`API Port: ${response.api.port}`));
           }
         }
-        
+
         if (response.network && typeof response.network === 'object') {
           console.log(chalk.cyan(`P2P Network: ${response.network.isRunning ? 'Running' : 'Stopped'}`));
           if (response.network.port) {
             console.log(chalk.cyan(`P2P Port: ${response.network.port}`));
           }
         }
-        
+
         if (response.mining && typeof response.mining === 'object') {
           console.log(chalk.cyan(`Mining: ${response.mining.isRunning ? 'Running' : 'Stopped'}`));
         }
@@ -630,7 +644,7 @@ class NetworkManager {
       }
 
       const response = await this.cli.makeApiRequest('/api/network/reputation');
-      
+
       console.log(chalk.blue('🏆 Network Reputation Statistics:'));
       console.log(chalk.cyan(`Total Peers Tracked: ${response.reputation.totalPeers}`));
       console.log(chalk.green(`Good Peers (Score ≥150): ${response.reputation.goodPeers}`));
@@ -638,7 +652,6 @@ class NetworkManager {
       console.log(chalk.red(`Banned Peers: ${response.reputation.bannedPeers}`));
       console.log(chalk.cyan(`Average Score: ${response.reputation.averageScore}`));
       console.log(chalk.gray(`Last Updated: ${new Date(response.timestamp).toLocaleString()}`));
-      
     } catch (error) {
       console.log(chalk.red(`❌ Error: ${error.message}`));
     }
@@ -653,7 +666,7 @@ class NetworkManager {
       }
 
       const response = await this.cli.makeApiRequest(`/api/network/reputation/${encodeURIComponent(peerAddress)}`);
-      
+
       console.log(chalk.blue(`🏆 Peer Reputation: ${response.peerAddress}`));
       console.log(chalk.cyan(`Score: ${response.reputation.score}`));
       console.log(chalk.cyan(`Banned: ${response.reputation.banned ? 'Yes' : 'No'}`));
@@ -669,7 +682,6 @@ class NetworkManager {
       console.log(chalk.green(`Successful Syncs: ${response.reputation.successfulSyncs}`));
       console.log(chalk.gray(`Last Seen: ${new Date(response.reputation.lastSeen).toLocaleString()}`));
       console.log(chalk.gray(`Last Updated: ${new Date(response.timestamp).toLocaleString()}`));
-      
     } catch (error) {
       console.log(chalk.red(`❌ Error: ${error.message}`));
     }
@@ -685,7 +697,7 @@ class NetworkManager {
       }
 
       const response = await this.cli.makeApiRequest('/api/network/status');
-      
+
       console.log(chalk.blue('🆔 Node Identity:'));
       if (response.nodeIdentity) {
         console.log(chalk.cyan(`Node ID: ${response.nodeIdentity.nodeId}`));
@@ -693,7 +705,7 @@ class NetworkManager {
       } else {
         console.log(chalk.yellow('⚠️  Node identity information not available'));
       }
-      
+
       console.log(chalk.blue('\n🔐 Authentication Status:'));
       if (response.authentication) {
         console.log(chalk.cyan(`Authenticated Peers: ${response.authentication.authenticatedPeers}`));
@@ -702,7 +714,6 @@ class NetworkManager {
       } else {
         console.log(chalk.yellow('⚠️  Authentication information not available'));
       }
-      
     } catch (error) {
       console.log(chalk.red(`❌ Error: ${error.message}`));
     }
@@ -717,11 +728,11 @@ class NetworkManager {
       }
 
       const response = await this.cli.makeApiRequest('/api/network/peers');
-      
+
       console.log(chalk.blue('🔐 Authenticated Peers:'));
-      
+
       const authenticatedPeers = response.filter(peer => peer.authenticated);
-      
+
       if (authenticatedPeers.length === 0) {
         console.log(chalk.yellow('⚠️  No authenticated peers found'));
         return;
@@ -737,7 +748,6 @@ class NetworkManager {
       });
 
       console.log(chalk.gray(`Total authenticated peers: ${authenticatedPeers.length}`));
-      
     } catch (error) {
       console.log(chalk.red(`❌ Error: ${error.message}`));
     }
@@ -752,19 +762,18 @@ class NetworkManager {
       }
 
       const response = await this.cli.makeApiRequest('/api/network/message-validation');
-      
+
       console.log(chalk.blue('🔍 Message Validation Statistics:'));
       console.log(chalk.cyan(`Total Messages: ${response.totalMessages.toLocaleString()}`));
       console.log(chalk.green(`Valid Messages: ${response.validMessages.toLocaleString()}`));
       console.log(chalk.red(`Invalid Messages: ${response.invalidMessages.toLocaleString()}`));
-      
+
       const validationRate = response.validationRate;
-      const rateColor = validationRate >= 95 ? chalk.green : 
-                       validationRate >= 80 ? chalk.yellow : chalk.red;
+      const rateColor = validationRate >= 95 ? chalk.green : validationRate >= 80 ? chalk.yellow : chalk.red;
       console.log(chalk.cyan(`Validation Rate: ${rateColor(validationRate + '%')}`));
-      
+
       console.log(chalk.cyan(`Supported Message Types: ${response.validatorStats.messageTypes}`));
-      
+
       // Show error breakdown if there are errors
       if (response.errorBreakdown && Object.keys(response.errorBreakdown).length > 0) {
         console.log(chalk.yellow('\nError Breakdown:'));
@@ -772,14 +781,30 @@ class NetworkManager {
           console.log(chalk.red(`  ${errorType}: ${count}`));
         });
       }
-      
+
       // Show validation rules
       console.log(chalk.cyan('\nValidation Rules:'));
-      console.log(chalk.gray(`  Max Message Size: ${(response.validatorStats.validationRules.maxMessageSize / 1024 / 1024).toFixed(1)} MB`));
-      console.log(chalk.gray(`  Max Timestamp Drift: ${response.validatorStats.validationRules.maxTimestampDrift / 1000 / 60} minutes`));
-      console.log(chalk.gray(`  Max Block Size: ${(response.validatorStats.validationRules.maxBlockSize / 1024 / 1024).toFixed(1)} MB`));
-      console.log(chalk.gray(`  Max Transaction Size: ${(response.validatorStats.validationRules.maxTransactionSize / 1024).toFixed(1)} KB`));
-      
+      console.log(
+        chalk.gray(
+          `  Max Message Size: ${(response.validatorStats.validationRules.maxMessageSize / 1024 / 1024).toFixed(1)} MB`
+        )
+      );
+      console.log(
+        chalk.gray(
+          `  Max Timestamp Drift: ${response.validatorStats.validationRules.maxTimestampDrift / 1000 / 60} minutes`
+        )
+      );
+      console.log(
+        chalk.gray(
+          `  Max Block Size: ${(response.validatorStats.validationRules.maxBlockSize / 1024 / 1024).toFixed(1)} MB`
+        )
+      );
+      console.log(
+        chalk.gray(
+          `  Max Transaction Size: ${(response.validatorStats.validationRules.maxTransactionSize / 1024).toFixed(1)} KB`
+        )
+      );
+
       if (response.timestamp) {
         console.log(chalk.gray(`\nLast Updated: ${new Date(response.timestamp).toLocaleString()}`));
       }
@@ -797,7 +822,7 @@ class NetworkManager {
       }
 
       const response = await this.cli.makeApiRequest('/api/network/message-validation/reset', 'POST');
-      
+
       console.log(chalk.green('✅ Message validation statistics reset successfully.'));
       if (response.timestamp) {
         console.log(chalk.gray(`Reset at: ${new Date(response.timestamp).toLocaleString()}`));
@@ -816,25 +841,27 @@ class NetworkManager {
       }
 
       const response = await this.cli.makeApiRequest('/api/network/partition-stats');
-      
+
       if (response.success && response.data) {
         const stats = response.data;
-        
+
         console.log(chalk.blue('🔗 Network Partition Statistics:'));
         console.log(chalk.cyan(`Status: ${stats.isPartitioned ? chalk.red('Partitioned') : chalk.green('Healthy')}`));
         console.log(chalk.cyan(`Total Partitions: ${stats.totalPartitions}`));
         console.log(chalk.cyan(`Current Partitions: ${stats.currentPartitions}`));
-        
+
         if (stats.isPartitioned && stats.partitionDuration > 0) {
           console.log(chalk.cyan(`Partition Duration: ${Math.round(stats.partitionDuration / 1000)}s`));
         }
-        
+
         console.log(chalk.cyan(`Recovery Attempts: ${stats.recoveryAttempts}`));
         console.log(chalk.green(`Successful Recoveries: ${stats.successfulRecoveries}`));
         console.log(chalk.red(`Failed Recoveries: ${stats.failedRecoveries}`));
         console.log(chalk.cyan(`Disconnected Peers: ${stats.disconnectedPeers}`));
-        console.log(chalk.cyan(`Recovery In Progress: ${stats.recoveryInProgress ? chalk.yellow('Yes') : chalk.gray('No')}`));
-        
+        console.log(
+          chalk.cyan(`Recovery In Progress: ${stats.recoveryInProgress ? chalk.yellow('Yes') : chalk.gray('No')}`)
+        );
+
         if (stats.lastHealthCheck) {
           console.log(chalk.cyan(`Last Health Check: ${new Date(stats.lastHealthCheck).toLocaleString()}`));
         }
@@ -855,7 +882,7 @@ class NetworkManager {
       }
 
       const response = await this.cli.makeApiRequest('/api/network/partition-reset', 'POST');
-      
+
       if (response.success && response.message) {
         console.log(chalk.green(`✅ ${response.message}`));
         console.log(chalk.gray(`Reset at: ${new Date(response.timestamp).toLocaleString()}`));
@@ -879,11 +906,11 @@ class NetworkManager {
       }
 
       console.log(chalk.blue('🔍 Blockchain Validation:'));
-      
+
       if (method === 'checkpoint' || method === 'fast') {
         console.log(chalk.yellow('Using checkpoint validation (fast mode)...'));
         const response = await this.cli.makeApiRequest('/api/blockchain/validate-checkpoints', 'POST');
-        
+
         if (response.success) {
           console.log(chalk.green('✅ Checkpoint validation completed successfully!'));
           if (response.checkpointsUsed > 0) {
@@ -901,7 +928,7 @@ class NetworkManager {
       } else if (method === 'full' || method === 'complete') {
         console.log(chalk.yellow('Using full validation (complete mode)...'));
         const response = await this.cli.makeApiRequest('/api/blockchain/validate-full', 'POST');
-        
+
         if (response.success) {
           console.log(chalk.green('✅ Full validation completed successfully!'));
           if (response.blocksValidated > 0) {
@@ -973,7 +1000,7 @@ class NetworkManager {
   async listCheckpoints() {
     try {
       const response = await this.cli.makeApiRequest('/api/blockchain/checkpoints');
-      
+
       if (response.success && response.checkpoints) {
         console.log(chalk.blue('🔍 Current Checkpoints:'));
         response.checkpoints.forEach(cp => {
@@ -1001,7 +1028,7 @@ class NetworkManager {
   async addCheckpoint(height) {
     try {
       const response = await this.cli.makeApiRequest('/api/blockchain/checkpoints/add', 'POST', { height });
-      
+
       if (response.success) {
         console.log(chalk.green(`✅ Checkpoint added at height ${height}`));
         if (response.hash) {
@@ -1018,7 +1045,7 @@ class NetworkManager {
   async updateCheckpoints() {
     try {
       const response = await this.cli.makeApiRequest('/api/blockchain/checkpoints/update', 'POST');
-      
+
       if (response.success) {
         console.log(chalk.green('✅ Checkpoints updated successfully'));
         if (response.updated > 0) {
@@ -1037,7 +1064,7 @@ class NetworkManager {
   async clearCheckpoints() {
     try {
       const response = await this.cli.makeApiRequest('/api/blockchain/checkpoints/clear', 'POST');
-      
+
       if (response.success) {
         console.log(chalk.green('✅ All checkpoints cleared successfully'));
       } else {

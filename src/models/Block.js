@@ -13,10 +13,10 @@ class Block {
     this.hash = null;
     this.merkleRoot = null;
     this.config = config;
-    
+
     // CRITICAL: Timestamp validation
     this.validateTimestamp();
-    
+
     // Calculate Merkle root
     this.calculateMerkleRoot();
   }
@@ -29,32 +29,34 @@ class Block {
     const maxFutureTime = 2 * 60 * 1000; // 2 minutes in future
     const maxPastTime = 24 * 60 * 60 * 1000; // 24 hours in past
     const minBlockTime = 1000; // 1 second minimum between blocks
-    
+
     // Check if timestamp is in the future
     if (this.timestamp > currentTime + maxFutureTime) {
-      throw new Error(`Block timestamp ${this.timestamp} is too far in the future (max: ${currentTime + maxFutureTime})`);
+      throw new Error(
+        `Block timestamp ${this.timestamp} is too far in the future (max: ${currentTime + maxFutureTime})`
+      );
     }
-    
+
     // Check if timestamp is too far in the past
     if (this.timestamp < currentTime - maxPastTime) {
       throw new Error(`Block timestamp ${this.timestamp} is too far in the past (min: ${currentTime - maxPastTime})`);
     }
-    
+
     // Check if timestamp is negative
     if (this.timestamp < 0) {
       throw new Error(`Block timestamp ${this.timestamp} cannot be negative`);
     }
-    
+
     // Check if timestamp is a valid number
     if (isNaN(this.timestamp) || !isFinite(this.timestamp)) {
       throw new Error(`Block timestamp ${this.timestamp} is not a valid number`);
     }
-    
+
     // Check if timestamp is an integer
     if (!Number.isInteger(this.timestamp)) {
       throw new Error(`Block timestamp ${this.timestamp} must be an integer`);
     }
-    
+
     logger.debug('BLOCK', `Timestamp validation passed: ${this.timestamp} (current: ${currentTime})`);
   }
 
@@ -65,27 +67,29 @@ class Block {
     if (!previousBlock) {
       return true; // Genesis block
     }
-    
+
     const minBlockTime = 1000; // 1 second minimum
     const maxBlockTime = 60 * 60 * 1000; // 1 hour maximum
-    
+
     const timeDifference = this.timestamp - previousBlock.timestamp;
-    
+
     // Check minimum block time
     if (timeDifference < minBlockTime) {
       throw new Error(`Block time difference ${timeDifference}ms is too short (min: ${minBlockTime}ms)`);
     }
-    
+
     // Check maximum block time
     if (timeDifference > maxBlockTime) {
       throw new Error(`Block time difference ${timeDifference}ms is too long (max: ${maxBlockTime}ms)`);
     }
-    
+
     // Check if timestamp is before previous block
     if (this.timestamp <= previousBlock.timestamp) {
-      throw new Error(`Block timestamp ${this.timestamp} must be after previous block timestamp ${previousBlock.timestamp}`);
+      throw new Error(
+        `Block timestamp ${this.timestamp} must be after previous block timestamp ${previousBlock.timestamp}`
+      );
     }
-    
+
     logger.debug('BLOCK', `Timestamp validation against previous block passed: ${timeDifference}ms difference`);
     return true;
   }
@@ -96,14 +100,14 @@ class Block {
   getTimestampValidationStatus() {
     const currentTime = Date.now();
     const timeDifference = currentTime - this.timestamp;
-    
+
     return {
       timestamp: this.timestamp,
       currentTime: currentTime,
       timeDifference: timeDifference,
       timeDifferenceSeconds: Math.floor(timeDifference / 1000),
-      isValid: this.timestamp > 0 && this.timestamp <= currentTime + (2 * 60 * 1000),
-      warnings: this.getTimestampWarnings()
+      isValid: this.timestamp > 0 && this.timestamp <= currentTime + 2 * 60 * 1000,
+      warnings: this.getTimestampWarnings(),
     };
   }
 
@@ -113,15 +117,15 @@ class Block {
   getTimestampWarnings() {
     const warnings = [];
     const currentTime = Date.now();
-    
+
     if (this.timestamp > currentTime) {
       warnings.push('Block timestamp is in the future');
     }
-    
-    if (this.timestamp < currentTime - (24 * 60 * 60 * 1000)) {
+
+    if (this.timestamp < currentTime - 24 * 60 * 60 * 1000) {
       warnings.push('Block timestamp is very old');
     }
-    
+
     return warnings;
   }
 
@@ -135,9 +139,9 @@ class Block {
       previousHash: this.previousHash,
       merkleRoot: this.merkleRoot,
       nonce: this.nonce,
-      difficulty: this.difficulty
+      difficulty: this.difficulty,
     });
-    
+
     this.hash = CryptoUtils.doubleHash(data);
     this.algorithm = 'sha256';
     return this.hash;
@@ -151,15 +155,15 @@ class Block {
       // Import KawPow utils dynamically to avoid circular dependencies
       const KawPowUtils = require('../utils/kawpow');
       const kawPowUtils = new KawPowUtils();
-      
+
       // Generate cache for this block - use consistent cache size
       const seed = kawPowUtils.generateSeedHash(this.index);
       const cache = kawPowUtils.generateCache(seed, 1000);
-      
+
       // Calculate KawPow hash
       this.hash = kawPowUtils.kawPowHash(this.index, this.previousHash, this.nonce, cache);
       this.algorithm = 'kawpow';
-      
+
       return this.hash;
     } catch (error) {
       console.log(`❌ ERROR: calculateKawPowId failed: ${error.message}`);
@@ -184,11 +188,11 @@ class Block {
       if (tx.id) {
         return tx.id;
       }
-      
+
       if (typeof tx.calculateId === 'function') {
         return tx.calculateId();
       }
-      
+
       // If it's a plain object, try to create a transaction from it
       if (tx.inputs && tx.outputs) {
         const transaction = new Transaction(tx.inputs, tx.outputs, tx.fee);
@@ -196,10 +200,10 @@ class Block {
         transaction.timestamp = tx.timestamp;
         return transaction.calculateId();
       }
-      
+
       return CryptoUtils.hash(JSON.stringify(tx));
     });
-    
+
     this.merkleRoot = CryptoUtils.calculateMerkleRoot(transactionHashes);
     return this.merkleRoot;
   }
@@ -211,7 +215,7 @@ class Block {
     // Convert difficulty to a target hash
     // Higher difficulty = smaller target (harder to find)
     const maxTarget = 'ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff';
-    
+
     // For genesis block, respect the user's difficulty setting
     // But ensure it's not impossibly hard (cap at reasonable difficulty)
     if (this.index === 0) {
@@ -219,15 +223,15 @@ class Block {
       const genesisDifficulty = Math.min(this.difficulty, 1000); // Cap at 1000
       const targetHex = BigInt('0x' + maxTarget) / BigInt(Math.max(1, genesisDifficulty));
       const result = targetHex.toString(16).padStart(64, '0');
-      
+
       return result;
     }
-    
+
     // For other blocks, use the actual difficulty
     // Standard formula: Target = MaxTarget / Difficulty
     const targetHex = BigInt('0x' + maxTarget) / BigInt(Math.max(1, this.difficulty));
     const result = targetHex.toString(16).padStart(64, '0');
-    
+
     return result;
   }
 
@@ -244,26 +248,26 @@ class Block {
    */
   mine() {
     this.calculateMerkleRoot();
-    
+
     const target = this.calculateTarget();
     let attempts = 0;
     const maxAttempts = 1000000; // Prevent infinite loops
-    
+
     while (attempts < maxAttempts) {
       this.nonce++;
       this.calculateId(); // Use SHA256 for CPU mining
-      
+
       // Compare hash as hex number with target
       const hashNum = BigInt('0x' + this.hash);
       const targetNum = BigInt('0x' + target);
-      
+
       if (hashNum <= targetNum) {
         return true;
       }
-      
+
       attempts++;
     }
-    
+
     return false;
   }
 
@@ -272,26 +276,26 @@ class Block {
    */
   mineKawPow() {
     this.calculateMerkleRoot();
-    
+
     const target = this.calculateTarget();
     let attempts = 0;
     const maxAttempts = 1000000; // Prevent infinite loops
-    
+
     while (attempts < maxAttempts) {
       this.nonce++;
       this.calculateKawPowId(); // Use KawPow for GPU mining
-      
+
       // Compare hash as hex number with target
       const hashNum = BigInt('0x' + this.hash);
       const targetNum = BigInt('0x' + target);
-      
+
       if (hashNum <= targetNum) {
         return true;
       }
-      
+
       attempts++;
     }
-    
+
     return false;
   }
 
@@ -300,16 +304,16 @@ class Block {
    */
   hasValidHash() {
     const target = this.calculateTarget();
-    
+
     if (!this.hash) {
       return false;
     }
-    
+
     try {
       const hashNum = BigInt('0x' + this.hash);
       const targetNum = BigInt('0x' + target);
       const isValid = hashNum <= targetNum;
-      
+
       return isValid;
     } catch (error) {
       logger.error('BLOCK', `Hash validation error: ${error.message}`);
@@ -326,17 +330,17 @@ class Block {
       try {
         const KawPowUtils = require('../utils/kawpow');
         const kawPowUtils = new KawPowUtils();
-        
+
         const seed = kawPowUtils.generateSeedHash(this.index);
         const cache = kawPowUtils.generateCache(seed, 1000);
         const expectedHash = kawPowUtils.kawPowHash(this.index, this.previousHash, this.nonce, cache);
-        
+
         // If hash matches, also check if it meets difficulty requirement
         if (expectedHash === this.hash) {
           const difficultyValid = this.hasValidHash();
           return difficultyValid;
         }
-        
+
         return false;
       } catch (error) {
         logger.error('BLOCK', `KawPow hash verification error: ${error.message}`);
@@ -352,8 +356,11 @@ class Block {
    * Verify block transactions are valid
    */
   hasValidTransactions(config = null) {
-    logger.debug('BLOCK', `Validating transactions for block ${this.index}: count=${this.transactions?.length || 0}, config=${config ? 'present' : 'null'}`);
-    
+    logger.debug(
+      'BLOCK',
+      `Validating transactions for block ${this.index}: count=${this.transactions?.length || 0}, config=${config ? 'present' : 'null'}`
+    );
+
     if (!this.transactions || this.transactions.length === 0) {
       logger.debug('BLOCK', `Block ${this.index} has no transactions, validation passed (genesis block)`);
       return true; // Genesis block has no transactions
@@ -362,7 +369,10 @@ class Block {
     // CRITICAL: First transaction must be coinbase
     if (this.transactions.length > 0) {
       const firstTx = this.transactions[0];
-      logger.debug('BLOCK', `Checking first transaction: id=${firstTx.id}, isCoinbase=${firstTx.isCoinbase}, type=${typeof firstTx.isCoinbase}`);
+      logger.debug(
+        'BLOCK',
+        `Checking first transaction: id=${firstTx.id}, isCoinbase=${firstTx.isCoinbase}, type=${typeof firstTx.isCoinbase}`
+      );
       if (!firstTx.isCoinbase) {
         logger.debug('BLOCK', `Block ${this.index} validation failed: first transaction is not coinbase`);
         return false; // First transaction must be coinbase
@@ -372,8 +382,11 @@ class Block {
     logger.debug('BLOCK', `Validating ${this.transactions.length} transactions individually`);
     for (let i = 0; i < this.transactions.length; i++) {
       const transaction = this.transactions[i];
-      logger.debug('BLOCK', `Validating transaction ${i}: id=${transaction.id}, isCoinbase=${transaction.isCoinbase}, hasIsValid=${typeof transaction.isValid === 'function'}`);
-      
+      logger.debug(
+        'BLOCK',
+        `Validating transaction ${i}: id=${transaction.id}, isCoinbase=${transaction.isCoinbase}, hasIsValid=${typeof transaction.isValid === 'function'}`
+      );
+
       // Check if transaction has isValid method (Transaction class instance)
       if (typeof transaction.isValid === 'function') {
         logger.debug('BLOCK', `Transaction ${i} has isValid method, calling it with config`);
@@ -398,18 +411,18 @@ class Block {
           logger.debug('BLOCK', `  outputs.length: ${transaction.outputs?.length || 'undefined'}`);
           return false;
         }
-        
+
         // Additional validation for plain objects
         if (i === 0 && !transaction.isCoinbase) {
           logger.debug('BLOCK', `Transaction ${i} validation failed: first transaction must be coinbase`);
           return false; // First transaction must be coinbase
         }
-        
+
         if (i > 0 && transaction.isCoinbase) {
           logger.debug('BLOCK', `Transaction ${i} validation failed: only first transaction can be coinbase`);
           return false; // Only first transaction can be coinbase
         }
-        
+
         logger.debug('BLOCK', `Transaction ${i} basic validation passed`);
       }
     }
@@ -422,10 +435,20 @@ class Block {
    * Verify the entire block is valid
    */
   isValid() {
-    logger.debug('BLOCK', `Validating block ${this.index}: timestamp=${this.timestamp}, previousHash=${this.previousHash?.substring(0, 16)}..., hash=${this.hash?.substring(0, 16)}...`);
-    
+    logger.debug(
+      'BLOCK',
+      `Validating block ${this.index}: timestamp=${this.timestamp}, previousHash=${this.previousHash?.substring(0, 16)}..., hash=${this.hash?.substring(0, 16)}...`
+    );
+
     // Check if block has required properties
-    if (this.index === null || this.index === undefined || this.timestamp === null || this.timestamp === undefined || !this.previousHash || !this.hash) {
+    if (
+      this.index === null ||
+      this.index === undefined ||
+      this.timestamp === null ||
+      this.timestamp === undefined ||
+      !this.previousHash ||
+      !this.hash
+    ) {
       logger.debug('BLOCK', `Block ${this.index} validation failed: missing required properties`);
       logger.debug('BLOCK', `  index: ${this.index} (${typeof this.index})`);
       logger.debug('BLOCK', `  timestamp: ${this.timestamp} (${typeof this.timestamp})`);
@@ -476,7 +499,7 @@ class Block {
    */
   static createGenesisBlock(address, timestamp = null, transactions = null, difficulty = 4, genesisConfig = null) {
     const genesisTimestamp = timestamp || Date.now();
-    
+
     let genesisTransactions = [];
     if (genesisConfig && genesisConfig.premineAmount && genesisConfig.premineAddress) {
       // Use config settings for premine
@@ -496,7 +519,7 @@ class Block {
     }
 
     const genesisBlock = new Block(0, genesisTimestamp, genesisTransactions, '0', 0, difficulty, genesisConfig);
-    
+
     // Use genesis config if available
     if (genesisConfig && genesisConfig.nonce !== undefined && genesisConfig.hash) {
       genesisBlock.nonce = genesisConfig.nonce;
@@ -505,7 +528,7 @@ class Block {
     } else {
       // Create a simple, valid genesis block without complex mining
       genesisBlock.calculateMerkleRoot();
-      
+
       // Use a simple approach: just calculate the hash once
       genesisBlock.calculateKawPowId();
     }
@@ -519,12 +542,12 @@ class Block {
   static createBlock(index, transactions, previousHash, difficulty = 4, config = null) {
     const block = new Block(index, Date.now(), transactions, previousHash, 0, difficulty, config);
     block.calculateMerkleRoot();
-    
+
     // For KawPow mining, we need to set a temporary hash and ensure algorithm is set
     // The actual hash will be calculated during mining
     block.algorithm = 'kawpow';
     block.hash = '0000000000000000000000000000000000000000000000000000000000000000'; // Temporary hash
-    
+
     return block;
   }
 
@@ -541,7 +564,7 @@ class Block {
       difficulty: this.difficulty,
       hash: this.hash,
       merkleRoot: this.merkleRoot,
-      algorithm: this.algorithm
+      algorithm: this.algorithm,
     };
   }
 
@@ -549,8 +572,11 @@ class Block {
    * Create block from JSON data
    */
   static fromJSON(data) {
-    logger.debug('BLOCK', `Creating Block instance from JSON data: index=${data.index}, timestamp=${data.timestamp}, transactions=${data.transactions?.length || 0}`);
-    
+    logger.debug(
+      'BLOCK',
+      `Creating Block instance from JSON data: index=${data.index}, timestamp=${data.timestamp}, transactions=${data.transactions?.length || 0}`
+    );
+
     // Convert transactions to Transaction instances if they're plain objects
     let transactions = data.transactions;
     if (transactions && Array.isArray(transactions)) {
@@ -558,10 +584,16 @@ class Block {
       try {
         const { Transaction } = require('./Transaction');
         transactions = transactions.map((tx, index) => {
-          logger.debug('BLOCK', `Converting transaction ${index}: id=${tx.id}, isCoinbase=${tx.isCoinbase}, hasIsValid=${typeof tx.isValid === 'function'}`);
+          logger.debug(
+            'BLOCK',
+            `Converting transaction ${index}: id=${tx.id}, isCoinbase=${tx.isCoinbase}, hasIsValid=${typeof tx.isValid === 'function'}`
+          );
           if (typeof tx === 'object' && !tx.isValid) {
             const convertedTx = Transaction.fromJSON(tx);
-            logger.debug('BLOCK', `Successfully converted transaction ${index} to Transaction instance: id=${convertedTx.id}`);
+            logger.debug(
+              'BLOCK',
+              `Successfully converted transaction ${index} to Transaction instance: id=${convertedTx.id}`
+            );
             return convertedTx;
           }
           logger.debug('BLOCK', `Transaction ${index} already a Transaction instance or invalid: id=${tx.id}`);
@@ -574,28 +606,30 @@ class Block {
         logger.warn('BLOCK', `Keeping original transactions due to conversion failure`);
       }
     } else {
-      logger.debug('BLOCK', `No transactions to convert or invalid transactions array: ${JSON.stringify(transactions)}`);
+      logger.debug(
+        'BLOCK',
+        `No transactions to convert or invalid transactions array: ${JSON.stringify(transactions)}`
+      );
     }
-    
-    logger.debug('BLOCK', `Creating Block constructor with: index=${data.index}, timestamp=${data.timestamp}, transactions=${transactions?.length || 0}, previousHash=${data.previousHash}, nonce=${data.nonce}, difficulty=${data.difficulty}`);
-    
-    const block = new Block(
-      data.index,
-      data.timestamp,
-      transactions,
-      data.previousHash,
-      data.nonce,
-      data.difficulty
+
+    logger.debug(
+      'BLOCK',
+      `Creating Block constructor with: index=${data.index}, timestamp=${data.timestamp}, transactions=${transactions?.length || 0}, previousHash=${data.previousHash}, nonce=${data.nonce}, difficulty=${data.difficulty}`
     );
-    
+
+    const block = new Block(data.index, data.timestamp, transactions, data.previousHash, data.nonce, data.difficulty);
+
     block.hash = data.hash;
     block.merkleRoot = data.merkleRoot;
     block.algorithm = data.algorithm || 'kawpow'; // Default to KawPow for new blocks
-    
-    logger.debug('BLOCK', `Block instance created successfully: index=${block.index}, hash=${block.hash?.substring(0, 16)}..., merkleRoot=${block.merkleRoot?.substring(0, 16)}...`);
-    
+
+    logger.debug(
+      'BLOCK',
+      `Block instance created successfully: index=${block.index}, hash=${block.hash?.substring(0, 16)}..., merkleRoot=${block.merkleRoot?.substring(0, 16)}...`
+    );
+
     return block;
   }
 }
 
-module.exports = Block; 
+module.exports = Block;

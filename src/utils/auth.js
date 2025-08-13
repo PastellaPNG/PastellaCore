@@ -18,8 +18,11 @@ class AuthMiddleware {
   validateApiKey(req, res, next) {
     // Debug logging
     logger.debug('AUTH', `Validating API key for ${req.method} ${req.path}`);
-    logger.debug('AUTH', `Authentication enabled: ${this.enabled}, API key stored: ${this.apiKey ? this.apiKey.substring(0, 8) + '...' : 'none'}`);
-    
+    logger.debug(
+      'AUTH',
+      `Authentication enabled: ${this.enabled}, API key stored: ${this.apiKey ? this.apiKey.substring(0, 8) + '...' : 'none'}`
+    );
+
     // If authentication is not enabled, skip validation
     if (!this.enabled) {
       logger.debug('AUTH', `Authentication disabled, skipping validation`);
@@ -31,7 +34,10 @@ class AuthMiddleware {
     const apiKeyHeader = req.headers['x-api-key'];
     const queryApiKey = req.query.api_key;
 
-    logger.debug('AUTH', `Request headers: authorization=${authHeader ? 'present' : 'missing'}, x-api-key=${apiKeyHeader ? 'present' : 'missing'}, query api_key=${queryApiKey ? 'present' : 'missing'}`);
+    logger.debug(
+      'AUTH',
+      `Request headers: authorization=${authHeader ? 'present' : 'missing'}, x-api-key=${apiKeyHeader ? 'present' : 'missing'}, query api_key=${queryApiKey ? 'present' : 'missing'}`
+    );
 
     let providedKey = null;
 
@@ -53,7 +59,8 @@ class AuthMiddleware {
       logger.warn('AUTH', `API key missing from request: ${req.method} ${req.path}`);
       return res.status(401).json({
         error: 'API key required',
-        message: 'Please provide a valid API key in the Authorization header, X-API-Key header, or api_key query parameter'
+        message:
+          'Please provide a valid API key in the Authorization header, X-API-Key header, or api_key query parameter',
       });
     }
 
@@ -61,7 +68,7 @@ class AuthMiddleware {
       logger.warn('AUTH', `Invalid API key provided: ${req.method} ${req.path}`);
       return res.status(403).json({
         error: 'Invalid API key',
-        message: 'The provided API key is invalid'
+        message: 'The provided API key is invalid',
       });
     }
 
@@ -89,7 +96,7 @@ class AuthMiddleware {
   getAuthStatus() {
     return {
       enabled: this.enabled,
-      hasKey: !!this.apiKey
+      hasKey: !!this.apiKey,
     };
   }
 

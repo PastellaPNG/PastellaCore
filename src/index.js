@@ -37,7 +37,7 @@ class PastellaDaemon {
     console.log(chalk.blue.bold('║                   NodeJS Cryptocurrency                      ║'));
     console.log(chalk.blue.bold('╚══════════════════════════════════════════════════════════════╝'));
     console.log('');
-    
+
     // Version and basic info
     console.log(chalk.cyan.bold('📋 SYSTEM SPECIFICATIONS:'));
     console.log(chalk.cyan('  • Pastella Version: '), chalk.white.bold(`v${version}`));
@@ -48,7 +48,10 @@ class PastellaDaemon {
     // Blockchain specifications
     console.log(chalk.yellow.bold('🔗 BLOCKCHAIN SPECS:'));
     console.log(chalk.yellow('  • Consensus:      '), chalk.white.bold('Proof of Work (KawPow)'));
-    console.log(chalk.yellow('  • Block Time:     '), chalk.white.bold(`${currentConfig.blockchain.blockTime / 1000}s`));
+    console.log(
+      chalk.yellow('  • Block Time:     '),
+      chalk.white.bold(`${currentConfig.blockchain.blockTime / 1000}s`)
+    );
     console.log('');
 
     // Network specifications
@@ -88,7 +91,7 @@ class PastellaDaemon {
           logger.error('BLOCKCHAIN', 'Existing blockchain file found but validation failed!');
           logger.error('BLOCKCHAIN', 'This could indicate data corruption or an invalid blockchain state.');
           logger.error('BLOCKCHAIN', 'Consider backing up your data and starting with a fresh blockchain.');
-          
+
           // Backup the corrupted file
           const backupPath = blockchainPath + '.backup.' + Date.now();
           try {
@@ -97,7 +100,7 @@ class PastellaDaemon {
           } catch (backupError) {
             logger.warn('BLOCKCHAIN', `Failed to backup corrupted blockchain: ${backupError.message}`);
           }
-          
+
           // Remove the corrupted file
           try {
             fs.unlinkSync(blockchainPath);
@@ -105,14 +108,15 @@ class PastellaDaemon {
           } catch (removeError) {
             logger.warn('BLOCKCHAIN', `Failed to remove corrupted blockchain: ${removeError.message}`);
           }
-          
+
           logger.info('BLOCKCHAIN', 'Creating new blockchain to replace invalid one...');
         } else {
           logger.info('BLOCKCHAIN', 'No existing blockchain found. Creating new one...');
         }
-        
+
         // Create genesis block with config settings
-        const defaultAddress = currentConfig.blockchain?.genesis?.premineAddress || '1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa';
+        const defaultAddress =
+          currentConfig.blockchain?.genesis?.premineAddress || '1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa';
         this.blockchain.initialize(defaultAddress, currentConfig);
         this.blockchain.saveToFile(blockchainPath);
         logger.info('BLOCKCHAIN', 'New blockchain created and saved successfully');
@@ -121,7 +125,10 @@ class PastellaDaemon {
       }
     } catch (error) {
       // If the error is about difficulty mismatch, stop the daemon
-      if (error.name === 'BlockchainDifficultyMismatchError' || error.message.includes('BLOCKCHAIN_DIFFICULTY_MISMATCH')) {
+      if (
+        error.name === 'BlockchainDifficultyMismatchError' ||
+        error.message.includes('BLOCKCHAIN_DIFFICULTY_MISMATCH')
+      ) {
         logger.error('SYSTEM', '🛑 CRITICAL ERROR: Blockchain configuration mismatch');
         logger.error('SYSTEM', '🛑 The daemon cannot start with incompatible blockchain');
         logger.error('SYSTEM', '🛑 Please fix the configuration or use a compatible blockchain');
@@ -133,7 +140,7 @@ class PastellaDaemon {
 
     // Initialize components
     logger.info('SYSTEM', 'Initializing system components...');
-    
+
     this.p2pNetwork = new P2PNetwork(this.blockchain, currentConfig.network.p2pPort, currentConfig);
     this.apiServer = new APIServer(this.blockchain, null, null, this.p2pNetwork, currentConfig.api.port, currentConfig);
 
@@ -172,7 +179,7 @@ class PastellaDaemon {
         this.apiServer.setApiKey(config.api.apiKey);
         logger.info('API', `API authentication enabled with key: ${config.api.apiKey.substring(0, 8)}...`);
       }
-      
+
       this.apiServer.start();
       // The API server will log its own binding information with the correct host
     }
@@ -213,8 +220,6 @@ class PastellaDaemon {
     console.log(chalk.red.bold('║                    🛑 SHUTTING DOWN                          ║'));
     console.log(chalk.red.bold('╚══════════════════════════════════════════════════════════════╝'));
 
-
-
     // Stop P2P network
     if (this.p2pNetwork) {
       this.p2pNetwork.stop();
@@ -243,49 +248,64 @@ class PastellaDaemon {
    */
   setupPeriodicTasks() {
     // Save blockchain every 5 minutes
-    setInterval(() => {
-      if (this.isRunning) {
-        const blockchainPath = path.join(config.storage.dataDir, config.storage.blockchainFile);
-        this.blockchain.saveToFile(blockchainPath);
-      }
-    }, 5 * 60 * 1000);
+    setInterval(
+      () => {
+        if (this.isRunning) {
+          const blockchainPath = path.join(config.storage.dataDir, config.storage.blockchainFile);
+          this.blockchain.saveToFile(blockchainPath);
+        }
+      },
+      5 * 60 * 1000
+    );
 
     // Cleanup expired transactions every 2 minutes (CRITICAL FEATURE)
-    setInterval(() => {
-      if (this.isRunning) {
-        const cleanupResult = this.blockchain.cleanupExpiredTransactions();
-        if (cleanupResult.cleaned > 0) {
-          logger.info('SYSTEM', `🧹 Cleaned up ${cleanupResult.cleaned} expired transactions`);
+    setInterval(
+      () => {
+        if (this.isRunning) {
+          const cleanupResult = this.blockchain.cleanupExpiredTransactions();
+          if (cleanupResult.cleaned > 0) {
+            logger.info('SYSTEM', `🧹 Cleaned up ${cleanupResult.cleaned} expired transactions`);
+          }
         }
-      }
-    }, 2 * 60 * 1000);
+      },
+      2 * 60 * 1000
+    );
 
     // Cleanup orphaned UTXOs every 10 minutes (CRITICAL FEATURE)
-    setInterval(() => {
-      if (this.isRunning) {
-        const cleanupResult = this.blockchain.cleanupOrphanedUTXOs();
-        if (cleanupResult.cleaned > 0) {
-          logger.info('SYSTEM', `🧹 Cleaned up ${cleanupResult.cleaned} orphaned UTXOs`);
+    setInterval(
+      () => {
+        if (this.isRunning) {
+          const cleanupResult = this.blockchain.cleanupOrphanedUTXOs();
+          if (cleanupResult.cleaned > 0) {
+            logger.info('SYSTEM', `🧹 Cleaned up ${cleanupResult.cleaned} orphaned UTXOs`);
+          }
         }
-      }
-    }, 10 * 60 * 1000);
+      },
+      10 * 60 * 1000
+    );
 
     // Memory pool management every 5 minutes (CRITICAL FEATURE)
-    setInterval(() => {
-      if (this.isRunning) {
-        const mempoolStatus = this.blockchain.manageMemoryPool();
-        if (mempoolStatus.actions > 0) {
-          logger.info('SYSTEM', `💾 Memory pool managed: ${mempoolStatus.actions} actions taken`);
+    setInterval(
+      () => {
+        if (this.isRunning) {
+          const mempoolStatus = this.blockchain.manageMemoryPool();
+          if (mempoolStatus.actions > 0) {
+            logger.info('SYSTEM', `💾 Memory pool managed: ${mempoolStatus.actions} actions taken`);
+          }
         }
-      }
-    }, 5 * 60 * 1000);
+      },
+      5 * 60 * 1000
+    );
 
     // Spam protection cleanup every 3 minutes (CRITICAL FEATURE)
-    setInterval(() => {
-      if (this.isRunning) {
-        this.blockchain.cleanupSpamProtection();
-      }
-    }, 3 * 60 * 1000);
+    setInterval(
+      () => {
+        if (this.isRunning) {
+          this.blockchain.cleanupSpamProtection();
+        }
+      },
+      3 * 60 * 1000
+    );
 
     // Note: Difficulty adjustment now happens before each new block is mined
     // in the minePendingTransactions method, so no periodic adjustment needed
@@ -306,7 +326,7 @@ class PastellaDaemon {
    * Setup graceful shutdown
    */
   setupGracefulShutdown() {
-    const shutdown = async (signal) => {
+    const shutdown = async signal => {
       console.log(chalk.yellow.bold(`\n📡 Received ${signal}. Shutting down gracefully...`));
       await this.stop();
       process.exit(0);
@@ -317,7 +337,7 @@ class PastellaDaemon {
     process.on('SIGQUIT', () => shutdown('SIGQUIT'));
 
     // Handle uncaught exceptions
-    process.on('uncaughtException', (error) => {
+    process.on('uncaughtException', error => {
       console.error(chalk.red.bold('❌ Uncaught Exception:'), error);
       this.stop().then(() => process.exit(1));
     });
@@ -336,7 +356,7 @@ class PastellaDaemon {
       isRunning: this.isRunning,
       blockchain: this.blockchain.getStatus(),
       network: this.p2pNetwork ? this.p2pNetwork.getNetworkStatus() : null,
-      api: this.apiServer ? { isRunning: this.apiServer.isRunning, port: this.apiServer.port } : null
+      api: this.apiServer ? { isRunning: this.apiServer.isRunning, port: this.apiServer.port } : null,
     };
   }
 
@@ -349,7 +369,7 @@ class PastellaDaemon {
     process.stdin.resume();
     process.stdin.setEncoding('utf8');
 
-    process.stdin.on('data', (key) => {
+    process.stdin.on('data', key => {
       // Handle Ctrl+C
       if (key === '\u0003') {
         process.exit(0);
@@ -396,12 +416,12 @@ class PastellaDaemon {
   showStatus() {
     const status = this.getStatus();
     const latestBlock = this.blockchain.getLatestBlock();
-    
+
     console.log(chalk.blue.bold('╔══════════════════════════════════════════════════════════════╗'));
     console.log(chalk.blue.bold('║                      📊 DAEMON STATUS                        ║'));
     console.log(chalk.blue.bold('╚══════════════════════════════════════════════════════════════╝'));
     console.log('');
-    
+
     // Overall status
     console.log(chalk.yellow.bold('🚀 DAEMON:'));
     console.log(chalk.cyan('  Status:'), status.isRunning ? chalk.green('Running') : chalk.red('Stopped'));
@@ -419,8 +439,16 @@ class PastellaDaemon {
     if (status.network) {
       console.log(chalk.cyan('  Status:'), status.network.isRunning ? chalk.green('Running') : chalk.red('Stopped'));
       console.log(chalk.cyan('  Port:'), chalk.white(status.network.port || 'N/A'));
-      console.log(chalk.cyan('  Peers:'), chalk.white(`${status.network.peerCount || 0}/${status.network.maxPeers || 0}`));
-      console.log(chalk.cyan('  Seed Connections:'), chalk.white(`${status.network.connectedSeedNodes || 0}/${status.network.minSeedConnections || 0} (min required)`));
+      console.log(
+        chalk.cyan('  Peers:'),
+        chalk.white(`${status.network.peerCount || 0}/${status.network.maxPeers || 0}`)
+      );
+      console.log(
+        chalk.cyan('  Seed Connections:'),
+        chalk.white(
+          `${status.network.connectedSeedNodes || 0}/${status.network.minSeedConnections || 0} (min required)`
+        )
+      );
     } else {
       console.log(chalk.red('  P2P Network disabled'));
     }
@@ -458,25 +486,30 @@ class PastellaDaemon {
 
     const networkStatus = this.p2pNetwork.getNetworkStatus();
     const peerList = this.p2pNetwork.getPeerList();
-    
+
     console.log(chalk.yellow.bold('📡 NETWORK INFO:'));
     console.log(chalk.cyan('  Status:'), networkStatus.isRunning ? chalk.green('Running') : chalk.red('Stopped'));
     console.log(chalk.cyan('  Port:'), chalk.white(networkStatus.port));
     console.log(chalk.cyan('  Peers:'), chalk.white(`${networkStatus.peerCount}/${networkStatus.maxPeers}`));
-    console.log(chalk.cyan('  Seed Connections:'), chalk.white(`${networkStatus.seedNodeConnections.connectedSeedNodes}/${networkStatus.seedNodeConnections.minSeedConnections} (min required)`));
+    console.log(
+      chalk.cyan('  Seed Connections:'),
+      chalk.white(
+        `${networkStatus.seedNodeConnections.connectedSeedNodes}/${networkStatus.seedNodeConnections.minSeedConnections} (min required)`
+      )
+    );
     console.log('');
 
     if (peerList.length > 0) {
       console.log(chalk.yellow.bold('🔗 CONNECTED PEERS:'));
       const maxPeersToShow = 7;
       const peersToShow = peerList.slice(0, maxPeersToShow);
-      
+
       peersToShow.forEach((peer, index) => {
         const statusText = peer.readyState === 1 ? chalk.green('(connected)') : chalk.red('(disconnected)');
         const typeText = peer.isSeedNode ? chalk.blue('[seed]') : chalk.gray('[peer]');
         console.log(chalk.cyan(`  ${index + 1}.`), chalk.white(`${peer.url} ${statusText} ${typeText}`));
       });
-      
+
       if (peerList.length > maxPeersToShow) {
         console.log(chalk.gray(`  ... and ${peerList.length - maxPeersToShow} more peers`));
       }
@@ -490,11 +523,11 @@ class PastellaDaemon {
         const seedUrl = node.replace('ws://', '').replace('wss://', '');
         const seedHost = seedUrl.split(':')[0];
         const seedPort = seedUrl.split(':')[1];
-        
+
         // Check if this is the current node
-        const isCurrentNode = (seedHost === 'localhost' || seedHost === '127.0.0.1') && 
-                             parseInt(seedPort) === networkStatus.port;
-        
+        const isCurrentNode =
+          (seedHost === 'localhost' || seedHost === '127.0.0.1') && parseInt(seedPort) === networkStatus.port;
+
         if (isCurrentNode) {
           // This is the current node
           const statusText = chalk.yellow('(this node)');
@@ -505,16 +538,17 @@ class PastellaDaemon {
             // Extract hostname and port from peer URL (now always IPv4)
             const peerHost = peer.url.split(':')[0];
             const peerPort = peer.url.split(':')[1];
-            
+
             // Check if ports match and hostnames are equivalent
             const portsMatch = seedPort === peerPort;
-            const hostsMatch = seedHost === peerHost || 
-                             (seedHost === 'localhost' && peerHost === '127.0.0.1') ||
-                             (peerHost === 'localhost' && seedHost === '127.0.0.1');
-            
+            const hostsMatch =
+              seedHost === peerHost ||
+              (seedHost === 'localhost' && peerHost === '127.0.0.1') ||
+              (peerHost === 'localhost' && seedHost === '127.0.0.1');
+
             return portsMatch && hostsMatch && peer.readyState === 1;
           });
-          
+
           const statusText = isConnected ? chalk.green('(connected)') : chalk.red('(disconnected)');
           console.log(chalk.cyan(`  ${index + 1}.`), chalk.white(node), statusText);
         }
@@ -538,7 +572,7 @@ class PastellaDaemon {
 
     const latestBlock = this.blockchain.getLatestBlock();
     const totalSupply = this.blockchain.getTotalSupply();
-    
+
     console.log(chalk.yellow.bold('📊 CHAIN INFO:'));
     console.log(chalk.cyan('  Height:'), chalk.white(this.blockchain.chain.length));
     console.log(chalk.cyan('  Difficulty:'), chalk.white(this.blockchain.difficulty));
@@ -586,7 +620,7 @@ class PastellaDaemon {
     }
 
     const networkStatus = this.p2pNetwork.getNetworkStatus();
-    
+
     console.log(chalk.yellow.bold('🔄 SYNC STATUS:'));
     if (networkStatus.networkSyncStatus) {
       const syncStatus = networkStatus.networkSyncStatus;
@@ -594,7 +628,10 @@ class PastellaDaemon {
       if (syncStatus.lastSyncTime) {
         console.log(chalk.cyan('  Last Sync:'), chalk.white(new Date(syncStatus.lastSyncTime).toLocaleString()));
       }
-      console.log(chalk.cyan('  Sync Attempts:'), chalk.white(`${syncStatus.syncAttempts}/${syncStatus.maxSyncAttempts}`));
+      console.log(
+        chalk.cyan('  Sync Attempts:'),
+        chalk.white(`${syncStatus.syncAttempts}/${syncStatus.maxSyncAttempts}`)
+      );
     } else {
       console.log(chalk.cyan('  Status:'), chalk.green('Idle'));
     }
@@ -608,7 +645,7 @@ class PastellaDaemon {
     const hours = Math.floor(uptime / 3600);
     const minutes = Math.floor((uptime % 3600) / 60);
     const seconds = Math.floor(uptime % 60);
-    
+
     if (hours > 0) {
       return `${hours}h ${minutes}m ${seconds}s`;
     } else if (minutes > 0) {
@@ -628,7 +665,7 @@ class PastellaDaemon {
     const minutes = Math.floor(seconds / 60);
     const hours = Math.floor(minutes / 60);
     const days = Math.floor(hours / 24);
-    
+
     if (days > 0) {
       return `${days}d ago`;
     } else if (hours > 0) {
@@ -647,16 +684,16 @@ async function main() {
 
   // Parse command line arguments
   const args = process.argv.slice(2);
-  
+
   // Check for debug flag first
   if (args.includes('--debug')) {
     logger.setDebugMode(true);
     logger.info('SYSTEM', '🐛 Debug mode enabled');
   }
-  
+
   if (args.includes('--help') || args.includes('-h')) {
     const version = packageJson.version;
-    
+
     console.log(chalk.blue.bold('╔══════════════════════════════════════════════════════════════╗'));
     console.log(chalk.blue.bold('║                    🚀 PASTELLA DAEMON                        ║'));
     console.log(chalk.blue.bold('║                   NodeJS Cryptocurrency                      ║'));
@@ -688,17 +725,47 @@ async function main() {
     console.log(chalk.cyan('  --generate-genesis   '), chalk.white('Generate new genesis block configuration'));
     console.log('');
     console.log(chalk.yellow.bold('💡 EXAMPLES:'));
-    console.log(chalk.cyan('  node src/index.js                                     '), chalk.white('# Start with all services'));
-    console.log(chalk.cyan('  node src/index.js --mining                            '), chalk.white('# Start with mining enabled'));
-    console.log(chalk.cyan('  node src/index.js --debug                             '), chalk.white('# Start with debug logging'));
-    console.log(chalk.cyan('  node src/index.js --no-api --no-p2p                   '), chalk.white('# Blockchain only mode'));
+    console.log(
+      chalk.cyan('  node src/index.js                                     '),
+      chalk.white('# Start with all services')
+    );
+    console.log(
+      chalk.cyan('  node src/index.js --mining                            '),
+      chalk.white('# Start with mining enabled')
+    );
+    console.log(
+      chalk.cyan('  node src/index.js --debug                             '),
+      chalk.white('# Start with debug logging')
+    );
+    console.log(
+      chalk.cyan('  node src/index.js --no-api --no-p2p                   '),
+      chalk.white('# Blockchain only mode')
+    );
     console.log(chalk.cyan('  node src/index.js --api-port 8080 --p2p-port 8081     '), chalk.white('# Custom ports'));
-    console.log(chalk.cyan('  node src/index.js --data-dir /path/to/data            '), chalk.white('# Custom data directory'));
-    console.log(chalk.cyan('  node src/index.js --mining --difficulty 2             '), chalk.white('# Enable mining with low difficulty'));
-    console.log(chalk.cyan('  node src/index.js --min-seed-conn 1                   '), chalk.white('# Require only 1 seed connection'));
-    console.log(chalk.cyan('  node src/index.js --api-key mysecretkey               '), chalk.white('# Enable API authentication'));
-    console.log(chalk.cyan('  node src/index.js --host 192.168.1.100 --api-key key  '), chalk.white('# Bind to specific network interface'));
-    console.log(chalk.cyan('  node src/index.js --generate-genesis                  '), chalk.white('# Generate new genesis configuration'));
+    console.log(
+      chalk.cyan('  node src/index.js --data-dir /path/to/data            '),
+      chalk.white('# Custom data directory')
+    );
+    console.log(
+      chalk.cyan('  node src/index.js --mining --difficulty 2             '),
+      chalk.white('# Enable mining with low difficulty')
+    );
+    console.log(
+      chalk.cyan('  node src/index.js --min-seed-conn 1                   '),
+      chalk.white('# Require only 1 seed connection')
+    );
+    console.log(
+      chalk.cyan('  node src/index.js --api-key mysecretkey               '),
+      chalk.white('# Enable API authentication')
+    );
+    console.log(
+      chalk.cyan('  node src/index.js --host 192.168.1.100 --api-key key  '),
+      chalk.white('# Bind to specific network interface')
+    );
+    console.log(
+      chalk.cyan('  node src/index.js --generate-genesis                  '),
+      chalk.white('# Generate new genesis configuration')
+    );
     console.log('');
     console.log(chalk.yellow.bold('🔗 SERVICES:'));
     console.log(chalk.green('  • Blockchain:     '), chalk.white('Core blockchain with UTXO model'));
@@ -726,20 +793,20 @@ async function main() {
     console.log(chalk.blue.bold('║                   Generate Custom Genesis Block              ║'));
     console.log(chalk.blue.bold('╚══════════════════════════════════════════════════════════════╝'));
     console.log('');
-    
+
     // Import required modules for genesis generation
     const Block = require('./models/Block');
     const { Transaction } = require('./models/Transaction');
     const { TRANSACTION_TAGS } = require('./utils/constants');
     const readline = require('readline');
-    
+
     const rl = readline.createInterface({
       input: process.stdin,
-      output: process.stdout
+      output: process.stdout,
     });
-    
-    const question = (query) => new Promise((resolve) => rl.question(query, resolve));
-    
+
+    const question = query => new Promise(resolve => rl.question(query, resolve));
+
     async function generateGenesis() {
       try {
         console.log(chalk.cyan.bold('📋 GENESIS BLOCK CONFIGURATION:'));
@@ -750,32 +817,36 @@ async function main() {
         console.log(chalk.gray('   Higher difficulties (>1000) are capped to prevent impossible mining'));
         console.log(chalk.gray('   Recommended: 500-1000 for reasonable mining time'));
         console.log('');
-        
+
         // Get user input
         const premineAddress = await question(chalk.cyan('🏦 Premine Address: '));
         const premineAmount = parseFloat(await question(chalk.cyan('💰 Premine Amount (PAS): ')));
-        const difficulty = parseInt(await question(chalk.cyan('⚡ Mining Difficulty (100-10000, recommended: 1000): ')));
-        const timestamp = await question(chalk.cyan('🕐 Genesis Timestamp (Unix timestamp, or press Enter for current time): '));
-        
+        const difficulty = parseInt(
+          await question(chalk.cyan('⚡ Mining Difficulty (100-10000, recommended: 1000): '))
+        );
+        const timestamp = await question(
+          chalk.cyan('🕐 Genesis Timestamp (Unix timestamp, or press Enter for current time): ')
+        );
+
         // Validate inputs
         if (!premineAddress || premineAddress.trim() === '') {
           throw new Error('Premine address is required');
         }
-        
+
         if (isNaN(premineAmount) || premineAmount <= 0) {
           throw new Error('Premine amount must be a positive number');
         }
-        
+
         if (isNaN(difficulty) || difficulty < 100 || difficulty > 10000) {
           throw new Error('Difficulty must be between 100 and 10000 (recommended: 1000)');
         }
-        
+
         // Use current timestamp if not provided
         const genesisTimestamp = timestamp.trim() === '' ? Date.now() : parseInt(timestamp);
         if (isNaN(genesisTimestamp) || genesisTimestamp <= 0) {
           throw new Error('Invalid timestamp');
         }
-        
+
         console.log('');
         console.log(chalk.yellow.bold('⏳ Generating genesis block...'));
         console.log(chalk.gray(`• Address: ${premineAddress}`));
@@ -783,75 +854,75 @@ async function main() {
         console.log(chalk.gray(`• Difficulty: ${difficulty}`));
         console.log(chalk.gray(`• Timestamp: ${genesisTimestamp} (${new Date(genesisTimestamp).toISOString()})`));
         console.log('');
-        
+
         // Create premine transaction
         const premineTransaction = Transaction.createCoinbase(premineAddress, premineAmount);
         premineTransaction.tag = TRANSACTION_TAGS.PREMINE;
         premineTransaction.timestamp = genesisTimestamp;
         premineTransaction.calculateId();
-        
+
         console.log(chalk.green('✅ Premine transaction created'));
         console.log(chalk.gray(`   Transaction ID: ${premineTransaction.id}`));
-        
+
         // Create genesis block and find valid nonce
         const genesisBlock = new Block(0, genesisTimestamp, [premineTransaction], '0', 0, difficulty);
         genesisBlock.calculateMerkleRoot();
-        
+
         // IMPORTANT: Generate cache using the SAME logic as the miner AND Block.js validation
         const KawPowUtils = require('./utils/kawpow');
         const kawPowUtils = new KawPowUtils();
-        
+
         // Use EXACTLY the same cache generation as BOTH the miner AND Block.js validation:
         // - Both use 1000 cache entries (no optimization)
         // - This ensures hash consistency across all components
         const seed = kawPowUtils.generateSeedHash(0); // Genesis block index is 0
         const genesisCache = kawPowUtils.generateCache(seed, 1000); // 1000 entries (same as miner & validation)
-        
+
         console.log(chalk.green(`✅ Genesis cache generated: ${genesisCache.length} entries`));
-        
+
         const target = genesisBlock.calculateTarget();
         console.log(chalk.green('✅ Genesis block structure created'));
         console.log(chalk.gray(`   Target: ${target}`));
         console.log(chalk.gray(`   Merkle Root: ${genesisBlock.merkleRoot}`));
-        
+
         console.log('');
-        
+
         // Find valid nonce
         console.log(chalk.yellow.bold('⛏️  MINING GENESIS BLOCK (KawPow Algorithm)'));
         console.log(chalk.gray('   Target: ' + target.substring(0, 16) + '...'));
         console.log(chalk.gray('   Difficulty: ' + difficulty));
         console.log(chalk.gray('   Algorithm: KawPow (ProgPoW + Keccak256)'));
         console.log('');
-        
+
         let nonce = 0;
         const maxAttempts = 10000000; // 10 million attempts
         const startTime = Date.now();
         let lastUpdate = 0;
-        
+
         // Progress bar setup
         const progressBarLength = 30;
         const updateInterval = 10000; // Update every 10k nonces
-        
+
         console.log(chalk.cyan('   Progress: [' + '░'.repeat(progressBarLength) + '] 0%'));
-        
+
         while (nonce < maxAttempts) {
           genesisBlock.nonce = nonce;
-          
+
           // IMPORTANT: Use the SAME cache and hash calculation as the miner
           genesisBlock.hash = kawPowUtils.kawPowHash(0, '0', nonce, genesisCache);
           genesisBlock.algorithm = 'kawpow';
-          
+
           // Check if hash meets difficulty requirement
           const hashNum = BigInt('0x' + genesisBlock.hash);
           const targetNum = BigInt('0x' + target);
-          
+
           if (hashNum <= targetNum) {
             // Clear the progress line
             process.stdout.write('\r' + ' '.repeat(80) + '\r');
-            
+
             const miningTime = ((Date.now() - startTime) / 1000).toFixed(2);
             const hashRate = Math.floor(nonce / (miningTime / 1000));
-            
+
             console.log(chalk.green.bold('   🎉 GENESIS BLOCK MINED!'));
             console.log(chalk.green('   ════════════════════════════════════════════════════════════'));
             console.log(chalk.cyan('   📊 Mining Statistics:'));
@@ -864,30 +935,34 @@ async function main() {
             console.log('');
             break;
           }
-          
+
           // Update progress every 10k nonces
           if (nonce % updateInterval === 0) {
             const progress = Math.min((nonce / maxAttempts) * 100, 100);
             const filledLength = Math.floor((progress / 100) * progressBarLength);
             const emptyLength = progressBarLength - filledLength;
-            
+
             const progressBar = '█'.repeat(filledLength) + '░'.repeat(emptyLength);
             const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
             const hashRate = Math.floor(nonce / (elapsed / 1000));
-            
-            process.stdout.write(chalk.cyan(`\r   Progress: [${progressBar}] ${progress.toFixed(1)}% | ${nonce.toLocaleString()} nonces | ${elapsed}s | ${hashRate.toLocaleString()} H/s`));
+
+            process.stdout.write(
+              chalk.cyan(
+                `\r   Progress: [${progressBar}] ${progress.toFixed(1)}% | ${nonce.toLocaleString()} nonces | ${elapsed}s | ${hashRate.toLocaleString()} H/s`
+              )
+            );
           }
-          
+
           nonce++;
         }
-        
+
         if (nonce >= maxAttempts) {
           // Clear the progress line
           process.stdout.write('\r' + ' '.repeat(80) + '\r');
-          
+
           const miningTime = ((Date.now() - startTime) / 1000).toFixed(2);
           const hashRate = Math.floor(nonce / (miningTime / 1000));
-          
+
           console.log(chalk.red.bold('   ❌ MINING FAILED'));
           console.log(chalk.red('   ════════════════════════════════════════════════════════════'));
           console.log(chalk.yellow('   📊 Final Statistics:'));
@@ -898,16 +973,18 @@ async function main() {
           console.log('');
           console.log(chalk.yellow('   💡 Suggestion: Try reducing the difficulty or increasing max attempts.'));
           console.log('');
-          
-          throw new Error(`Could not find valid nonce within ${maxAttempts.toLocaleString()} attempts. Try reducing difficulty.`);
+
+          throw new Error(
+            `Could not find valid nonce within ${maxAttempts.toLocaleString()} attempts. Try reducing difficulty.`
+          );
         }
-        
+
         console.log('');
         console.log(chalk.blue.bold('╔══════════════════════════════════════════════════════════════╗'));
         console.log(chalk.blue.bold('║                    🎉 GENESIS GENERATED                      ║'));
         console.log(chalk.blue.bold('╚══════════════════════════════════════════════════════════════╝'));
         console.log('');
-        
+
         // Generate config.json snippet
         console.log(chalk.cyan.bold('📝 CONFIG.JSON Snippet:'));
         console.log(chalk.white('Add this to your config.json file:'));
@@ -927,7 +1004,7 @@ async function main() {
         console.log(chalk.gray('  }'));
         console.log(chalk.gray('}'));
         console.log('');
-        
+
         // Generate complete config.json
         const newConfig = {
           ...config,
@@ -941,29 +1018,33 @@ async function main() {
               difficulty: difficulty,
               nonce: nonce,
               hash: genesisBlock.hash,
-              algorithm: 'kawpow'
-            }
-          }
+              algorithm: 'kawpow',
+            },
+          },
         };
-        
+
         console.log(chalk.yellow.bold('🔧 IMPORTANT: Cache Consistency'));
-        console.log(chalk.white('The genesis block was generated using the EXACT same cache generation logic as the miner AND validator:'));
+        console.log(
+          chalk.white(
+            'The genesis block was generated using the EXACT same cache generation logic as the miner AND validator:'
+          )
+        );
         console.log(chalk.gray(`   • Cache size: 1000 entries (no optimization)`));
         console.log(chalk.gray(`   • Seed hash: ${seed.substring(0, 16)}...`));
         console.log(chalk.gray(`   • This ensures hash validation will work correctly!`));
         console.log('');
-        
+
         // Ask if user wants to save config
         const saveConfig = await question(chalk.cyan('💾 Save as new config.json? (y/N): '));
-        
+
         if (saveConfig.toLowerCase() === 'y' || saveConfig.toLowerCase() === 'yes') {
           const configPath = await question(chalk.cyan('📁 Config file path (default: config-new.json): '));
           const finalPath = configPath.trim() === '' ? 'config-new.json' : configPath;
-          
+
           fs.writeFileSync(finalPath, JSON.stringify(newConfig, null, 2));
           console.log(chalk.green(`✅ Configuration saved to: ${finalPath}`));
         }
-        
+
         console.log('');
         console.log(chalk.yellow.bold('🚀 NEXT STEPS:'));
         console.log(chalk.white('1. Update your config.json with the generated values'));
@@ -976,7 +1057,6 @@ async function main() {
         console.log(chalk.white('This should resolve the "Genesis block validation failed" error! 🎉'));
         console.log('');
         console.log(chalk.blue.bold('🎉 Happy forking! 🎉'));
-        
       } catch (error) {
         console.error(chalk.red.bold('❌ Error generating genesis block:'), error.message);
         process.exit(1);
@@ -984,7 +1064,7 @@ async function main() {
         rl.close();
       }
     }
-    
+
     generateGenesis();
     return; // Exit early
   }
@@ -994,7 +1074,7 @@ async function main() {
     const nodeVersion = process.version;
     const platform = os.platform();
     const arch = os.arch();
-    
+
     console.log(chalk.blue.bold('╔══════════════════════════════════════════════════════════════╗'));
     console.log(chalk.blue.bold('║                    🚀 PASTELLA DAEMON                      ║'));
     console.log(chalk.blue.bold('║                   NodeJS Cryptocurrency                      ║'));
@@ -1007,18 +1087,24 @@ async function main() {
     console.log(chalk.cyan('  • License:          '), chalk.white.bold(packageJson.license));
     console.log(chalk.cyan('  • Author:           '), chalk.white.bold(packageJson.author));
     console.log('');
-            console.log(chalk.yellow.bold('🔗 BLOCKCHAIN SPECS:'));
-        console.log(chalk.yellow('  • Consensus:       '), chalk.white.bold('Proof of Work (KawPow)'));
-        console.log(chalk.yellow('  • Block Time:      '), chalk.white.bold(`${config.blockchain.blockTime / 1000}s`));
-    console.log(chalk.yellow('  • Genesis Difficulty:'), chalk.white.bold(config.blockchain.genesis?.difficulty || 'Not set'));
-    console.log(chalk.yellow('  • Difficulty Algorithm:'), chalk.white.bold(config.blockchain.difficultyAlgorithm || 'lwma3'));
+    console.log(chalk.yellow.bold('🔗 BLOCKCHAIN SPECS:'));
+    console.log(chalk.yellow('  • Consensus:       '), chalk.white.bold('Proof of Work (KawPow)'));
+    console.log(chalk.yellow('  • Block Time:      '), chalk.white.bold(`${config.blockchain.blockTime / 1000}s`));
+    console.log(
+      chalk.yellow('  • Genesis Difficulty:'),
+      chalk.white.bold(config.blockchain.genesis?.difficulty || 'Not set')
+    );
+    console.log(
+      chalk.yellow('  • Difficulty Algorithm:'),
+      chalk.white.bold(config.blockchain.difficultyAlgorithm || 'lwma3')
+    );
     console.log(chalk.yellow('  • Coinbase Reward: '), chalk.white.bold(`${config.blockchain.coinbaseReward} PAS`));
     console.log('');
     process.exit(0);
   }
 
   // Parse arguments with values
-  const parseArgValue = (argName) => {
+  const parseArgValue = argName => {
     const index = args.indexOf(argName);
     if (index !== -1 && index + 1 < args.length) {
       return args[index + 1];
@@ -1132,10 +1218,10 @@ async function main() {
       logger.error('SYSTEM', 'Examples: 127.0.0.1, 192.168.1.100, 0.0.0.0');
       process.exit(1);
     }
-    
+
     config.api = config.api || {};
     config.api.host = host;
-    
+
     // CRITICAL: Require API key for non-localhost binding
     if (host !== '127.0.0.1' && host !== 'localhost') {
       if (!apiKey) {
@@ -1179,4 +1265,4 @@ if (require.main === module) {
   main();
 }
 
-module.exports = PastellaDaemon; 
+module.exports = PastellaDaemon;

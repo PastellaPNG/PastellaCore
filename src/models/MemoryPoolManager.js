@@ -11,12 +11,12 @@ class MemoryProtection {
     this.memoryThreshold = 0.8; // 80% memory usage threshold
     this.cleanupInterval = 60000; // 1 minute cleanup interval
     this.lastCleanup = Date.now();
-    
+
     // Memory monitoring
     this.currentMemoryUsage = 0;
     this.transactionSizes = new Map(); // Track transaction memory usage
     this.memoryWarnings = [];
-    
+
     // Start memory monitoring
     this.startMemoryMonitoring();
   }
@@ -37,17 +37,20 @@ class MemoryProtection {
     try {
       const used = process.memoryUsage();
       this.currentMemoryUsage = used.heapUsed;
-      
+
       const memoryUsagePercent = this.currentMemoryUsage / this.maxMemoryUsage;
-      
+
       if (memoryUsagePercent > this.memoryThreshold) {
         logger.warn('MEMORY_PROTECTION', `⚠️  High memory usage: ${(memoryUsagePercent * 100).toFixed(2)}%`);
         this.triggerMemoryCleanup();
       }
-      
+
       // Log memory status every minute
       if (Date.now() - this.lastCleanup > 60000) {
-        logger.debug('MEMORY_PROTECTION', `Memory usage: ${(this.currentMemoryUsage / 1024 / 1024).toFixed(2)}MB / ${(this.maxMemoryUsage / 1024 / 1024).toFixed(2)}MB`);
+        logger.debug(
+          'MEMORY_PROTECTION',
+          `Memory usage: ${(this.currentMemoryUsage / 1024 / 1024).toFixed(2)}MB / ${(this.maxMemoryUsage / 1024 / 1024).toFixed(2)}MB`
+        );
         this.lastCleanup = Date.now();
       }
     } catch (error) {
@@ -61,28 +64,27 @@ class MemoryProtection {
   triggerMemoryCleanup() {
     try {
       logger.info('MEMORY_PROTECTION', '🚨 Memory threshold exceeded, triggering cleanup');
-      
+
       // Force garbage collection if available
       if (global.gc) {
         global.gc();
         logger.info('MEMORY_PROTECTION', 'Garbage collection triggered');
       }
-      
+
       // Clear old transaction size tracking
       this.transactionSizes.clear();
-      
+
       // Add memory warning
       this.memoryWarnings.push({
         timestamp: Date.now(),
         usage: this.currentMemoryUsage,
-        threshold: this.maxMemoryUsage
+        threshold: this.maxMemoryUsage,
       });
-      
+
       // Keep only last 10 warnings
       if (this.memoryWarnings.length > 10) {
         this.memoryWarnings.shift();
       }
-      
     } catch (error) {
       logger.error('MEMORY_PROTECTION', `Memory cleanup failed: ${error.message}`);
     }
@@ -94,11 +96,11 @@ class MemoryProtection {
   validateTransactionSize(transaction) {
     try {
       const transactionSize = JSON.stringify(transaction).length;
-      
+
       if (transactionSize > this.maxTransactionSize) {
         throw new Error(`Transaction size ${transactionSize} bytes exceeds limit ${this.maxTransactionSize} bytes`);
       }
-      
+
       return transactionSize;
     } catch (error) {
       throw new Error(`Transaction size validation failed: ${error.message}`);
@@ -112,12 +114,12 @@ class MemoryProtection {
     try {
       const transactionSize = this.validateTransactionSize(transaction);
       const estimatedNewUsage = this.currentMemoryUsage + transactionSize;
-      
+
       if (estimatedNewUsage > this.maxMemoryUsage) {
         logger.warn('MEMORY_PROTECTION', `⚠️  Cannot add transaction: would exceed memory limit`);
         return false;
       }
-      
+
       return true;
     } catch (error) {
       logger.error('MEMORY_PROTECTION', `Transaction validation failed: ${error.message}`);
@@ -132,12 +134,12 @@ class MemoryProtection {
     return {
       currentUsage: this.currentMemoryUsage,
       maxUsage: this.maxMemoryUsage,
-      usagePercent: (this.currentMemoryUsage / this.maxMemoryUsage * 100).toFixed(2),
+      usagePercent: ((this.currentMemoryUsage / this.maxMemoryUsage) * 100).toFixed(2),
       maxTransactionSize: this.maxTransactionSize,
       maxPoolSize: this.maxPoolSize,
       memoryThreshold: this.memoryThreshold,
       warnings: this.memoryWarnings.length,
-      lastCleanup: this.lastCleanup
+      lastCleanup: this.lastCleanup,
     };
   }
 
@@ -157,7 +159,7 @@ class MemoryProtection {
     if (newLimits.memoryThreshold) {
       this.memoryThreshold = newLimits.memoryThreshold;
     }
-    
+
     logger.info('MEMORY_PROTECTION', 'Memory protection limits updated');
   }
 }
@@ -168,10 +170,10 @@ class MemoryProtection {
 class MemoryPoolManager {
   constructor() {
     this.pendingTransactions = [];
-    
+
     // CRITICAL: Initialize memory protection
     this.memoryProtection = new MemoryProtection();
-    
+
     // Start periodic cleanup
     setTimeout(() => {
       this.startPeriodicCleanup();
@@ -259,13 +261,13 @@ class MemoryPoolManager {
     const results = {
       valid: [],
       invalid: [],
-      errors: []
+      errors: [],
     };
 
     // Process in batches to avoid memory issues
     for (let i = 0; i < transactions.length; i += maxBatchSize) {
       const batch = transactions.slice(i, i + maxBatchSize);
-      
+
       for (const tx of batch) {
         try {
           // Basic validation
@@ -296,7 +298,6 @@ class MemoryPoolManager {
             results.invalid.push(tx);
             results.errors.push(`Transaction ${tx.id} failed validation`);
           }
-
         } catch (error) {
           results.invalid.push(tx);
           results.errors.push(`Transaction ${tx.id} validation error: ${error.message}`);
@@ -316,24 +317,23 @@ class MemoryPoolManager {
       if (!this.memoryProtection.canAddTransaction(transaction)) {
         throw new Error('Transaction would exceed memory limits');
       }
-      
+
       // Check pool size limits
       if (this.pendingTransactions.length >= this.memoryProtection.maxPoolSize) {
         throw new Error('Transaction pool is full');
       }
-      
+
       // Validate transaction size
       const transactionSize = this.memoryProtection.validateTransactionSize(transaction);
-      
+
       // Add transaction
       this.pendingTransactions.push(transaction);
-      
+
       // Track transaction size for memory monitoring
       this.memoryProtection.transactionSizes.set(transaction.id, transactionSize);
-      
+
       logger.debug('MEMORY_POOL', `Transaction ${transaction.id} added to pool (size: ${transactionSize} bytes)`);
       return true;
-      
     } catch (error) {
       logger.error('MEMORY_POOL', `Failed to add transaction: ${error.message}`);
       return false;
@@ -345,14 +345,17 @@ class MemoryPoolManager {
    */
   startPeriodicCleanup() {
     // Clean up expired transactions every 5 minutes
-    setInterval(() => {
-      try {
-        this.cleanupExpiredTransactions();
-        this.manageMemoryPool();
-      } catch (error) {
-        logger.error('MEMORY_POOL', `Periodic cleanup failed: ${error.message}`);
-      }
-    }, 5 * 60 * 1000); // 5 minutes
+    setInterval(
+      () => {
+        try {
+          this.cleanupExpiredTransactions();
+          this.manageMemoryPool();
+        } catch (error) {
+          logger.error('MEMORY_POOL', `Periodic cleanup failed: ${error.message}`);
+        }
+      },
+      5 * 60 * 1000
+    ); // 5 minutes
   }
 
   /**

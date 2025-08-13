@@ -14,7 +14,7 @@ class CheckpointManager {
     this.metadata = {};
     this.isValid = true;
     this.validationErrors = [];
-    
+
     logger.debug('CHECKPOINT_MANAGER', `Initializing CheckpointManager: dataDir=${dataDir}`);
   }
 
@@ -24,7 +24,7 @@ class CheckpointManager {
   loadCheckpoints() {
     try {
       logger.debug('CHECKPOINT_MANAGER', `Loading checkpoints from: ${this.checkpointsPath}`);
-      
+
       if (!fs.existsSync(this.checkpointsPath)) {
         logger.warn('CHECKPOINT_MANAGER', `Checkpoints file not found: ${this.checkpointsPath}`);
         logger.info('CHECKPOINT_MANAGER', `No checkpoints loaded - continuing without checkpoint validation`);
@@ -33,19 +33,19 @@ class CheckpointManager {
 
       const checkpointData = fs.readFileSync(this.checkpointsPath, 'utf8');
       const parsed = JSON.parse(checkpointData);
-      
+
       this.checkpoints = parsed.checkpoints || [];
       this.metadata = parsed.metadata || {};
-      
+
       logger.debug('CHECKPOINT_MANAGER', `Loaded ${this.checkpoints.length} checkpoints`);
       logger.debug('CHECKPOINT_MANAGER', `Checkpoint metadata: ${JSON.stringify(this.metadata)}`);
-      
+
       // Validate checkpoint structure
       if (!this.validateCheckpointStructure()) {
         logger.error('CHECKPOINT_MANAGER', `Checkpoint structure validation failed`);
         return false;
       }
-      
+
       return true;
     } catch (error) {
       logger.error('CHECKPOINT_MANAGER', `Failed to load checkpoints: ${error.message}`);
@@ -59,7 +59,7 @@ class CheckpointManager {
    */
   validateCheckpointStructure() {
     logger.debug('CHECKPOINT_MANAGER', `Validating checkpoint structure...`);
-    
+
     if (!Array.isArray(this.checkpoints)) {
       this.addValidationError('checkpoints_not_array', 'Checkpoints must be an array');
       return false;
@@ -67,7 +67,7 @@ class CheckpointManager {
 
     for (let i = 0; i < this.checkpoints.length; i++) {
       const checkpoint = this.checkpoints[i];
-      
+
       if (!checkpoint || typeof checkpoint !== 'object') {
         this.addValidationError('invalid_checkpoint_object', `Checkpoint ${i} is not a valid object`);
         return false;
@@ -84,16 +84,20 @@ class CheckpointManager {
       }
 
       if (checkpoint.hash.length !== 64) {
-        this.addValidationError('invalid_hash_length', `Checkpoint ${i} hash length invalid: ${checkpoint.hash.length} (expected 64)`);
+        this.addValidationError(
+          'invalid_hash_length',
+          `Checkpoint ${i} hash length invalid: ${checkpoint.hash.length} (expected 64)`
+        );
         return false;
       }
 
       // Check for duplicate heights
-      const duplicateHeight = this.checkpoints.findIndex((cp, idx) => 
-        idx !== i && cp.height === checkpoint.height
-      );
+      const duplicateHeight = this.checkpoints.findIndex((cp, idx) => idx !== i && cp.height === checkpoint.height);
       if (duplicateHeight !== -1) {
-        this.addValidationError('duplicate_height', `Checkpoint ${i} has duplicate height ${checkpoint.height} with checkpoint ${duplicateHeight}`);
+        this.addValidationError(
+          'duplicate_height',
+          `Checkpoint ${i} has duplicate height ${checkpoint.height} with checkpoint ${duplicateHeight}`
+        );
         return false;
       }
     }
@@ -109,7 +113,7 @@ class CheckpointManager {
   validateCheckpoints(blockchain) {
     logger.debug('CHECKPOINT_MANAGER', `Validating checkpoints against blockchain...`);
     logger.debug('CHECKPOINT_MANAGER', `Blockchain height: ${blockchain.chain.length}`);
-    
+
     if (this.checkpoints.length === 0) {
       logger.info('CHECKPOINT_MANAGER', `No checkpoints to validate`);
       return true;
@@ -120,11 +124,17 @@ class CheckpointManager {
     let invalidCheckpoints = 0;
 
     for (const checkpoint of this.checkpoints) {
-      logger.debug('CHECKPOINT_MANAGER', `Validating checkpoint at height ${checkpoint.height}: ${checkpoint.hash.substring(0, 16)}...`);
-      
+      logger.debug(
+        'CHECKPOINT_MANAGER',
+        `Validating checkpoint at height ${checkpoint.height}: ${checkpoint.hash.substring(0, 16)}...`
+      );
+
       // Check if checkpoint height exists in blockchain
       if (checkpoint.height >= blockchain.chain.length) {
-        logger.debug('CHECKPOINT_MANAGER', `Checkpoint height ${checkpoint.height} exceeds blockchain height ${blockchain.chain.length} - skipping`);
+        logger.debug(
+          'CHECKPOINT_MANAGER',
+          `Checkpoint height ${checkpoint.height} exceeds blockchain height ${blockchain.chain.length} - skipping`
+        );
         continue;
       }
 
@@ -138,13 +148,13 @@ class CheckpointManager {
       if (block.hash !== checkpoint.hash) {
         const error = `Checkpoint validation FAILED at height ${checkpoint.height}`;
         const details = `Expected: ${checkpoint.hash}, Got: ${block.hash}`;
-        
+
         logger.error('CHECKPOINT_MANAGER', `❌ ${error}`);
         logger.error('CHECKPOINT_MANAGER', `   ${details}`);
-        
+
         this.addValidationError('hash_mismatch', error, details);
         invalidCheckpoints++;
-        
+
         // CRITICAL: Stop daemon immediately for invalid checkpoints
         this.handleInvalidCheckpoint(error, details, checkpoint, block);
         return false; // This will stop the validation process
@@ -154,8 +164,11 @@ class CheckpointManager {
       validCheckpoints++;
     }
 
-    logger.info('CHECKPOINT_MANAGER', `Checkpoint validation completed: ${validCheckpoints} valid, ${invalidCheckpoints} invalid`);
-    
+    logger.info(
+      'CHECKPOINT_MANAGER',
+      `Checkpoint validation completed: ${validCheckpoints} valid, ${invalidCheckpoints} invalid`
+    );
+
     if (invalidCheckpoints > 0) {
       logger.error('CHECKPOINT_MANAGER', `❌ ${invalidCheckpoints} invalid checkpoints detected - daemon stopped`);
       return false;
@@ -193,7 +206,7 @@ class CheckpointManager {
     logger.error('CHECKPOINT_MANAGER', `🚨 This error indicates blockchain corruption or a fork.`);
     logger.error('CHECKPOINT_MANAGER', `🚨 Continuing would risk further data corruption.`);
     logger.error('CHECKPOINT_MANAGER', `🚨`);
-    
+
     // Force process exit to stop the daemon
     logger.error('CHECKPOINT_MANAGER', `🚨 FORCING DAEMON SHUTDOWN...`);
     process.exit(1);
@@ -207,12 +220,12 @@ class CheckpointManager {
       type,
       message,
       details,
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
     };
-    
+
     this.validationErrors.push(error);
     this.isValid = false;
-    
+
     logger.error('CHECKPOINT_MANAGER', `Validation error: ${type} - ${message}`);
     if (details) {
       logger.error('CHECKPOINT_MANAGER', `Details: ${details}`);
@@ -241,7 +254,7 @@ class CheckpointManager {
       total: this.checkpoints.length,
       valid: this.isValid,
       validationErrors: this.validationErrors.length,
-      metadata: this.metadata
+      metadata: this.metadata,
     };
   }
 
@@ -250,7 +263,7 @@ class CheckpointManager {
    */
   addCheckpoint(height, hash, description = '') {
     logger.debug('CHECKPOINT_MANAGER', `Adding checkpoint: height=${height}, hash=${hash.substring(0, 16)}...`);
-    
+
     // Check for duplicates
     if (this.checkpoints.find(cp => cp.height === height)) {
       logger.warn('CHECKPOINT_MANAGER', `Checkpoint at height ${height} already exists`);
@@ -260,12 +273,12 @@ class CheckpointManager {
     const checkpoint = {
       height: parseInt(height),
       hash: hash,
-      description: description
+      description: description,
     };
 
     this.checkpoints.push(checkpoint);
     this.saveCheckpoints();
-    
+
     logger.info('CHECKPOINT_MANAGER', `Checkpoint added at height ${height}`);
     return true;
   }
@@ -275,7 +288,7 @@ class CheckpointManager {
    */
   updateCheckpoint(height, hash, description = '') {
     logger.debug('CHECKPOINT_MANAGER', `Updating checkpoint at height ${height}`);
-    
+
     const index = this.checkpoints.findIndex(cp => cp.height === height);
     if (index === -1) {
       logger.warn('CHECKPOINT_MANAGER', `Checkpoint at height ${height} not found`);
@@ -285,11 +298,11 @@ class CheckpointManager {
     this.checkpoints[index] = {
       height: parseInt(height),
       hash: hash,
-      description: description || this.checkpoints[index].description
+      description: description || this.checkpoints[index].description,
     };
 
     this.saveCheckpoints();
-    
+
     logger.info('CHECKPOINT_MANAGER', `Checkpoint updated at height ${height}`);
     return true;
   }
@@ -299,7 +312,7 @@ class CheckpointManager {
    */
   removeCheckpoint(height) {
     logger.debug('CHECKPOINT_MANAGER', `Removing checkpoint at height ${height}`);
-    
+
     const index = this.checkpoints.findIndex(cp => cp.height === height);
     if (index === -1) {
       logger.warn('CHECKPOINT_MANAGER', `Checkpoint at height ${height} not found`);
@@ -308,7 +321,7 @@ class CheckpointManager {
 
     this.checkpoints.splice(index, 1);
     this.saveCheckpoints();
-    
+
     logger.info('CHECKPOINT_MANAGER', `Checkpoint removed at height ${height}`);
     return true;
   }
@@ -318,10 +331,10 @@ class CheckpointManager {
    */
   clearCheckpoints() {
     logger.debug('CHECKPOINT_MANAGER', `Clearing all checkpoints`);
-    
+
     this.checkpoints = [];
     this.saveCheckpoints();
-    
+
     logger.info('CHECKPOINT_MANAGER', `All checkpoints cleared`);
     return true;
   }
@@ -335,8 +348,8 @@ class CheckpointManager {
         checkpoints: this.checkpoints,
         metadata: {
           ...this.metadata,
-          lastUpdated: new Date().toISOString()
-        }
+          lastUpdated: new Date().toISOString(),
+        },
       };
 
       fs.writeFileSync(this.checkpointsPath, JSON.stringify(data, null, 2));

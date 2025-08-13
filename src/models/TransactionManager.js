@@ -29,7 +29,10 @@ class TransactionManager {
 
     // MANDATORY PROTECTION: Reject ALL transactions without replay protection (except coinbase)
     if (!transactionInstance.isCoinbase && (!transactionInstance.nonce || !transactionInstance.expiresAt)) {
-      logger.error('TRANSACTION_MANAGER', `Transaction ${transactionInstance.id} REJECTED: Missing mandatory replay protection`);
+      logger.error(
+        'TRANSACTION_MANAGER',
+        `Transaction ${transactionInstance.id} REJECTED: Missing mandatory replay protection`
+      );
       logger.error('TRANSACTION_MANAGER', 'ALL transactions must include nonce and expiration fields');
       logger.error('TRANSACTION_MANAGER', 'Use Transaction.createTransaction() to create protected transactions');
       return false;
@@ -44,16 +47,21 @@ class TransactionManager {
     // SPAM PROTECTION: Check address-specific rate limit
     if (!transactionInstance.isCoinbase) {
       // Extract sender address from inputs
-      const senderAddresses = transactionInstance.inputs.map(input => {
-        // Find the UTXO to get the address
-        const utxo = this.utxoManager.findUTXO(input.txHash, input.outputIndex);
-        return utxo ? utxo.address : null;
-      }).filter(addr => addr !== null);
+      const senderAddresses = transactionInstance.inputs
+        .map(input => {
+          // Find the UTXO to get the address
+          const utxo = this.utxoManager.findUTXO(input.txHash, input.outputIndex);
+          return utxo ? utxo.address : null;
+        })
+        .filter(addr => addr !== null);
 
       // Check if any sender address is rate limited
       for (const senderAddress of senderAddresses) {
         if (!this.spamProtection.isAddressAllowedToSubmit(senderAddress)) {
-          logger.warn('TRANSACTION_MANAGER', `Transaction ${transactionInstance.id} REJECTED: Address ${senderAddress} rate limited for spam`);
+          logger.warn(
+            'TRANSACTION_MANAGER',
+            `Transaction ${transactionInstance.id} REJECTED: Address ${senderAddress} rate limited for spam`
+          );
           return false;
         }
       }
@@ -76,7 +84,10 @@ class TransactionManager {
     // REPLAY ATTACK PROTECTION: Check for duplicate nonces from same sender in pending pool
     if (transactionInstance.isReplayAttack && typeof transactionInstance.isReplayAttack === 'function') {
       if (transactionInstance.isReplayAttack(this.memoryPool.getPendingTransactions())) {
-        logger.warn('TRANSACTION_MANAGER', `Transaction ${transactionInstance.id} detected as replay attack in pending pool`);
+        logger.warn(
+          'TRANSACTION_MANAGER',
+          `Transaction ${transactionInstance.id} detected as replay attack in pending pool`
+        );
         return false;
       }
     }
@@ -87,7 +98,10 @@ class TransactionManager {
 
     if (transactionInstance.isValid()) {
       this.memoryPool.addTransaction(transactionInstance);
-      logger.info('TRANSACTION_MANAGER', `Transaction ${transactionInstance.id} added to pending pool with mandatory replay protection and spam protection`);
+      logger.info(
+        'TRANSACTION_MANAGER',
+        `Transaction ${transactionInstance.id} added to pending pool with mandatory replay protection and spam protection`
+      );
       return true;
     }
 
@@ -134,26 +148,25 @@ class TransactionManager {
           if (!utxo) {
             return { valid: false, reason: `Input UTXO not found: ${input.txHash}:${input.outputIndex}` };
           }
-          
+
           // Check if UTXO is already spent
           if (this.utxoManager.isUTXOSpent(input.txHash, input.outputIndex)) {
             return { valid: false, reason: `UTXO already spent: ${input.txHash}:${input.outputIndex}` };
           }
-          
+
           totalInputAmount += utxo.amount;
         }
 
         // Validate input/output balance (input must cover output + fee)
-        if (totalInputAmount < (totalOutputAmount + transaction.fee)) {
-          return { 
-            valid: false, 
-            reason: `Insufficient input amount. Input: ${totalInputAmount}, Output: ${totalOutputAmount}, Fee: ${transaction.fee}` 
+        if (totalInputAmount < totalOutputAmount + transaction.fee) {
+          return {
+            valid: false,
+            reason: `Insufficient input amount. Input: ${totalInputAmount}, Output: ${totalOutputAmount}, Fee: ${transaction.fee}`,
           };
         }
       }
 
       return { valid: true, reason: 'Transaction validation passed' };
-
     } catch (error) {
       logger.error('TRANSACTION_MANAGER', `Transaction validation error: ${error.message}`);
       return { valid: false, reason: `Validation error: ${error.message}` };
@@ -187,14 +200,12 @@ class TransactionManager {
     }
 
     // Create inputs
-    const inputs = selectedUtxos.map(utxo =>
-      new TransactionInput(utxo.txHash, utxo.outputIndex, '', '') // Signature will be added later
+    const inputs = selectedUtxos.map(
+      utxo => new TransactionInput(utxo.txHash, utxo.outputIndex, '', '') // Signature will be added later
     );
 
     // Create outputs
-    const outputs = [
-      new TransactionOutput(toAddress, amount)
-    ];
+    const outputs = [new TransactionOutput(toAddress, amount)];
 
     // Add change output if needed
     const change = selectedAmount - amount - fee;
@@ -204,7 +215,7 @@ class TransactionManager {
 
     // Create transaction with tag (automatically includes replay protection)
     const transaction = new Transaction(inputs, outputs, fee, tag);
-    
+
     // Verify replay protection fields are present
     if (!transaction.nonce || !transaction.expiresAt) {
       throw new Error('Transaction creation failed: Missing replay protection fields');
@@ -230,10 +241,16 @@ class TransactionManager {
 
     // Log results
     if (validationResults.valid.length > 0 || validationResults.invalid.length > 0) {
-      logger.info('TRANSACTION_MANAGER', `Batch transaction processing: ${validationResults.valid.length} valid, ${validationResults.invalid.length} invalid`);
-      
+      logger.info(
+        'TRANSACTION_MANAGER',
+        `Batch transaction processing: ${validationResults.valid.length} valid, ${validationResults.invalid.length} invalid`
+      );
+
       if (validationResults.errors.length > 0) {
-        logger.warn('TRANSACTION_MANAGER', `Batch validation errors: ${validationResults.errors.slice(0, 5).join(', ')}${validationResults.errors.length > 5 ? '...' : ''}`);
+        logger.warn(
+          'TRANSACTION_MANAGER',
+          `Batch validation errors: ${validationResults.errors.slice(0, 5).join(', ')}${validationResults.errors.length > 5 ? '...' : ''}`
+        );
       }
     }
 
@@ -241,7 +258,7 @@ class TransactionManager {
       added: addedCount,
       valid: validationResults.valid.length,
       invalid: validationResults.invalid.length,
-      errors: validationResults.errors
+      errors: validationResults.errors,
     };
   }
 }

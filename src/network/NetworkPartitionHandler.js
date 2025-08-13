@@ -12,9 +12,9 @@ class NetworkPartitionHandler {
       partitionDuration: 0,
       recoveryAttempts: 0,
       successfulRecoveries: 0,
-      failedRecoveries: 0
+      failedRecoveries: 0,
     };
-    
+
     // Partition detection configuration
     this.config = {
       healthCheckInterval: 30000, // 30 seconds
@@ -22,9 +22,9 @@ class NetworkPartitionHandler {
       recoveryTimeout: 120000, // 2 minutes
       maxRecoveryAttempts: 5,
       heartbeatInterval: 15000, // 15 seconds
-      connectionTimeout: 10000 // 10 seconds
+      connectionTimeout: 10000, // 10 seconds
     };
-    
+
     // Partition state tracking
     this.partitionState = {
       isPartitioned: false,
@@ -32,20 +32,15 @@ class NetworkPartitionHandler {
       disconnectedPeers: new Set(),
       partitionGroups: new Map(), // Map<partitionId, Set<peerAddress>>
       recoveryInProgress: false,
-      lastHealthCheck: Date.now()
+      lastHealthCheck: Date.now(),
     };
-    
+
     // Health check intervals
     this.healthCheckInterval = null;
     this.heartbeatInterval = null;
-    
+
     // Recovery strategies
-    this.recoveryStrategies = [
-      'reconnect_seed_nodes',
-      'broadcast_health_status',
-      'request_peer_list',
-      'force_sync'
-    ];
+    this.recoveryStrategies = ['reconnect_seed_nodes', 'broadcast_health_status', 'request_peer_list', 'force_sync'];
   }
 
   /**
@@ -108,7 +103,10 @@ class NetworkPartitionHandler {
       this.partitionStats.partitionDuration = now - this.partitionState.partitionStartTime;
     }
 
-    logger.debug('P2P', `Health check: ${connectedPeers}/${totalPeers} peers connected (${Math.round(connectionRatio * 100)}%)`);
+    logger.debug(
+      'P2P',
+      `Health check: ${connectedPeers}/${totalPeers} peers connected (${Math.round(connectionRatio * 100)}%)`
+    );
   }
 
   /**
@@ -117,7 +115,8 @@ class NetworkPartitionHandler {
   getConnectedPeerCount() {
     let connectedCount = 0;
     this.p2pNetwork.peerManager.getAllPeers().forEach(peer => {
-      if (peer.readyState === 1) { // WebSocket.OPEN
+      if (peer.readyState === 1) {
+        // WebSocket.OPEN
         connectedCount++;
       }
     });
@@ -153,9 +152,10 @@ class NetworkPartitionHandler {
    */
   identifyDisconnectedPeers() {
     this.partitionState.disconnectedPeers.clear();
-    
+
     this.p2pNetwork.peerManager.getAllPeers().forEach(peer => {
-      if (peer.readyState !== 1) { // Not WebSocket.OPEN
+      if (peer.readyState !== 1) {
+        // Not WebSocket.OPEN
         const peerAddress = this.p2pNetwork.peerManager.getPeerAddress(peer);
         if (peerAddress) {
           this.partitionState.disconnectedPeers.add(peerAddress);
@@ -198,7 +198,6 @@ class NetworkPartitionHandler {
         this.partitionStats.failedRecoveries++;
         logger.error('P2P', 'All recovery strategies failed, network remains partitioned');
       }
-
     } catch (error) {
       logger.error('P2P', `Recovery error: ${error.message}`);
       this.partitionStats.failedRecoveries++;
@@ -235,18 +234,18 @@ class NetworkPartitionHandler {
    */
   async reconnectSeedNodes() {
     logger.info('P2P', 'Attempting to reconnect to seed nodes...');
-    
+
     const originalSeedCount = this.p2pNetwork.seedNodeManager.getConnectedSeedNodes().length;
     await this.p2pNetwork.seedNodeManager.attemptSeedNodeReconnection();
-    
+
     // Check if we gained new seed connections
     const newSeedCount = this.p2pNetwork.seedNodeManager.getConnectedSeedNodes().length;
     const improvement = newSeedCount > originalSeedCount;
-    
+
     if (improvement) {
       logger.info('P2P', `Seed node reconnection successful: ${originalSeedCount} → ${newSeedCount}`);
     }
-    
+
     return improvement;
   }
 
@@ -255,7 +254,7 @@ class NetworkPartitionHandler {
    */
   async broadcastHealthStatus() {
     logger.info('P2P', 'Broadcasting health status to peers...');
-    
+
     const healthMessage = {
       type: 'HEALTH_STATUS',
       data: {
@@ -264,14 +263,15 @@ class NetworkPartitionHandler {
         peerCount: this.p2pNetwork.peerManager.getPeerCount(),
         connectedCount: this.getConnectedPeerCount(),
         isPartitioned: this.partitionState.isPartitioned,
-        blockchainHeight: this.p2pNetwork.blockchain.getLatestBlock().index
-      }
+        blockchainHeight: this.p2pNetwork.blockchain.getLatestBlock().index,
+      },
     };
 
     // Broadcast health message to all peers
     const peers = this.p2pNetwork.peerManager.getAllPeers();
     peers.forEach(peer => {
-      if (peer.readyState === 1) { // WebSocket.OPEN
+      if (peer.readyState === 1) {
+        // WebSocket.OPEN
         try {
           peer.send(JSON.stringify(healthMessage));
         } catch (error) {
@@ -287,19 +287,20 @@ class NetworkPartitionHandler {
    */
   async requestPeerList() {
     logger.info('P2P', 'Requesting peer lists from connected peers...');
-    
+
     const peerListMessage = {
       type: 'REQUEST_PEER_LIST',
       data: {
         timestamp: Date.now(),
-        requester: this.p2pNetwork.nodeIdentity.nodeId
-      }
+        requester: this.p2pNetwork.nodeIdentity.nodeId,
+      },
     };
 
     // Broadcast peer list request to all peers
     const peers = this.p2pNetwork.peerManager.getAllPeers();
     peers.forEach(peer => {
-      if (peer.readyState === 1) { // WebSocket.OPEN
+      if (peer.readyState === 1) {
+        // WebSocket.OPEN
         try {
           peer.send(JSON.stringify(peerListMessage));
         } catch (error) {
@@ -315,7 +316,7 @@ class NetworkPartitionHandler {
    */
   async forceSync() {
     logger.info('P2P', 'Forcing blockchain synchronization...');
-    
+
     try {
       await this.p2pNetwork.syncWithNetwork();
       return true;
@@ -334,7 +335,7 @@ class NetworkPartitionHandler {
     }
 
     const partitionDuration = Date.now() - this.partitionState.partitionStartTime;
-    
+
     this.partitionState.isPartitioned = false;
     this.partitionState.partitionStartTime = null;
     this.partitionState.disconnectedPeers.clear();
@@ -342,7 +343,10 @@ class NetworkPartitionHandler {
     this.partitionStats.currentPartitions--;
 
     logger.info('P2P', `Network partition resolved after ${Math.round(partitionDuration / 1000)}s`);
-    logger.info('P2P', `Total partitions: ${this.partitionStats.totalPartitions}, Current: ${this.partitionStats.currentPartitions}`);
+    logger.info(
+      'P2P',
+      `Total partitions: ${this.partitionStats.totalPartitions}, Current: ${this.partitionStats.currentPartitions}`
+    );
   }
 
   /**
@@ -358,14 +362,15 @@ class NetworkPartitionHandler {
       data: {
         nodeId: this.p2pNetwork.nodeIdentity.nodeId,
         timestamp: Date.now(),
-        sequence: Math.floor(Date.now() / this.config.heartbeatInterval)
-      }
+        sequence: Math.floor(Date.now() / this.config.heartbeatInterval),
+      },
     };
 
     // Broadcast heartbeat to all peers
     const peers = this.p2pNetwork.peerManager.getAllPeers();
     peers.forEach(peer => {
-      if (peer.readyState === 1) { // WebSocket.OPEN
+      if (peer.readyState === 1) {
+        // WebSocket.OPEN
         try {
           peer.send(JSON.stringify(heartbeatMessage));
         } catch (error) {
@@ -392,7 +397,7 @@ class NetworkPartitionHandler {
     if (this.partitionState.disconnectedPeers.has(peerAddress)) {
       this.partitionState.disconnectedPeers.delete(peerAddress);
       logger.debug('P2P', `Peer reconnected: ${peerAddress}`);
-      
+
       // Check if partition is resolved
       if (this.partitionState.disconnectedPeers.size === 0 && this.partitionState.isPartitioned) {
         this.resolvePartition();
@@ -407,12 +412,13 @@ class NetworkPartitionHandler {
     return {
       ...this.partitionStats,
       isPartitioned: this.partitionState.isPartitioned,
-      partitionDuration: this.partitionState.isPartitioned && this.partitionState.partitionStartTime 
-        ? Date.now() - this.partitionState.partitionStartTime 
-        : 0,
+      partitionDuration:
+        this.partitionState.isPartitioned && this.partitionState.partitionStartTime
+          ? Date.now() - this.partitionState.partitionStartTime
+          : 0,
       disconnectedPeers: this.partitionState.disconnectedPeers.size,
       recoveryInProgress: this.partitionState.recoveryInProgress,
-      lastHealthCheck: this.partitionState.lastHealthCheck
+      lastHealthCheck: this.partitionState.lastHealthCheck,
     };
   }
 
@@ -427,18 +433,18 @@ class NetworkPartitionHandler {
       partitionDuration: 0,
       recoveryAttempts: 0,
       successfulRecoveries: 0,
-      failedRecoveries: 0
+      failedRecoveries: 0,
     };
-    
+
     this.partitionState = {
       isPartitioned: false,
       partitionStartTime: null,
       disconnectedPeers: new Set(),
       partitionGroups: new Map(),
       recoveryInProgress: false,
-      lastHealthCheck: Date.now()
+      lastHealthCheck: Date.now(),
     };
-    
+
     logger.info('P2P', 'Partition statistics reset');
   }
 
@@ -457,10 +463,9 @@ class NetworkPartitionHandler {
     return {
       ...this.partitionState,
       config: this.config,
-      stats: this.partitionStats
+      stats: this.partitionStats,
     };
   }
 }
 
 module.exports = NetworkPartitionHandler;
-

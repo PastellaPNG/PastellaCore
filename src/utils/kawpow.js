@@ -17,7 +17,7 @@ class KawPowUtils {
     this.PROGPOW_CNT_CACHE = 11;
     this.PROGPOW_CNT_MATH = 18;
     this.PROGPOW_CNT_MATH_VM = 11;
-    
+
     // Keccak256 parameters
     this.KECCAK256_BLOCK_SIZE = 136;
     this.KECCAK256_DIGEST_SIZE = 32;
@@ -40,21 +40,23 @@ class KawPowUtils {
     // Create array with exactly the requested number of entries
     const cache = new Array(size);
     const seedBuffer = Buffer.from(seed, 'hex');
-    
+
     // Initialize cache with seed
     for (let i = 0; i < cache.length; i++) {
       cache[i] = keccak256(Buffer.concat([seedBuffer, Buffer.from(i.toString(), 'hex')])).readUInt32LE(0);
     }
-    
+
     // Generate cache using Keccak256
     for (let i = 0; i < this.PROGPOW_CNT_CACHE; i++) {
       for (let j = 0; j < cache.length; j++) {
         const idx = cache[j] % cache.length;
         const val = cache[idx];
-        cache[j] = keccak256(Buffer.from([val & 0xFF, (val >> 8) & 0xFF, (val >> 16) & 0xFF, (val >> 24) & 0xFF])).readUInt32LE(0);
+        cache[j] = keccak256(
+          Buffer.from([val & 0xff, (val >> 8) & 0xff, (val >> 16) & 0xff, (val >> 24) & 0xff])
+        ).readUInt32LE(0);
       }
     }
-    
+
     return cache;
   }
 
@@ -64,33 +66,35 @@ class KawPowUtils {
   progPowHash(blockNumber, headerHash, nonce, cache) {
     const seed = this.generateSeedHash(blockNumber);
     const mix = new Array(this.PROGPOW_LANES);
-    
+
     // Initialize mix with header hash and nonce
     for (let i = 0; i < this.PROGPOW_LANES; i++) {
-      mix[i] = keccak256(Buffer.concat([
-        Buffer.from(headerHash, 'hex'),
-        Buffer.from(nonce.toString(), 'hex'),
-        Buffer.from(i.toString(), 'hex')
-      ])).readUInt32LE(0);
+      mix[i] = keccak256(
+        Buffer.concat([
+          Buffer.from(headerHash, 'hex'),
+          Buffer.from(nonce.toString(), 'hex'),
+          Buffer.from(i.toString(), 'hex'),
+        ])
+      ).readUInt32LE(0);
     }
-    
+
     // ProgPoW mixing rounds
     for (let round = 0; round < this.PROGPOW_CNT_MATH; round++) {
       for (let lane = 0; lane < this.PROGPOW_LANES; lane++) {
         const cacheIndex = (mix[lane] + round) % cache.length;
         const cacheValue = cache[cacheIndex];
-        
+
         // Mixing operations
         mix[lane] = this.mix(mix[lane], cacheValue, round);
       }
     }
-    
+
     // Final mix reduction
     let finalMix = 0;
     for (let i = 0; i < this.PROGPOW_LANES; i++) {
       finalMix ^= mix[i];
     }
-    
+
     return finalMix;
   }
 
@@ -113,14 +117,16 @@ class KawPowUtils {
   kawPowHash(blockNumber, headerHash, nonce, cache) {
     // First, run ProgPoW
     const progPowResult = this.progPowHash(blockNumber, headerHash, nonce, cache);
-    
+
     // Then, apply Keccak256
-    const finalHash = keccak256(Buffer.concat([
-      Buffer.from(headerHash, 'hex'),
-      Buffer.from(nonce.toString(), 'hex'),
-      Buffer.from(progPowResult.toString(16).padStart(8, '0'), 'hex')
-    ]));
-    
+    const finalHash = keccak256(
+      Buffer.concat([
+        Buffer.from(headerHash, 'hex'),
+        Buffer.from(nonce.toString(), 'hex'),
+        Buffer.from(progPowResult.toString(16).padStart(8, '0'), 'hex'),
+      ])
+    );
+
     return finalHash.toString('hex');
   }
 
@@ -155,7 +161,7 @@ class KawPowUtils {
       headerHash,
       nonce,
       cache: cache.slice(0, 1000), // Limit cache size for GPU transfer
-      seed: this.generateSeedHash(blockNumber)
+      seed: this.generateSeedHash(blockNumber),
     };
   }
 
@@ -164,18 +170,18 @@ class KawPowUtils {
    */
   processGPUResults(results, blockNumber, headerHash, cache) {
     const validResults = [];
-    
+
     for (const result of results) {
       if (result && result.nonce !== undefined) {
         const hash = this.kawPowHash(blockNumber, headerHash, result.nonce, cache);
         validResults.push({
           nonce: result.nonce,
           hash,
-          isValid: true
+          isValid: true,
         });
       }
     }
-    
+
     return validResults;
   }
 
@@ -186,15 +192,15 @@ class KawPowUtils {
     if (cache.length <= maxSize) {
       return cache;
     }
-    
+
     // Sample cache entries for GPU processing
     const optimized = [];
     const step = Math.floor(cache.length / maxSize);
-    
+
     for (let i = 0; i < maxSize; i++) {
       optimized.push(cache[i * step]);
     }
-    
+
     return optimized;
   }
 
@@ -212,13 +218,13 @@ class KawPowUtils {
     if (!Array.isArray(cache) || cache.length !== expectedSize) {
       return false;
     }
-    
+
     for (const item of cache) {
-      if (typeof item !== 'number' || item < 0 || item > 0xFFFFFFFF) {
+      if (typeof item !== 'number' || item < 0 || item > 0xffffffff) {
         return false;
       }
     }
-    
+
     return true;
   }
 }

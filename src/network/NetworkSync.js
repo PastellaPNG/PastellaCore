@@ -12,7 +12,7 @@ class NetworkSync {
       isSyncing: false,
       lastSyncTime: null,
       syncAttempts: 0,
-      maxSyncAttempts: 5
+      maxSyncAttempts: 5,
     };
     this.periodicSyncInterval = null;
   }
@@ -54,9 +54,8 @@ class NetworkSync {
 
       this.networkSyncStatus.lastSyncTime = Date.now();
       logger.info('NETWORK_SYNC', 'Network synchronization completed');
-      
-      return true;
 
+      return true;
     } catch (error) {
       logger.error('NETWORK_SYNC', `Network synchronization failed: ${error.message}`);
       return false;
@@ -68,7 +67,8 @@ class NetworkSync {
   /**
    * Start periodic network synchronization
    */
-  startPeriodicSync(intervalMs = 30000) { // 30 seconds default
+  startPeriodicSync(intervalMs = 30000) {
+    // 30 seconds default
     if (this.periodicSyncInterval) {
       clearInterval(this.periodicSyncInterval);
     }
@@ -101,21 +101,21 @@ class NetworkSync {
       logger.info('NETWORK_SYNC', 'P2P Network: Standalone mode (no seed connections required)');
       return 0;
     }
-    
+
     logger.info('NETWORK_SYNC', 'P2P Network: Attempting to connect to seed nodes...');
-    
+
     const filteredSeedNodes = this.seedNodeManager.getFilteredSeedNodes();
-    
+
     if (filteredSeedNodes.length === 0) {
       logger.info('NETWORK_SYNC', 'P2P Network: No external seed nodes available');
       this.seedNodeManager.minSeedConnections = 0;
       return 0;
     }
-    
+
     // Initialize seed node connection tracking
     this.seedNodeManager.initializeConnectionTracking();
-    
-    const connectionPromises = filteredSeedNodes.map(async (seedNode) => {
+
+    const connectionPromises = filteredSeedNodes.map(async seedNode => {
       try {
         const url = new URL(seedNode);
         const connected = await connectToPeerFunction(url.hostname, url.port);
@@ -138,13 +138,16 @@ class NetworkSync {
 
     const results = await Promise.all(connectionPromises);
     const successfulConnections = results.filter(result => result).length;
-    
+
     if (successfulConnections >= this.seedNodeManager.minSeedConnections) {
       logger.info('NETWORK_SYNC', `P2P Network: Connected to ${successfulConnections} seed nodes`);
     } else if (this.seedNodeManager.minSeedConnections > 0) {
-      logger.info('NETWORK_SYNC', `P2P Network: Standalone mode (${successfulConnections}/${this.seedNodeManager.minSeedConnections} seed connections)`);
+      logger.info(
+        'NETWORK_SYNC',
+        `P2P Network: Standalone mode (${successfulConnections}/${this.seedNodeManager.minSeedConnections} seed connections)`
+      );
     }
-    
+
     return successfulConnections;
   }
 
@@ -160,7 +163,7 @@ class NetworkSync {
 
     const message = {
       type: 'NEW_BLOCK',
-      data: block
+      data: block,
     };
 
     let broadcastCount = 0;
@@ -190,7 +193,7 @@ class NetworkSync {
 
     const message = {
       type: 'NEW_TRANSACTION',
-      data: transaction
+      data: transaction,
     };
 
     let broadcastCount = 0;
@@ -213,7 +216,8 @@ class NetworkSync {
    */
   sendMessage(peer, message) {
     try {
-      if (peer.readyState === 1) { // WebSocket.OPEN
+      if (peer.readyState === 1) {
+        // WebSocket.OPEN
         peer.send(JSON.stringify(message));
         return true;
       }
@@ -231,7 +235,7 @@ class NetworkSync {
       ...this.networkSyncStatus,
       peerCount: this.peerManager.getPeerCount(),
       seedNodeStatus: this.seedNodeManager.getSeedNodeStatus(),
-      periodicSyncActive: !!this.periodicSyncInterval
+      periodicSyncActive: !!this.periodicSyncInterval,
     };
   }
 
@@ -250,7 +254,7 @@ class NetworkSync {
       isSyncing: false,
       lastSyncTime: null,
       syncAttempts: 0,
-      maxSyncAttempts: 5
+      maxSyncAttempts: 5,
     };
     logger.info('NETWORK_SYNC', 'Network sync status reset');
   }
@@ -265,7 +269,7 @@ class NetworkSync {
       isCurrentlySyncing: this.networkSyncStatus.isSyncing,
       peerCount: this.peerManager.getPeerCount(),
       seedNodeConnections: this.seedNodeManager.connectedSeedNodes,
-      periodicSyncActive: !!this.periodicSyncInterval
+      periodicSyncActive: !!this.periodicSyncInterval,
     };
   }
 }

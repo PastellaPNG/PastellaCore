@@ -46,7 +46,7 @@ class UTXOManager {
         this.utxoSet.set(utxoKey, {
           address: output.address,
           amount: output.amount,
-          scriptPubKey: output.scriptPubKey
+          scriptPubKey: output.scriptPubKey,
         });
       });
     });
@@ -99,7 +99,7 @@ class UTXOManager {
           txHash,
           outputIndex: parseInt(outputIndex),
           amount: utxo.amount,
-          scriptPubKey: utxo.scriptPubKey
+          scriptPubKey: utxo.scriptPubKey,
         });
       }
     });
@@ -165,9 +165,7 @@ class UTXOManager {
    * Remove UTXO from the set
    */
   removeUTXO(txHash, outputIndex) {
-    this.utxos = this.utxos.filter(utxo => 
-      !(utxo.txHash === txHash && utxo.outputIndex === outputIndex)
-    );
+    this.utxos = this.utxos.filter(utxo => !(utxo.txHash === txHash && utxo.outputIndex === outputIndex));
   }
 
   /**

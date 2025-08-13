@@ -7,15 +7,15 @@ const logger = require('../utils/logger');
 class PeerManager {
   constructor(maxPeers = 10) {
     logger.debug('PEER_MANAGER', `Initializing PeerManager: maxPeers=${maxPeers}`);
-    
+
     this.peers = new Set();
     this.maxPeers = maxPeers;
     this.peerAddresses = new Map(); // Map<WebSocket, string> for address tracking
-    
+
     logger.debug('PEER_MANAGER', `PeerManager configuration:`);
     logger.debug('PEER_MANAGER', `  Max Peers: ${this.maxPeers}`);
     logger.debug('PEER_MANAGER', `  Initial peer count: ${this.peers.size}`);
-    
+
     logger.debug('PEER_MANAGER', `PeerManager initialized successfully`);
   }
 
@@ -23,9 +23,12 @@ class PeerManager {
    * Add a new peer connection
    */
   addPeer(ws, peerAddress) {
-    logger.debug('PEER_MANAGER', `Adding peer: address=${peerAddress}, currentPeers=${this.peers.size}, maxPeers=${this.maxPeers}`);
+    logger.debug(
+      'PEER_MANAGER',
+      `Adding peer: address=${peerAddress}, currentPeers=${this.peers.size}, maxPeers=${this.maxPeers}`
+    );
     logger.debug('PEER_MANAGER', `WebSocket instance: ${ws ? 'present' : 'null'}, type: ${typeof ws}`);
-    
+
     if (this.peers.size >= this.maxPeers) {
       logger.warn('PEER_MANAGER', `Max peers reached (${this.maxPeers}), rejecting connection`);
       logger.debug('PEER_MANAGER', `Cannot accept peer ${peerAddress}: peer limit exceeded`);
@@ -35,7 +38,7 @@ class PeerManager {
     logger.debug('PEER_MANAGER', `Adding peer ${peerAddress} to peer set and address map...`);
     this.peers.add(ws);
     this.peerAddresses.set(ws, peerAddress);
-    
+
     logger.info('PEER_MANAGER', `Peer added: ${peerAddress} (${this.peers.size}/${this.maxPeers})`);
     logger.debug('PEER_MANAGER', `Peer added successfully: address=${peerAddress}, newPeerCount=${this.peers.size}`);
     return true;
@@ -48,7 +51,7 @@ class PeerManager {
     const peerAddress = this.peerAddresses.get(ws);
     this.peers.delete(ws);
     this.peerAddresses.delete(ws);
-    
+
     if (peerAddress) {
       logger.info('PEER_MANAGER', `Peer removed: ${peerAddress} (${this.peers.size}/${this.maxPeers})`);
       return peerAddress;
@@ -90,7 +93,7 @@ class PeerManager {
   getPeerList() {
     return Array.from(this.peerAddresses.values()).map(address => ({
       url: `ws://${address}`,
-      address: address
+      address: address,
     }));
   }
 
@@ -133,7 +136,7 @@ class PeerManager {
       currentPeers: this.peers.size,
       maxPeers: this.maxPeers,
       availableSlots: this.maxPeers - this.peers.size,
-      peerAddresses: this.getPeerAddresses()
+      peerAddresses: this.getPeerAddresses(),
     };
   }
 }

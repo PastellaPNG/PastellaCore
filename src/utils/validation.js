@@ -17,7 +17,7 @@ class InputValidator {
       pattern = null,
       required = false,
       trim = true,
-      allowEmpty = false
+      allowEmpty = false,
     } = options;
 
     // Check if input is required
@@ -64,12 +64,7 @@ class InputValidator {
    * @returns {number|null} - Validated number or null if invalid
    */
   static validateNumber(input, options = {}) {
-    const {
-      min = -Infinity,
-      max = Infinity,
-      integer = false,
-      required = false
-    } = options;
+    const { min = -Infinity, max = Infinity, integer = false, required = false } = options;
 
     // Check if input is required
     if (required && (input === null || input === undefined || input === '')) {
@@ -119,11 +114,7 @@ class InputValidator {
    * @returns {number|null} - Validated amount or null if invalid
    */
   static validateAmount(input, options = {}, decimals = 8) {
-    const {
-      min = 0,
-      max = Infinity,
-      required = false
-    } = options;
+    const { min = 0, max = Infinity, required = false } = options;
 
     // First validate as a regular number
     const num = this.validateNumber(input, { min, max, required });
@@ -166,11 +157,11 @@ class InputValidator {
    */
   static validateEmail(input, options = {}) {
     const emailPattern = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
-    
+
     return this.validateString(input, {
       ...options,
       pattern: emailPattern,
-      maxLength: 254 // RFC 5321 limit
+      maxLength: 254, // RFC 5321 limit
     });
   }
 
@@ -198,12 +189,12 @@ class InputValidator {
    */
   static validateAddress(input, options = {}) {
     const addressPattern = /^[13][a-km-zA-HJ-NP-Z1-9]{25,34}$/;
-    
+
     return this.validateString(input, {
       ...options,
       pattern: addressPattern,
       minLength: 26,
-      maxLength: 35
+      maxLength: 35,
     });
   }
 
@@ -215,12 +206,12 @@ class InputValidator {
    */
   static validateHash(input, options = {}) {
     const hashPattern = /^[a-fA-F0-9]{64}$/;
-    
+
     return this.validateString(input, {
       ...options,
       pattern: hashPattern,
       minLength: 64,
-      maxLength: 64
+      maxLength: 64,
     });
   }
 
@@ -235,7 +226,7 @@ class InputValidator {
       ...options,
       min: 1,
       max: 65535,
-      integer: true
+      integer: true,
     });
   }
 
@@ -252,16 +243,16 @@ class InputValidator {
     }
 
     const result = {};
-    
+
     for (const [key, validator] of Object.entries(schema)) {
       const value = input[key];
       const validated = validator(value);
-      
+
       if (validated === null) {
         logger.debug('VALIDATION', `Object validation failed: invalid field '${key}'`);
         return null;
       }
-      
+
       result[key] = validated;
     }
 
@@ -276,11 +267,7 @@ class InputValidator {
    * @returns {Array|null} - Validated array or null if invalid
    */
   static validateArray(input, itemValidator, options = {}) {
-    const {
-      minLength = 0,
-      maxLength = 1000,
-      required = false
-    } = options;
+    const { minLength = 0, maxLength = 1000, required = false } = options;
 
     // Check if input is required
     if (required && (!input || !Array.isArray(input))) {
@@ -328,18 +315,20 @@ class InputValidator {
       return '';
     }
 
-    return input
-      .replace(/&/g, '&amp;')
-      .replace(/</g, '&lt;')
-      .replace(/>/g, '&gt;')
-      .replace(/"/g, '&quot;')
-      .replace(/'/g, '&#x27;')
-      .replace(/\//g, '&#x2F;')
-      // CRITICAL: Additional XSS protection
-      .replace(/javascript:/gi, '')
-      .replace(/on\w+\s*=/gi, '')
-      .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '')
-      .replace(/<iframe\b[^<]*(?:(?!<\/iframe>)<[^<]*)*<\/iframe>/gi, '');
+    return (
+      input
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#x27;')
+        .replace(/\//g, '&#x2F;')
+        // CRITICAL: Additional XSS protection
+        .replace(/javascript:/gi, '')
+        .replace(/on\w+\s*=/gi, '')
+        .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '')
+        .replace(/<iframe\b[^<]*(?:(?!<\/iframe>)<[^<]*)*<\/iframe>/gi, '')
+    );
   }
 
   /**
@@ -353,22 +342,24 @@ class InputValidator {
     }
 
     // Remove SQL injection patterns
-    return input
-      .replace(/['";]/g, '')
-      .replace(/--/g, '')
-      .replace(/\/\*/g, '')
-      .replace(/\*\//g, '')
-      .replace(/union\s+select/gi, '')
-      .replace(/drop\s+table/gi, '')
-      .replace(/delete\s+from/gi, '')
-      .replace(/insert\s+into/gi, '')
-      .replace(/update\s+set/gi, '')
-      // CRITICAL: Additional SQL injection protection
-      .replace(/exec\s*\(/gi, '')
-      .replace(/xp_cmdshell/gi, '')
-      .replace(/sp_executesql/gi, '')
-      .replace(/waitfor\s+delay/gi, '')
-      .replace(/benchmark\s*\(/gi, '');
+    return (
+      input
+        .replace(/['";]/g, '')
+        .replace(/--/g, '')
+        .replace(/\/\*/g, '')
+        .replace(/\*\//g, '')
+        .replace(/union\s+select/gi, '')
+        .replace(/drop\s+table/gi, '')
+        .replace(/delete\s+from/gi, '')
+        .replace(/insert\s+into/gi, '')
+        .replace(/update\s+set/gi, '')
+        // CRITICAL: Additional SQL injection protection
+        .replace(/exec\s*\(/gi, '')
+        .replace(/xp_cmdshell/gi, '')
+        .replace(/sp_executesql/gi, '')
+        .replace(/waitfor\s+delay/gi, '')
+        .replace(/benchmark\s*\(/gi, '')
+    );
   }
 
   /**
@@ -378,12 +369,7 @@ class InputValidator {
    * @returns {string|null} - Sanitized address or null if invalid
    */
   static validateCryptocurrencyAddress(input, options = {}) {
-    const {
-      minLength = 26,
-      maxLength = 35,
-      required = false,
-      allowTestnet = false
-    } = options;
+    const { minLength = 26, maxLength = 35, required = false, allowTestnet = false } = options;
 
     // Basic string validation
     const sanitized = this.validateString(input, { minLength, maxLength, required });
@@ -392,10 +378,10 @@ class InputValidator {
     // CRITICAL: Enhanced address pattern validation
     const mainnetPattern = /^[13][a-km-zA-HJ-NP-Z1-9]{25,34}$/;
     const testnetPattern = /^[2mn][a-km-zA-HJ-NP-Z1-9]{25,34}$/;
-    
+
     const isValidMainnet = mainnetPattern.test(sanitized);
     const isValidTestnet = allowTestnet && testnetPattern.test(sanitized);
-    
+
     if (!isValidMainnet && !isValidTestnet) {
       logger.debug('VALIDATION', `Cryptocurrency address validation failed: invalid format`);
       return null;
@@ -433,19 +419,19 @@ class InputValidator {
         inputs: [],
         outputs: [],
         fee: 0,
-        timestamp: Date.now()
+        timestamp: Date.now(),
       };
 
       // Validate inputs
       if (Array.isArray(transaction.inputs)) {
         for (const input of transaction.inputs) {
           if (!input || typeof input !== 'object') continue;
-          
+
           const validatedInput = {
             txId: this.validateHash(input.txId, { required: true }),
             outputIndex: this.validateNumber(input.outputIndex, { min: 0, required: true }),
             signature: this.validateString(input.signature, { required: true, maxLength: 200 }),
-            publicKey: this.validateString(input.publicKey, { required: true, maxLength: 200 })
+            publicKey: this.validateString(input.publicKey, { required: true, maxLength: 200 }),
           };
 
           if (Object.values(validatedInput).some(v => v === null)) {
@@ -461,10 +447,10 @@ class InputValidator {
       if (Array.isArray(transaction.outputs)) {
         for (const output of transaction.outputs) {
           if (!output || typeof output !== 'object') continue;
-          
+
           const validatedOutput = {
             address: this.validateCryptocurrencyAddress(output.address, { required: true }),
-            amount: this.validateAmount(output.amount, { min: 0.00000001, required: true })
+            amount: this.validateAmount(output.amount, { min: 0.00000001, required: true }),
           };
 
           if (Object.values(validatedOutput).some(v => v === null)) {
@@ -488,7 +474,6 @@ class InputValidator {
       }
 
       return validated;
-
     } catch (error) {
       logger.error('VALIDATION', `Transaction validation error: ${error.message}`);
       return null;
@@ -512,7 +497,7 @@ class InputValidator {
         previousHash: this.validateHash(block.previousHash, { required: true }),
         nonce: this.validateNumber(block.nonce, { min: 0, required: true }),
         difficulty: this.validateNumber(block.difficulty, { min: 1, required: true }),
-        transactions: []
+        transactions: [],
       };
 
       if (Object.values(validated).some(v => v === null)) {
@@ -530,7 +515,6 @@ class InputValidator {
       }
 
       return validated;
-
     } catch (error) {
       logger.error('VALIDATION', `Block validation error: ${error.message}`);
       return null;

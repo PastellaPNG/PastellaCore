@@ -17,8 +17,6 @@ class Miner {
     this.debugMode = false;
   }
 
-
-
   /**
    * Set custom mining address
    */
@@ -50,8 +48,6 @@ class Miner {
     return this.debugMode;
   }
 
-
-
   /**
    * Verify block validity
    */
@@ -64,7 +60,16 @@ class Miner {
       }
 
       // Verify required fields
-      const requiredFields = ['index', 'timestamp', 'previousHash', 'hash', 'nonce', 'difficulty', 'merkleRoot', 'transactions'];
+      const requiredFields = [
+        'index',
+        'timestamp',
+        'previousHash',
+        'hash',
+        'nonce',
+        'difficulty',
+        'merkleRoot',
+        'transactions',
+      ];
       for (const field of requiredFields) {
         if (!(field in block)) {
           console.log(`Missing required field: ${field}`);
@@ -152,7 +157,7 @@ class Miner {
 
     this.isMining = false;
     this.currentBlock = null;
-    
+
     if (this.miningInterval) {
       clearInterval(this.miningInterval);
       this.miningInterval = null;
@@ -172,15 +177,12 @@ class Miner {
       // Create new block with pending transactions
       const latestBlock = this.blockchain.getLatestBlock();
       const pendingTransactions = this.blockchain.pendingTransactions.slice(0, 100);
-      
+
       // Add coinbase transaction with custom mining address
-      const coinbaseTransaction = Transaction.createCoinbase(
-        this.getMiningAddress(), 
-        this.blockchain.miningReward
-      );
-      
+      const coinbaseTransaction = Transaction.createCoinbase(this.getMiningAddress(), this.blockchain.miningReward);
+
       const transactions = [coinbaseTransaction, ...pendingTransactions];
-      
+
       this.currentBlock = Block.createBlock(
         latestBlock.index + 1,
         transactions,
@@ -188,19 +190,18 @@ class Miner {
         this.blockchain.difficulty
       );
 
-             if (this.debugMode) {
-         console.log(`\n⛏️  Starting to mine block #${this.currentBlock.index}`);
-         console.log(`📊 Transactions: ${transactions.length}`);
-         console.log(`🎯 Target: ${this.currentBlock.calculateTarget()}...`);
-         console.log(`💰 Mining reward: ${this.blockchain.miningReward} PAS`);
-         console.log(`📍 Mining address: ${this.getMiningAddress()}`);
-       } else {
+      if (this.debugMode) {
+        console.log(`\n⛏️  Starting to mine block #${this.currentBlock.index}`);
+        console.log(`📊 Transactions: ${transactions.length}`);
+        console.log(`🎯 Target: ${this.currentBlock.calculateTarget()}...`);
+        console.log(`💰 Mining reward: ${this.blockchain.miningReward} PAS`);
+        console.log(`📍 Mining address: ${this.getMiningAddress()}`);
+      } else {
         console.log(`⛏️  Mining block #${this.currentBlock.index}...`);
       }
 
       // Start mining process
       this.mineBlock();
-
     } catch (error) {
       console.log('Error creating mining block:', error.message);
       this.stopMining();
@@ -248,13 +249,13 @@ class Miner {
             // Add block to blockchain
             if (this.blockchain.addBlock(this.currentBlock)) {
               console.log('✅ Block added to blockchain');
-              
+
               // Update wallet balance
               this.wallet.updateBalance(this.blockchain);
-              
+
               // Update miner difficulty to match blockchain
               this.difficulty = this.blockchain.difficulty;
-              
+
               // Start mining next block
               setTimeout(() => this.mineNextBlock(), 1000);
             } else {
@@ -288,7 +289,7 @@ class Miner {
    */
   getHashRate() {
     if (!this.startTime) return 0;
-    
+
     const elapsed = (Date.now() - this.startTime) / 1000; // seconds
     return elapsed > 0 ? Math.round(this.totalHashes / elapsed) : 0;
   }
@@ -299,24 +300,28 @@ class Miner {
   getMiningStats() {
     const hashrate = this.getHashRate();
     const elapsed = this.startTime ? (Date.now() - this.startTime) / 1000 : 0;
-    
+
     return {
       isMining: this.isMining,
       miningAddress: this.getMiningAddress(),
-      currentBlock: this.currentBlock ? {
-        index: this.currentBlock.index,
-        nonce: this.currentBlock.nonce,
-        hash: this.currentBlock.hash
-      } : null,
+      currentBlock: this.currentBlock
+        ? {
+            index: this.currentBlock.index,
+            nonce: this.currentBlock.nonce,
+            hash: this.currentBlock.hash,
+          }
+        : null,
       hashrate: hashrate,
       totalHashes: this.totalHashes,
       elapsed: Math.round(elapsed),
       difficulty: this.blockchain.difficulty,
-      target: this.currentBlock ? this.currentBlock.calculateTarget() : (this.blockchain.difficulty ? new (require('../models/Block'))(0, Date.now(), [], '0', 0, this.blockchain.difficulty).calculateTarget() : '0'.repeat(this.difficulty))
+      target: this.currentBlock
+        ? this.currentBlock.calculateTarget()
+        : this.blockchain.difficulty
+          ? new (require('../models/Block'))(0, Date.now(), [], '0', 0, this.blockchain.difficulty).calculateTarget()
+          : '0'.repeat(this.difficulty),
     };
   }
-
-
 
   /**
    * Set mining difficulty
@@ -332,13 +337,13 @@ class Miner {
   getEstimatedBlockTime() {
     const hashrate = this.getHashRate();
     if (hashrate === 0) return 'Unknown';
-    
+
     // Use the new difficulty calculation
     const maxTarget = BigInt('0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff');
     const targetNum = maxTarget / BigInt(this.difficulty);
     const estimatedAttempts = Number(targetNum) / 2; // Average attempts needed
     const estimatedSeconds = estimatedAttempts / hashrate;
-    
+
     if (estimatedSeconds < 60) {
       return `${Math.round(estimatedSeconds)} seconds`;
     } else if (estimatedSeconds < 3600) {
@@ -355,18 +360,18 @@ class Miner {
     const hashrate = this.getHashRate();
     const blockReward = this.blockchain.miningReward;
     const estimatedBlockTime = this.getEstimatedBlockTime();
-    
+
     if (hashrate === 0) return 'Unknown';
-    
+
     // Very rough estimate - in reality would need to consider network difficulty
     const blocksPerDay = 24 * 60; // Assuming 1 minute block time
     const dailyReward = blocksPerDay * blockReward;
-    
+
     return {
       hashrate: hashrate,
       estimatedBlockTime: estimatedBlockTime,
       dailyReward: dailyReward,
-      blockReward: blockReward
+      blockReward: blockReward,
     };
   }
 
@@ -392,4 +397,4 @@ class Miner {
   }
 }
 
-module.exports = Miner; 
+module.exports = Miner;

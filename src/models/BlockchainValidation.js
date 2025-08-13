@@ -10,14 +10,14 @@ class CPUProtection {
     this.maxTransactionsPerBatch = 100; // Maximum transactions to validate per batch
     this.cpuThreshold = 0.8; // 80% CPU usage threshold
     this.rateLimitPerSecond = 100; // Maximum validations per second
-    
+
     // CPU monitoring
     this.currentCPUUsage = 0;
     this.validationCount = 0;
     this.lastValidationReset = Date.now();
     this.executionTimes = [];
     this.complexityScores = [];
-    
+
     // Start CPU monitoring
     this.startCPUMonitoring();
   }
@@ -40,17 +40,16 @@ class CPUProtection {
       // Reset validation count every second
       this.validationCount = 0;
       this.lastValidationReset = Date.now();
-      
+
       // Monitor execution times
       if (this.executionTimes.length > 10) {
         this.executionTimes.shift();
       }
-      
+
       // Monitor complexity scores
       if (this.complexityScores.length > 10) {
         this.complexityScores.shift();
       }
-      
     } catch (error) {
       logger.error('CPU_PROTECTION', `CPU monitoring failed: ${error.message}`);
     }
@@ -69,10 +68,13 @@ class CPUProtection {
    */
   canValidate() {
     if (this.validationCount >= this.rateLimitPerSecond) {
-      logger.warn('CPU_PROTECTION', `⚠️  Validation rate limit exceeded: ${this.validationCount}/${this.rateLimitPerSecond}`);
+      logger.warn(
+        'CPU_PROTECTION',
+        `⚠️  Validation rate limit exceeded: ${this.validationCount}/${this.rateLimitPerSecond}`
+      );
       return false;
     }
-    
+
     this.validationCount++;
     return true;
   }
@@ -82,37 +84,40 @@ class CPUProtection {
    */
   measureExecution(operation, complexity = 1) {
     const startTime = Date.now();
-    
+
     return {
       start: () => {
         // Check if operation is allowed
         if (!this.canValidate()) {
           throw new Error('CPU validation rate limit exceeded');
         }
-        
+
         // Check complexity
         if (complexity > this.maxValidationComplexity) {
           throw new Error(`Operation complexity ${complexity} exceeds maximum ${this.maxValidationComplexity}`);
         }
-        
+
         return startTime;
       },
       end: () => {
         const executionTime = Date.now() - startTime;
-        
+
         // Record execution time
         this.executionTimes.push(executionTime);
-        
+
         // Record complexity score
         this.complexityScores.push(complexity);
-        
+
         // Check execution time limit
         if (executionTime > this.maxExecutionTime) {
-          logger.warn('CPU_PROTECTION', `⚠️  Operation execution time ${executionTime}ms exceeds limit ${this.maxExecutionTime}ms`);
+          logger.warn(
+            'CPU_PROTECTION',
+            `⚠️  Operation execution time ${executionTime}ms exceeds limit ${this.maxExecutionTime}ms`
+          );
         }
-        
+
         return executionTime;
-      }
+      },
     };
   }
 
@@ -120,14 +125,14 @@ class CPUProtection {
    * CRITICAL: Get CPU protection status
    */
   getCPUStatus() {
-    const avgExecutionTime = this.executionTimes.length > 0 
-      ? this.executionTimes.reduce((a, b) => a + b, 0) / this.executionTimes.length 
-      : 0;
-    
-    const avgComplexity = this.complexityScores.length > 0 
-      ? this.complexityScores.reduce((a, b) => a + b, 0) / this.complexityScores.length 
-      : 0;
-    
+    const avgExecutionTime =
+      this.executionTimes.length > 0 ? this.executionTimes.reduce((a, b) => a + b, 0) / this.executionTimes.length : 0;
+
+    const avgComplexity =
+      this.complexityScores.length > 0
+        ? this.complexityScores.reduce((a, b) => a + b, 0) / this.complexityScores.length
+        : 0;
+
     return {
       currentValidationCount: this.validationCount,
       maxValidationsPerSecond: this.rateLimitPerSecond,
@@ -136,7 +141,7 @@ class CPUProtection {
       averageExecutionTime: avgExecutionTime.toFixed(2),
       averageComplexity: avgComplexity.toFixed(2),
       executionTimes: this.executionTimes.length,
-      complexityScores: this.complexityScores.length
+      complexityScores: this.complexityScores.length,
     };
   }
 
@@ -156,7 +161,7 @@ class CPUProtection {
     if (newLimits.rateLimitPerSecond) {
       this.rateLimitPerSecond = newLimits.rateLimitPerSecond;
     }
-    
+
     logger.info('CPU_PROTECTION', 'CPU protection limits updated');
   }
 }
@@ -176,46 +181,50 @@ class BlockchainValidation {
   validateBlockTransactions(block, config = null) {
     const measurement = this.cpuProtection.measureExecution('validateBlockTransactions', block.transactions.length);
     const startTime = measurement.start();
-    
+
     try {
       // Validate transaction count
       if (!Array.isArray(block.transactions) || block.transactions.length === 0) {
         throw new Error('Block must contain at least one transaction');
       }
-      
+
       // Check batch size limit
       if (block.transactions.length > this.cpuProtection.maxTransactionsPerBatch) {
-        throw new Error(`Transaction count ${block.transactions.length} exceeds batch limit ${this.cpuProtection.maxTransactionsPerBatch}`);
+        throw new Error(
+          `Transaction count ${block.transactions.length} exceeds batch limit ${this.cpuProtection.maxTransactionsPerBatch}`
+        );
       }
-      
+
       // Validate each transaction
       for (let i = 0; i < block.transactions.length; i++) {
         const transaction = block.transactions[i];
-        
+
         // First transaction must be coinbase
         if (i === 0 && !transaction.isCoinbase) {
           throw new Error('First transaction must be coinbase');
         }
-        
+
         // Other transactions must not be coinbase
         if (i > 0 && transaction.isCoinbase) {
           throw new Error('Only first transaction can be coinbase');
         }
-        
+
         // Validate transaction
         if (!transaction.isValid()) {
           throw new Error(`Transaction ${i} is invalid: ${transaction.id}`);
         }
       }
-      
+
       const executionTime = measurement.end();
       logger.debug('BLOCKCHAIN_VALIDATION', `Block transactions validated in ${executionTime}ms`);
-      
+
       return { valid: true, reason: null };
-      
     } catch (error) {
       const executionTime = measurement.end();
-      logger.error('BLOCKCHAIN_VALIDATION', `Block transaction validation failed in ${executionTime}ms: ${error.message}`);
+      logger.error(
+        'BLOCKCHAIN_VALIDATION',
+        `Block transaction validation failed in ${executionTime}ms: ${error.message}`
+      );
       return { valid: false, reason: error.message };
     }
   }
@@ -224,9 +233,12 @@ class BlockchainValidation {
    * Check if block is valid
    */
   isValidBlock(block, config = null) {
-    logger.debug('BLOCKCHAIN_VALIDATION', `Validating block: index=${block?.index}, timestamp=${block?.timestamp}, previousHash=${block?.previousHash?.substring(0, 16) || 'none'}..., hash=${block?.hash?.substring(0, 16) || 'none'}...`);
+    logger.debug(
+      'BLOCKCHAIN_VALIDATION',
+      `Validating block: index=${block?.index}, timestamp=${block?.timestamp}, previousHash=${block?.previousHash?.substring(0, 16) || 'none'}..., hash=${block?.hash?.substring(0, 16) || 'none'}...`
+    );
     logger.debug('BLOCKCHAIN_VALIDATION', `Config present: ${config ? 'yes' : 'no'}, config type: ${typeof config}`);
-    
+
     try {
       // Basic block validation
       logger.debug('BLOCKCHAIN_VALIDATION', `Running basic block validation for block ${block?.index}`);
@@ -235,7 +247,10 @@ class BlockchainValidation {
         logger.debug('BLOCKCHAIN_VALIDATION', `  block exists: ${!!block}`);
         logger.debug('BLOCKCHAIN_VALIDATION', `  block.index: ${block?.index} (${typeof block?.index})`);
         logger.debug('BLOCKCHAIN_VALIDATION', `  block.timestamp: ${block?.timestamp} (${typeof block?.timestamp})`);
-        logger.debug('BLOCKCHAIN_VALIDATION', `  block.previousHash: ${block?.previousHash} (${typeof block?.previousHash})`);
+        logger.debug(
+          'BLOCKCHAIN_VALIDATION',
+          `  block.previousHash: ${block?.previousHash} (${typeof block?.previousHash})`
+        );
         logger.debug('BLOCKCHAIN_VALIDATION', `  block.hash: ${block?.hash} (${typeof block?.hash})`);
         return false;
       }
@@ -245,9 +260,12 @@ class BlockchainValidation {
       logger.debug('BLOCKCHAIN_VALIDATION', `Checking block structure for block ${block.index}`);
       logger.debug('BLOCKCHAIN_VALIDATION', `  block.isValid exists: ${!!block.isValid}`);
       logger.debug('BLOCKCHAIN_VALIDATION', `  block.isValid type: ${typeof block.isValid}`);
-      
+
       if (!block.isValid || typeof block.isValid !== 'function') {
-        logger.debug('BLOCKCHAIN_VALIDATION', `Block structure validation failed: isValid method missing or not a function`);
+        logger.debug(
+          'BLOCKCHAIN_VALIDATION',
+          `Block structure validation failed: isValid method missing or not a function`
+        );
         return false;
       }
       logger.debug('BLOCKCHAIN_VALIDATION', `Block structure validation passed for block ${block.index}`);
@@ -263,11 +281,17 @@ class BlockchainValidation {
       if (block.index > 0) {
         logger.debug('BLOCKCHAIN_VALIDATION', `Block ${block.index} is not genesis, validating transactions`);
         const validationResult = this.validateBlockTransactions(block, config);
-        logger.debug('BLOCKCHAIN_VALIDATION', `Transaction validation result for block ${block.index}: ${JSON.stringify(validationResult)}`);
-        
+        logger.debug(
+          'BLOCKCHAIN_VALIDATION',
+          `Transaction validation result for block ${block.index}: ${JSON.stringify(validationResult)}`
+        );
+
         if (!validationResult.valid) {
           logger.error('BLOCKCHAIN_VALIDATION', `Block ${block.index} REJECTED: ${validationResult.reason}`);
-          logger.debug('BLOCKCHAIN_VALIDATION', `Transaction validation failed for block ${block.index}: ${validationResult.reason}`);
+          logger.debug(
+            'BLOCKCHAIN_VALIDATION',
+            `Transaction validation failed for block ${block.index}: ${validationResult.reason}`
+          );
           return false;
         }
         logger.debug('BLOCKCHAIN_VALIDATION', `Transaction validation passed for block ${block.index}`);
@@ -277,17 +301,19 @@ class BlockchainValidation {
 
       logger.debug('BLOCKCHAIN_VALIDATION', `Block ${block.index} validation completed successfully`);
       return true;
-
     } catch (error) {
       logger.error('BLOCKCHAIN_VALIDATION', `Block validation error for block ${block?.index}: ${error.message}`);
       logger.error('BLOCKCHAIN_VALIDATION', `Error stack: ${error.stack}`);
-      logger.error('BLOCKCHAIN_VALIDATION', `Block data: ${JSON.stringify({
-        index: block?.index,
-        timestamp: block?.timestamp,
-        previousHash: block?.previousHash,
-        hash: block?.hash,
-        hasIsValid: typeof block?.isValid === 'function'
-      })}`);
+      logger.error(
+        'BLOCKCHAIN_VALIDATION',
+        `Block data: ${JSON.stringify({
+          index: block?.index,
+          timestamp: block?.timestamp,
+          previousHash: block?.previousHash,
+          hash: block?.hash,
+          hasIsValid: typeof block?.isValid === 'function',
+        })}`
+      );
       return false;
     }
   }
@@ -347,7 +373,6 @@ class BlockchainValidation {
 
       logger.info('BLOCKCHAIN_VALIDATION', 'Blockchain validation completed successfully');
       return true;
-
     } catch (error) {
       logger.error('BLOCKCHAIN_VALIDATION', `Blockchain validation error: ${error.message}`);
       return false;
@@ -414,7 +439,6 @@ class BlockchainValidation {
 
       logger.info('BLOCKCHAIN_VALIDATION', 'Fast validation completed successfully');
       return true;
-
     } catch (error) {
       logger.error('BLOCKCHAIN_VALIDATION', `Fast validation error: ${error.message}`);
       return false;
@@ -446,7 +470,6 @@ class BlockchainValidation {
 
       logger.info('BLOCKCHAIN_VALIDATION', 'Ultra-fast validation completed successfully');
       return true;
-
     } catch (error) {
       logger.error('BLOCKCHAIN_VALIDATION', `Ultra-fast validation error: ${error.message}`);
       return false;

@@ -3,10 +3,10 @@ const { TRANSACTION_TAGS } = require('../utils/constants');
 
 class TransactionInput {
   constructor(txId, outputIndex, signature, publicKey) {
-    this.txId = txId;               // Hash of the transaction containing the UTXO
+    this.txId = txId; // Hash of the transaction containing the UTXO
     this.outputIndex = outputIndex; // Index of the output in the previous transaction
-    this.signature = signature;     // Signature proving ownership
-    this.publicKey = publicKey;     // Public key of the owner
+    this.signature = signature; // Signature proving ownership
+    this.publicKey = publicKey; // Public key of the owner
   }
 
   toJSON() {
@@ -14,7 +14,7 @@ class TransactionInput {
       txId: this.txId,
       outputIndex: this.outputIndex,
       signature: this.signature,
-      publicKey: this.publicKey
+      publicKey: this.publicKey,
     };
   }
 
@@ -23,29 +23,24 @@ class TransactionInput {
       if (!data || typeof data !== 'object') {
         throw new Error('Invalid transaction input data: data is not an object');
       }
-      
+
       if (typeof data.txId !== 'string') {
         throw new Error('Invalid transaction input data: txId is not a string');
       }
-      
+
       if (typeof data.outputIndex !== 'number') {
         throw new Error('Invalid transaction input data: outputIndex is not a number');
       }
-      
+
       if (typeof data.signature !== 'string') {
         throw new Error('Invalid transaction input data: signature is not a string');
       }
-      
+
       if (typeof data.publicKey !== 'string') {
         throw new Error('Invalid transaction input data: publicKey is not a string');
       }
-      
-      return new TransactionInput(
-        data.txId,
-        data.outputIndex,
-        data.signature,
-        data.publicKey
-      );
+
+      return new TransactionInput(data.txId, data.outputIndex, data.signature, data.publicKey);
     } catch (error) {
       throw new Error(`Failed to create transaction input from JSON: ${error.message}`);
     }
@@ -54,8 +49,8 @@ class TransactionInput {
 
 class TransactionOutput {
   constructor(address, amount, scriptPubKey = '') {
-    this.address = address;     // Recipient address
-    this.amount = amount;       // Amount in PAS
+    this.address = address; // Recipient address
+    this.amount = amount; // Amount in PAS
     this.scriptPubKey = scriptPubKey || `OP_DUP OP_HASH160 ${address} OP_EQUALVERIFY OP_CHECKSIG`;
   }
 
@@ -63,7 +58,7 @@ class TransactionOutput {
     return {
       address: this.address,
       amount: this.amount,
-      scriptPubKey: this.scriptPubKey
+      scriptPubKey: this.scriptPubKey,
     };
   }
 
@@ -72,20 +67,16 @@ class TransactionOutput {
       if (!data || typeof data !== 'object') {
         throw new Error('Invalid transaction output data: data is not an object');
       }
-      
+
       if (typeof data.address !== 'string') {
         throw new Error('Invalid transaction output data: address is not a string');
       }
-      
+
       if (typeof data.amount !== 'number') {
         throw new Error('Invalid transaction output data: amount is not a number');
       }
-      
-      return new TransactionOutput(
-        data.address,
-        data.amount,
-        data.scriptPubKey || ''
-      );
+
+      return new TransactionOutput(data.address, data.amount, data.scriptPubKey || '');
     } catch (error) {
       throw new Error(`Failed to create transaction output from JSON: ${error.message}`);
     }
@@ -94,24 +85,24 @@ class TransactionOutput {
 
 class Transaction {
   constructor(inputs = [], outputs = [], fee = 0, tag = TRANSACTION_TAGS.TRANSACTION) {
-    this.id = null;                    // Transaction hash
-    this.inputs = inputs;              // Array of TransactionInput
-    this.outputs = outputs;            // Array of TransactionOutput
-    this.fee = fee;                    // Transaction fee
-    this.timestamp = Date.now();       // Transaction timestamp
-    this.isCoinbase = false;           // Whether this is a coinbase transaction
-    this.tag = tag;                    // Transaction tag (STAKING, GOVERNANCE, COINBASE, TRANSACTION, PREMINE)
-    
+    this.id = null; // Transaction hash
+    this.inputs = inputs; // Array of TransactionInput
+    this.outputs = outputs; // Array of TransactionOutput
+    this.fee = fee; // Transaction fee
+    this.timestamp = Date.now(); // Transaction timestamp
+    this.isCoinbase = false; // Whether this is a coinbase transaction
+    this.tag = tag; // Transaction tag (STAKING, GOVERNANCE, COINBASE, TRANSACTION, PREMINE)
+
     // REPLAY ATTACK PROTECTION
     this.nonce = this.generateNonce(); // Unique nonce for replay protection
-    this.expiresAt = this.timestamp + (24 * 60 * 60 * 1000); // 24 hour expiration
-    this.sequence = 0;                 // Sequence number for input ordering
-    
+    this.expiresAt = this.timestamp + 24 * 60 * 60 * 1000; // 24 hour expiration
+    this.sequence = 0; // Sequence number for input ordering
+
     // CRITICAL: RACE ATTACK PROTECTION
-    this._lockId = null;               // Transaction lock identifier
-    this._isLocked = false;            // Lock status
-    this._lockTimestamp = null;        // When lock was acquired
-    this._lockTimeout = 30000;         // 30 second lock timeout
+    this._lockId = null; // Transaction lock identifier
+    this._isLocked = false; // Lock status
+    this._lockTimestamp = null; // When lock was acquired
+    this._lockTimeout = 30000; // 30 second lock timeout
     this._atomicSequence = this.generateAtomicSequence(); // Atomic sequence for race protection
   }
 
@@ -131,7 +122,7 @@ class Transaction {
     const random = Math.random().toString(36).substr(2, 9);
     const processId = process.pid || 0;
     const threadId = (Math.random() * 1000000) | 0;
-    
+
     // Create a unique sequence that's impossible to duplicate
     return `${timestamp}-${random}-${processId}-${threadId}`;
   }
@@ -142,18 +133,18 @@ class Transaction {
   acquireLock(lockId, timeout = 30000) {
     if (this._isLocked) {
       // Check if lock has expired
-      if (this._lockTimestamp && (Date.now() - this._lockTimestamp) > this._lockTimeout) {
+      if (this._lockTimestamp && Date.now() - this._lockTimestamp > this._lockTimeout) {
         this._releaseLock();
       } else {
         throw new Error('Transaction is already locked by another process');
       }
     }
-    
+
     this._lockId = lockId;
     this._isLocked = true;
     this._lockTimestamp = Date.now();
     this._lockTimeout = timeout;
-    
+
     return true;
   }
 
@@ -182,7 +173,7 @@ class Transaction {
    */
   isLocked() {
     // Auto-release expired locks
-    if (this._isLocked && this._lockTimestamp && (Date.now() - this._lockTimestamp) > this._lockTimeout) {
+    if (this._isLocked && this._lockTimestamp && Date.now() - this._lockTimestamp > this._lockTimeout) {
       this._releaseLock();
     }
     return this._isLocked;
@@ -195,19 +186,19 @@ class Transaction {
     if (!this._atomicSequence) {
       throw new Error('Transaction missing atomic sequence - potential race attack');
     }
-    
+
     // Validate sequence format
     const parts = this._atomicSequence.split('-');
     if (parts.length !== 4) {
       throw new Error('Invalid atomic sequence format - potential race attack');
     }
-    
+
     // Validate timestamp is recent (within 5 minutes)
     const timestamp = parseInt(parts[0]);
     if (Date.now() - timestamp > 5 * 60 * 1000) {
       throw new Error('Atomic sequence timestamp too old - potential race attack');
     }
-    
+
     return true;
   }
 
@@ -220,15 +211,15 @@ class Transaction {
       for (const output of this.outputs) {
         SafeMath.validateAmount(output.amount);
       }
-      
+
       // Validate fee
       SafeMath.validateAmount(this.fee);
-      
+
       // Validate total output amount
       const totalOutput = this.outputs.reduce((sum, output) => {
         return SafeMath.safeAdd(sum, output.amount);
       }, 0);
-      
+
       // Validate total input amount (if not coinbase)
       if (!this.isCoinbase && this.inputs.length > 0) {
         // This would need to be validated against UTXO amounts
@@ -237,7 +228,7 @@ class Transaction {
           throw new Error('Total output amount cannot be negative');
         }
       }
-      
+
       return true;
     } catch (error) {
       throw new Error(`Amount validation failed: ${error.message}`);
@@ -251,14 +242,14 @@ class Transaction {
     try {
       const totalInput = SafeMath.validateAmount(inputAmount);
       const totalOutput = SafeMath.validateAmount(outputAmount);
-      
+
       if (totalInput < totalOutput) {
         throw new Error('Input amount must be greater than or equal to output amount');
       }
-      
+
       const fee = SafeMath.safeSub(totalInput, totalOutput);
       SafeMath.validateAmount(fee);
-      
+
       return fee;
     } catch (error) {
       throw new Error(`Fee calculation failed: ${error.message}`);
@@ -272,40 +263,40 @@ class Transaction {
   calculateId() {
     // CRITICAL: Validate atomic sequence before ID calculation
     this.validateAtomicSequence();
-    
+
     // CRITICAL: Use immutable data structure to prevent malleability
     const immutableData = {
       inputs: this.inputs.map(input => ({
         txId: input.txId,
         outputIndex: input.outputIndex,
-        publicKey: input.publicKey
+        publicKey: input.publicKey,
       })),
       outputs: this.outputs.map(output => ({
         address: output.address,
-        amount: output.amount
+        amount: output.amount,
       })),
       fee: this.fee,
       timestamp: this.timestamp,
       isCoinbase: this.isCoinbase,
       tag: this.tag,
-      nonce: this.nonce,           // Include nonce for replay protection
-      expiresAt: this.expiresAt,   // Include expiration for replay protection
-      sequence: this.sequence,     // Include sequence for input ordering
-      atomicSequence: this._atomicSequence // CRITICAL: Include atomic sequence for race protection
+      nonce: this.nonce, // Include nonce for replay protection
+      expiresAt: this.expiresAt, // Include expiration for replay protection
+      sequence: this.sequence, // Include sequence for input ordering
+      atomicSequence: this._atomicSequence, // CRITICAL: Include atomic sequence for race protection
     };
-    
+
     // CRITICAL: Freeze the data to prevent modification
     Object.freeze(immutableData);
-    
+
     // CRITICAL: Use deterministic JSON stringification to prevent malleability
     const dataString = JSON.stringify(immutableData, Object.keys(immutableData).sort());
-    
+
     // CRITICAL: Double hash for additional security
     this.id = CryptoUtils.doubleHash(dataString);
-    
+
     // CRITICAL: Mark transaction as immutable after ID calculation
     this._isImmutable = true;
-    
+
     return this.id;
   }
 
@@ -359,19 +350,19 @@ class Transaction {
     return JSON.stringify({
       inputs: this.inputs.map(input => ({
         txId: input.txId,
-        outputIndex: input.outputIndex
+        outputIndex: input.outputIndex,
       })),
       outputs: this.outputs.map(output => ({
         address: output.address,
-        amount: output.amount
+        amount: output.amount,
       })),
       fee: this.fee,
       tag: this.tag,
       timestamp: this.timestamp,
       isCoinbase: this.isCoinbase,
-      nonce: this.nonce,           // Include nonce in signature
-      expiresAt: this.expiresAt,   // Include expiration in signature
-      sequence: this.sequence      // Include sequence in signature
+      nonce: this.nonce, // Include nonce in signature
+      expiresAt: this.expiresAt, // Include expiration in signature
+      sequence: this.sequence, // Include sequence in signature
     });
   }
 
@@ -423,7 +414,7 @@ class Transaction {
       expiresAt: this.expiresAt,
       sequence: this.sequence,
       isExpired: this.isExpired(),
-      timeUntilExpiry: Math.max(0, this.expiresAt - Date.now())
+      timeUntilExpiry: Math.max(0, this.expiresAt - Date.now()),
     };
   }
 
@@ -436,24 +427,22 @@ class Transaction {
     if (!existingTransactions || !Array.isArray(existingTransactions)) {
       return false;
     }
-    
+
     // Check for duplicate nonce (same sender, same nonce = replay attack)
-    const duplicateNonce = existingTransactions.find(tx => 
-      tx.id !== this.id && 
-      tx.nonce === this.nonce &&
-      this.hasSameSender(tx)
+    const duplicateNonce = existingTransactions.find(
+      tx => tx.id !== this.id && tx.nonce === this.nonce && this.hasSameSender(tx)
     );
-    
+
     if (duplicateNonce) {
       return true;
     }
-    
+
     // Check for duplicate transaction ID (exact same transaction)
     const duplicateId = existingTransactions.find(tx => tx.id === this.id);
     if (duplicateId) {
       return true;
     }
-    
+
     return false;
   }
 
@@ -466,15 +455,15 @@ class Transaction {
     if (!otherTx || !otherTx.inputs || !this.inputs) {
       return false;
     }
-    
+
     // Compare public keys from inputs to determine if same sender
     const thisPublicKeys = this.inputs.map(input => input.publicKey).sort();
     const otherPublicKeys = otherTx.inputs.map(input => input.publicKey).sort();
-    
+
     if (thisPublicKeys.length !== otherPublicKeys.length) {
       return false;
     }
-    
+
     return thisPublicKeys.every((pk, index) => pk === otherPublicKeys[index]);
   }
 
@@ -483,7 +472,7 @@ class Transaction {
    */
   getInputAmount() {
     if (this.isCoinbase) return 0;
-    
+
     return this.inputs.reduce((total, input) => {
       // This would normally look up the actual UTXO amount
       // For now, we'll assume a default value for non-coinbase transactions
@@ -502,16 +491,22 @@ class Transaction {
    * Check if transaction is valid with MANDATORY replay attack protection
    */
   isValid(config = null) {
-    logger.debug('TRANSACTION', `Validating transaction: id=${this.id}, isCoinbase=${this.isCoinbase}, outputs=${this.outputs?.length || 0}`);
-    logger.debug('TRANSACTION', `Transaction data: timestamp=${this.timestamp}, expiresAt=${this.expiresAt}, fee=${this.fee}, nonce=${this.nonce}`);
-    
+    logger.debug(
+      'TRANSACTION',
+      `Validating transaction: id=${this.id}, isCoinbase=${this.isCoinbase}, outputs=${this.outputs?.length || 0}`
+    );
+    logger.debug(
+      'TRANSACTION',
+      `Transaction data: timestamp=${this.timestamp}, expiresAt=${this.expiresAt}, fee=${this.fee}, nonce=${this.nonce}`
+    );
+
     // Check outputs exist
     if (this.outputs.length === 0) {
       logger.debug('TRANSACTION', `Transaction validation failed: no outputs`);
       return false;
     }
     logger.debug('TRANSACTION', `Outputs check passed: ${this.outputs.length} outputs`);
-    
+
     // MANDATORY PROTECTION: ALL non-coinbase transactions must have replay protection
     if (!this.isCoinbase && (!this.nonce || !this.expiresAt)) {
       logger.debug('TRANSACTION', `Transaction validation failed: missing replay protection`);
@@ -521,7 +516,7 @@ class Transaction {
       return false; // Reject unprotected transactions
     }
     logger.debug('TRANSACTION', `Replay protection check passed`);
-    
+
     // REPLAY ATTACK PROTECTION: Check if transaction has expired
     logger.debug('TRANSACTION', `Checking if transaction is expired...`);
     if (this.isExpired()) {
@@ -532,7 +527,7 @@ class Transaction {
       return false;
     }
     logger.debug('TRANSACTION', `Expiration check passed`);
-    
+
     // Verify transaction signature
     logger.debug('TRANSACTION', `Verifying transaction signature...`);
     if (!this.verify()) {
@@ -540,10 +535,10 @@ class Transaction {
       return false;
     }
     logger.debug('TRANSACTION', `Signature verification passed`);
-    
+
     const outputAmount = this.getOutputAmount();
     logger.debug('TRANSACTION', `Output amount calculated: ${outputAmount}`);
-    
+
     if (this.isCoinbase) {
       logger.debug('TRANSACTION', `Validating coinbase transaction...`);
       // CRITICAL: Validate coinbase transaction amount
@@ -552,17 +547,20 @@ class Transaction {
         logger.debug('TRANSACTION', `  outputAmount: ${outputAmount}`);
         return false;
       }
-      
+
       logger.debug('TRANSACTION', `Coinbase transaction validation passed`);
       // Additional coinbase validation can be done at blockchain level
       return true;
     }
-    
+
     logger.debug('TRANSACTION', `Validating non-coinbase transaction...`);
-    
+
     // Validate minimum fee if config is provided
     if (config && config.wallet && config.wallet.minFee !== undefined) {
-      logger.debug('TRANSACTION', `Checking minimum fee requirement: minFee=${config.wallet.minFee}, actualFee=${this.fee}`);
+      logger.debug(
+        'TRANSACTION',
+        `Checking minimum fee requirement: minFee=${config.wallet.minFee}, actualFee=${this.fee}`
+      );
       if (this.fee < config.wallet.minFee) {
         logger.debug('TRANSACTION', `Transaction validation failed: fee below minimum`);
         logger.debug('TRANSACTION', `  Required: ${config.wallet.minFee}`);
@@ -571,7 +569,7 @@ class Transaction {
       }
       logger.debug('TRANSACTION', `Minimum fee check passed`);
     }
-    
+
     // Validate fee is a positive number
     logger.debug('TRANSACTION', `Validating fee: ${this.fee} (${typeof this.fee})`);
     if (typeof this.fee !== 'number' || this.fee < 0) {
@@ -580,7 +578,7 @@ class Transaction {
       return false;
     }
     logger.debug('TRANSACTION', `Fee validation passed`);
-    
+
     // For non-coinbase transactions, validate inputs and outputs
     logger.debug('TRANSACTION', `Validating inputs: ${this.inputs.length} inputs`);
     if (this.inputs.length === 0) {
@@ -588,7 +586,7 @@ class Transaction {
       return false; // Must have inputs
     }
     logger.debug('TRANSACTION', `Inputs validation passed`);
-    
+
     // Validate output amount is positive
     logger.debug('TRANSACTION', `Validating output amount: ${outputAmount}`);
     if (outputAmount <= 0) {
@@ -597,7 +595,7 @@ class Transaction {
       return false;
     }
     logger.debug('TRANSACTION', `Output amount validation passed`);
-    
+
     logger.debug('TRANSACTION', `Transaction ${this.id} validation completed successfully`);
     return true;
   }
@@ -630,9 +628,9 @@ class Transaction {
       timestamp: this.timestamp,
       isCoinbase: this.isCoinbase,
       tag: this.tag,
-      nonce: this.nonce,           // Include replay protection fields
+      nonce: this.nonce, // Include replay protection fields
       expiresAt: this.expiresAt,
-      sequence: this.sequence
+      sequence: this.sequence,
     };
   }
 
@@ -641,15 +639,15 @@ class Transaction {
       if (!data || typeof data !== 'object') {
         throw new Error('Invalid transaction data: data is not an object');
       }
-      
+
       if (!data.inputs || !Array.isArray(data.inputs)) {
         throw new Error('Invalid transaction data: inputs property is missing or not an array');
       }
-      
+
       if (!data.outputs || !Array.isArray(data.outputs)) {
         throw new Error('Invalid transaction data: outputs property is missing or not an array');
       }
-      
+
       const transaction = new Transaction(
         data.inputs.length > 0 ? data.inputs.map(input => TransactionInput.fromJSON(input)) : [],
         data.outputs.map(output => TransactionOutput.fromJSON(output)),
@@ -659,7 +657,7 @@ class Transaction {
       transaction.id = data.id;
       transaction.timestamp = data.timestamp || Date.now();
       transaction.isCoinbase = data.isCoinbase || false;
-      
+
       // Load replay protection fields if they exist
       if (data.nonce) {
         transaction.nonce = data.nonce;
@@ -670,7 +668,7 @@ class Transaction {
       if (data.sequence !== undefined) {
         transaction.sequence = data.sequence;
       }
-      
+
       return transaction;
     } catch (error) {
       throw new Error(`Failed to create transaction from JSON: ${error.message}`);
@@ -678,4 +676,4 @@ class Transaction {
   }
 }
 
-module.exports = { Transaction, TransactionInput, TransactionOutput }; 
+module.exports = { Transaction, TransactionInput, TransactionOutput };
