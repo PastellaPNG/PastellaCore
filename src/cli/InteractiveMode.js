@@ -116,13 +116,17 @@ class InteractiveMode {
     if (args.length === 0 || args[0] === 'status') {
       try {
         const response = await this.cli.makeApiRequest('/api/spam-protection/status', 'GET');
-        if (response) {
+        if (response && response.success && response.data) {
+          const data = response.data;
           console.log(chalk.blue.bold('🛡️  SPAM PROTECTION STATUS:'));
-          console.log(chalk.cyan('  Rate Limiting:'), response.rateLimiting ? chalk.green('Enabled') : chalk.red('Disabled'));
-          console.log(chalk.cyan('  Global Rate Limit:'), chalk.white(`${response.globalRateLimit} requests per minute`));
-          console.log(chalk.cyan('  Address Rate Limit:'), chalk.white(`${response.addressRateLimit} requests per minute`));
-          console.log(chalk.cyan('  Banned Addresses:'), chalk.white(response.bannedAddresses.length));
-          console.log(chalk.cyan('  Rate Limited Addresses:'), chalk.white(response.rateLimitedAddresses.length));
+          console.log(chalk.cyan('  Rate Limiting:'), chalk.green('Enabled'));
+          console.log(chalk.cyan('  Global Rate Limit:'), chalk.white(`${data.maxTransactionsPerMinute || 'N/A'} requests per minute`));
+          console.log(chalk.cyan('  Address Rate Limit:'), chalk.white(`${data.maxTransactionsPerAddress || 'N/A'} transactions per address`));
+          console.log(chalk.cyan('  Banned Addresses:'), chalk.white(data.bannedAddresses ? data.bannedAddresses.length : 0));
+          console.log(chalk.cyan('  Rate Limited Addresses:'), chalk.white(data.rateLimitData ? data.rateLimitData.length : 0));
+          console.log(chalk.cyan('  Address Ban Duration:'), chalk.white(`${data.addressBanDuration || 'N/A'} ms`));
+        } else {
+          console.log(chalk.red('❌ Invalid response from spam protection API'));
         }
       } catch (error) {
         console.log(chalk.red(`❌ Error: ${error.message}`));
@@ -130,14 +134,18 @@ class InteractiveMode {
     } else if (args[0] === 'reset') {
       try {
         const response = await this.cli.makeApiRequest('/api/spam-protection/reset', 'POST');
-        if (response) {
+        if (response && response.success) {
           console.log(chalk.green('✅ Spam protection reset successfully'));
+        } else {
+          console.log(chalk.red('❌ Failed to reset spam protection'));
         }
       } catch (error) {
         console.log(chalk.red(`❌ Error: ${error.message}`));
       }
     } else {
       console.log(chalk.yellow('Usage: spam-protection [status|reset]'));
+      console.log(chalk.cyan('  status  - Show spam protection status'));
+      console.log(chalk.cyan('  reset   - Reset all spam protection data'));
     }
   }
 
