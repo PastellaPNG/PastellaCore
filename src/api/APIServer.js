@@ -211,7 +211,21 @@ class APIServer {
       return false;
     }
 
-    this.server = this.app.listen(this.port, () => {
+    // Get host binding from config (defaults to 127.0.0.1 for security)
+    const host = this.config.api?.host || '127.0.0.1';
+    
+    // Log the binding information at the beginning using consistent logger style
+    logger.info('API', `API Server: http://${host}:${this.port}`);
+    
+    // Security warning for external binding
+    if (host !== '127.0.0.1' && host !== 'localhost') {
+      logger.warn('API', `API server bound to external interface: ${host}`);
+      logger.warn('API', `Ensure your network is secure and API key authentication is enabled!`);
+    } else {
+      logger.info('API', `API server bound to localhost-only for security`);
+    }
+    
+    this.server = this.app.listen(this.port, host, () => {
       this.isRunning = true;
     });
 
@@ -220,6 +234,12 @@ class APIServer {
       console.error(`❌ API Server error: ${error.message}`);
       if (error.code === 'EADDRINUSE') {
         console.error(`Port ${this.port} is already in use`);
+      } else if (error.code === 'EACCES') {
+        console.error(`Permission denied binding to ${host}:${this.port}`);
+        console.error(`Try using a different port or run with elevated privileges`);
+      } else if (error.code === 'EADDRNOTAVAIL') {
+        console.error(`Address ${host} is not available on this system`);
+        console.error(`Check your network configuration and try again`);
       }
     });
 

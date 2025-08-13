@@ -174,7 +174,7 @@ class PastellaDaemon {
       }
       
       this.apiServer.start();
-      logger.info('API', `API Server: http://localhost:${config.api.port}`);
+      // The API server will log its own binding information with the correct host
     }
 
     // Log block submission service status
@@ -687,18 +687,20 @@ async function main() {
     console.log(chalk.cyan('  --block-time <ms>    '), chalk.white('Set block time in milliseconds (default: 60000)'));
     console.log(chalk.cyan('  --min-seed-conn <n>  '), chalk.white('Minimum seed node connections (0-10, default: 2)'));
     console.log(chalk.cyan('  --api-key <key>      '), chalk.white('API key for authentication (default: none)'));
+    console.log(chalk.cyan('  --host <ip>          '), chalk.white('API server host binding (default: 127.0.0.1)'));
     console.log(chalk.cyan('  --generate-genesis   '), chalk.white('Generate new genesis block configuration'));
     console.log('');
     console.log(chalk.yellow.bold('💡 EXAMPLES:'));
-    console.log(chalk.cyan('  node src/index.js                                    '), chalk.white('# Start with all services'));
+    console.log(chalk.cyan('  node src/index.js                                     '), chalk.white('# Start with all services'));
     console.log(chalk.cyan('  node src/index.js --mining                            '), chalk.white('# Start with mining enabled'));
     console.log(chalk.cyan('  node src/index.js --debug                             '), chalk.white('# Start with debug logging'));
     console.log(chalk.cyan('  node src/index.js --no-api --no-p2p                   '), chalk.white('# Blockchain only mode'));
     console.log(chalk.cyan('  node src/index.js --api-port 8080 --p2p-port 8081     '), chalk.white('# Custom ports'));
     console.log(chalk.cyan('  node src/index.js --data-dir /path/to/data            '), chalk.white('# Custom data directory'));
     console.log(chalk.cyan('  node src/index.js --mining --difficulty 2             '), chalk.white('# Enable mining with low difficulty'));
-    console.log(chalk.cyan('  node src/index.js --min-seed-conn 1                  '), chalk.white('# Require only 1 seed connection'));
-    console.log(chalk.cyan('  node src/index.js --api-key mysecretkey              '), chalk.white('# Enable API authentication'));
+    console.log(chalk.cyan('  node src/index.js --min-seed-conn 1                   '), chalk.white('# Require only 1 seed connection'));
+    console.log(chalk.cyan('  node src/index.js --api-key mysecretkey               '), chalk.white('# Enable API authentication'));
+    console.log(chalk.cyan('  node src/index.js --host 192.168.1.100 --api-key key  '), chalk.white('# Bind to specific network interface'));
     console.log(chalk.cyan('  node src/index.js --generate-genesis                  '), chalk.white('# Generate new genesis configuration'));
     console.log('');
     console.log(chalk.yellow.bold('🔗 SERVICES:'));
@@ -708,10 +710,15 @@ async function main() {
     console.log(chalk.green('  • REST API:       '), chalk.white('HTTP API for external integration'));
     console.log(chalk.green('  • CLI Wallet:     '), chalk.white('Local wallet management (use CLI)'));
     console.log('');
+    console.log(chalk.yellow.bold('🔒 SECURITY:'));
+    console.log(chalk.red('  • API Server:     '), chalk.white('Defaults to localhost-only (127.0.0.1)'));
+    console.log(chalk.red('  • External Access:'), chalk.white('Requires --host + --api-key for security'));
+    console.log(chalk.red('  • Authentication:  '), chalk.white('API key required for non-localhost binding'));
+    console.log('');
     console.log(chalk.yellow.bold('📞 SUPPORT:'));
     console.log(chalk.white('  • License:        '), chalk.cyan(packageJson.license));
     console.log(chalk.white('  • Author:         '), chalk.cyan(packageJson.author));
-    console.log(chalk.white('  • Repository:     '), chalk.cyan('https://github.com/pastella/pastella-coin'));
+    console.log(chalk.white('  • Repository:     '), chalk.cyan('https://github.com/PastellaOrg/PastellaCore'));
     console.log('');
     process.exit(0);
   }
@@ -1116,6 +1123,39 @@ async function main() {
     config.api = config.api || {};
     config.api.apiKey = apiKey;
     console.log(chalk.green('🔐 API authentication enabled'));
+  }
+
+  // Parse host binding argument
+  const host = parseArgValue('--host');
+  if (host) {
+    // Validate host format
+    const isValidHost = /^(127\.0\.0\.1|localhost|0\.0\.0\.0|\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})$/.test(host);
+    if (!isValidHost) {
+      console.error(chalk.red('❌ Invalid host format. Must be a valid IP address or localhost.'));
+      console.error(chalk.red('   Examples: 127.0.0.1, 192.168.1.100, 0.0.0.0'));
+      process.exit(1);
+    }
+    
+    config.api = config.api || {};
+    config.api.host = host;
+    console.log(chalk.green(`🌐 API server will bind to: ${host}`));
+    
+    // CRITICAL: Require API key for non-localhost binding
+    if (host !== '127.0.0.1' && host !== 'localhost') {
+      if (!apiKey) {
+        console.error(chalk.red('🚨 SECURITY ERROR: API key is REQUIRED when binding to external interfaces!'));
+        console.error(chalk.red('   Binding to external interfaces without authentication is a security risk.'));
+        console.error(chalk.red('   Please provide an API key with --api-key <key>'));
+        console.error(chalk.red('   Or use --host 127.0.0.1 for localhost-only access.'));
+        process.exit(1);
+      }
+      console.log(chalk.yellow('⚠️  WARNING: Binding to external interface. Ensure your network is secure!'));
+    }
+  } else {
+    // Default to localhost for security
+    config.api = config.api || {};
+    config.api.host = '127.0.0.1';
+    console.log(chalk.cyan('🔒 API server defaulting to localhost-only (127.0.0.1) for security'));
   }
 
   // Load custom config file if specified
