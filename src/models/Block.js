@@ -1,19 +1,128 @@
-const CryptoUtils = require('../utils/crypto');
+const { CryptoUtils } = require('../utils/crypto');
 const { Transaction } = require('./Transaction');
 const logger = require('../utils/logger');
 
 class Block {
   constructor(index, timestamp, transactions, previousHash, nonce = 0, difficulty = 4, config = null) {
-    this.index = index;                    // Block height
-    this.timestamp = timestamp;            // Block timestamp
-    this.transactions = transactions;      // Array of transactions
-    this.previousHash = previousHash;      // Hash of previous block
-    this.nonce = nonce;                    // Mining nonce
-    this.difficulty = difficulty;          // Mining difficulty
-    this.hash = null;                      // Block hash
-    this.merkleRoot = null;                // Merkle root of transactions
-    this.algorithm = 'kawpow';             // Mining algorithm (kawpow or sha256)
-    this.config = config;                  // Configuration for validation
+    this.index = index;
+    this.timestamp = timestamp;
+    this.transactions = transactions;
+    this.previousHash = previousHash;
+    this.nonce = nonce;
+    this.difficulty = difficulty;
+    this.hash = null;
+    this.merkleRoot = null;
+    this.config = config;
+    
+    // CRITICAL: Timestamp validation
+    this.validateTimestamp();
+    
+    // Calculate Merkle root
+    this.calculateMerkleRoot();
+  }
+
+  /**
+   * CRITICAL: Validate timestamp to prevent manipulation attacks
+   */
+  validateTimestamp() {
+    const currentTime = Date.now();
+    const maxFutureTime = 2 * 60 * 1000; // 2 minutes in future
+    const maxPastTime = 24 * 60 * 60 * 1000; // 24 hours in past
+    const minBlockTime = 1000; // 1 second minimum between blocks
+    
+    // Check if timestamp is in the future
+    if (this.timestamp > currentTime + maxFutureTime) {
+      throw new Error(`Block timestamp ${this.timestamp} is too far in the future (max: ${currentTime + maxFutureTime})`);
+    }
+    
+    // Check if timestamp is too far in the past
+    if (this.timestamp < currentTime - maxPastTime) {
+      throw new Error(`Block timestamp ${this.timestamp} is too far in the past (min: ${currentTime - maxPastTime})`);
+    }
+    
+    // Check if timestamp is negative
+    if (this.timestamp < 0) {
+      throw new Error(`Block timestamp ${this.timestamp} cannot be negative`);
+    }
+    
+    // Check if timestamp is a valid number
+    if (isNaN(this.timestamp) || !isFinite(this.timestamp)) {
+      throw new Error(`Block timestamp ${this.timestamp} is not a valid number`);
+    }
+    
+    // Check if timestamp is an integer
+    if (!Number.isInteger(this.timestamp)) {
+      throw new Error(`Block timestamp ${this.timestamp} must be an integer`);
+    }
+    
+    logger.debug('BLOCK', `Timestamp validation passed: ${this.timestamp} (current: ${currentTime})`);
+  }
+
+  /**
+   * CRITICAL: Validate timestamp against previous block
+   */
+  validateTimestampAgainstPrevious(previousBlock) {
+    if (!previousBlock) {
+      return true; // Genesis block
+    }
+    
+    const minBlockTime = 1000; // 1 second minimum
+    const maxBlockTime = 60 * 60 * 1000; // 1 hour maximum
+    
+    const timeDifference = this.timestamp - previousBlock.timestamp;
+    
+    // Check minimum block time
+    if (timeDifference < minBlockTime) {
+      throw new Error(`Block time difference ${timeDifference}ms is too short (min: ${minBlockTime}ms)`);
+    }
+    
+    // Check maximum block time
+    if (timeDifference > maxBlockTime) {
+      throw new Error(`Block time difference ${timeDifference}ms is too long (max: ${maxBlockTime}ms)`);
+    }
+    
+    // Check if timestamp is before previous block
+    if (this.timestamp <= previousBlock.timestamp) {
+      throw new Error(`Block timestamp ${this.timestamp} must be after previous block timestamp ${previousBlock.timestamp}`);
+    }
+    
+    logger.debug('BLOCK', `Timestamp validation against previous block passed: ${timeDifference}ms difference`);
+    return true;
+  }
+
+  /**
+   * CRITICAL: Get timestamp validation status
+   */
+  getTimestampValidationStatus() {
+    const currentTime = Date.now();
+    const timeDifference = currentTime - this.timestamp;
+    
+    return {
+      timestamp: this.timestamp,
+      currentTime: currentTime,
+      timeDifference: timeDifference,
+      timeDifferenceSeconds: Math.floor(timeDifference / 1000),
+      isValid: this.timestamp > 0 && this.timestamp <= currentTime + (2 * 60 * 1000),
+      warnings: this.getTimestampWarnings()
+    };
+  }
+
+  /**
+   * CRITICAL: Get timestamp warnings
+   */
+  getTimestampWarnings() {
+    const warnings = [];
+    const currentTime = Date.now();
+    
+    if (this.timestamp > currentTime) {
+      warnings.push('Block timestamp is in the future');
+    }
+    
+    if (this.timestamp < currentTime - (24 * 60 * 60 * 1000)) {
+      warnings.push('Block timestamp is very old');
+    }
+    
+    return warnings;
   }
 
   /**

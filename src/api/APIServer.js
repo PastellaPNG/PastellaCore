@@ -124,6 +124,9 @@ class APIServer {
     this.app.get('/api/blockchain/transactions', this.getPendingTransactions.bind(this));
     this.app.get('/api/blockchain/transactions/:txId', this.getTransaction.bind(this));
     this.app.post('/api/blockchain/transactions', this.submitTransaction.bind(this));
+    this.app.get('/api/blockchain/memory-protection', this.getMemoryProtectionStatus.bind(this));
+    this.app.get('/api/blockchain/cpu-protection', this.getCPUProtectionStatus.bind(this));
+    this.app.get('/api/network/reputation-status', this.getReputationStatus.bind(this));
 
     // Block submission routes
     this.app.get('/api/blocks/pending', this.getPendingBlocks.bind(this));
@@ -1296,6 +1299,53 @@ class APIServer {
       });
     } catch (error) {
       logger.error('API', `Error adding transaction batch: ${error.message}`);
+      res.status(500).json({ error: 'Internal server error' });
+    }
+  }
+
+  getMemoryProtectionStatus(req, res) {
+    try {
+      const status = this.blockchain.getMemoryProtectionStatus();
+      res.json({
+        success: true,
+        data: status,
+        timestamp: new Date().toISOString()
+      });
+    } catch (error) {
+      logger.error('API', `Error getting memory protection status: ${error.message}`);
+      res.status(500).json({ error: 'Internal server error' });
+    }
+  }
+
+  getCPUProtectionStatus(req, res) {
+    try {
+      const status = this.blockchain.getCPUProtectionStatus();
+      res.json({
+        success: true,
+        data: status,
+        timestamp: new Date().toISOString()
+      });
+    } catch (error) {
+      logger.error('API', `Error getting CPU protection status: ${error.message}`);
+      res.status(500).json({ error: 'Internal server error' });
+    }
+  }
+
+  getReputationStatus(req, res) {
+    try {
+      if (!this.p2pNetwork) {
+        return res.status(503).json({
+          error: 'P2P network not available'
+        });
+      }
+      const status = this.p2pNetwork.getReputationStatus();
+      res.json({
+        success: true,
+        data: status,
+        timestamp: new Date().toISOString()
+      });
+    } catch (error) {
+      logger.error('API', `Error getting reputation status: ${error.message}`);
       res.status(500).json({ error: 'Internal server error' });
     }
   }

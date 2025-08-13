@@ -1,6 +1,165 @@
 const crypto = require('crypto');
 const secp256k1 = require('secp256k1');
 
+/**
+ * CRITICAL: Safe arithmetic operations to prevent integer overflow/underflow
+ */
+class SafeMath {
+  static MAX_SAFE_INTEGER = Number.MAX_SAFE_INTEGER;
+  static MIN_SAFE_INTEGER = Number.MIN_SAFE_INTEGER;
+  
+  /**
+   * CRITICAL: Safe addition with overflow protection
+   */
+  static safeAdd(a, b) {
+    const result = BigInt(a) + BigInt(b);
+    
+    // Check if result exceeds safe integer bounds
+    if (result > BigInt(this.MAX_SAFE_INTEGER)) {
+      throw new Error(`Integer overflow detected: ${a} + ${b} = ${result} exceeds maximum safe integer`);
+    }
+    
+    if (result < BigInt(this.MIN_SAFE_INTEGER)) {
+      throw new Error(`Integer underflow detected: ${a} + ${b} = ${result} below minimum safe integer`);
+    }
+    
+    return Number(result);
+  }
+  
+  /**
+   * CRITICAL: Safe subtraction with underflow protection
+   */
+  static safeSub(a, b) {
+    const result = BigInt(a) - BigInt(b);
+    
+    // Check if result exceeds safe integer bounds
+    if (result > BigInt(this.MAX_SAFE_INTEGER)) {
+      throw new Error(`Integer overflow detected: ${a} - ${b} = ${result} exceeds maximum safe integer`);
+    }
+    
+    if (result < BigInt(this.MIN_SAFE_INTEGER)) {
+      throw new Error(`Integer underflow detected: ${a} - ${b} = ${result} below minimum safe integer`);
+    }
+    
+    return Number(result);
+  }
+  
+  /**
+   * CRITICAL: Safe multiplication with overflow protection
+   */
+  static safeMul(a, b) {
+    const result = BigInt(a) * BigInt(b);
+    
+    // Check if result exceeds safe integer bounds
+    if (result > BigInt(this.MAX_SAFE_INTEGER)) {
+      throw new Error(`Integer overflow detected: ${a} * ${b} = ${result} exceeds maximum safe integer`);
+    }
+    
+    if (result < BigInt(this.MIN_SAFE_INTEGER)) {
+      throw new Error(`Integer underflow detected: ${a} * ${b} = ${result} below minimum safe integer`);
+    }
+    
+    return Number(result);
+  }
+  
+  /**
+   * CRITICAL: Safe division with division by zero protection
+   */
+  static safeDiv(a, b) {
+    if (b === 0) {
+      throw new Error('Division by zero detected');
+    }
+    
+    const result = BigInt(a) / BigInt(b);
+    
+    // Check if result exceeds safe integer bounds
+    if (result > BigInt(this.MAX_SAFE_INTEGER)) {
+      throw new Error(`Integer overflow detected: ${a} / ${b} = ${result} exceeds maximum safe integer`);
+    }
+    
+    if (result < BigInt(this.MIN_SAFE_INTEGER)) {
+      throw new Error(`Integer underflow detected: ${a} / ${b} = ${result} below minimum safe integer`);
+    }
+    
+    return Number(result);
+  }
+  
+  /**
+   * CRITICAL: Safe modulo with division by zero protection
+   */
+  static safeMod(a, b) {
+    if (b === 0) {
+      throw new Error('Modulo by zero detected');
+    }
+    
+    const result = BigInt(a) % BigInt(b);
+    
+    // Check if result exceeds safe integer bounds
+    if (result > BigInt(this.MAX_SAFE_INTEGER)) {
+      throw new Error(`Integer overflow detected: ${a} % ${b} = ${result} exceeds maximum safe integer`);
+    }
+    
+    if (result < BigInt(this.MIN_SAFE_INTEGER)) {
+      throw new Error(`Integer underflow detected: ${a} % ${b} = ${result} below minimum safe integer`);
+    }
+    
+    return Number(result);
+  }
+  
+  /**
+   * CRITICAL: Validate amount is within safe bounds
+   */
+  static validateAmount(amount) {
+    if (typeof amount !== 'number' || isNaN(amount)) {
+      throw new Error('Invalid amount: must be a valid number');
+    }
+    
+    if (amount > this.MAX_SAFE_INTEGER) {
+      throw new Error(`Amount ${amount} exceeds maximum safe integer`);
+    }
+    
+    if (amount < this.MIN_SAFE_INTEGER) {
+      throw new Error(`Amount ${amount} below minimum safe integer`);
+    }
+    
+    if (amount < 0) {
+      throw new Error(`Amount ${amount} cannot be negative`);
+    }
+    
+    return true;
+  }
+  
+  /**
+   * CRITICAL: Safe balance calculation
+   */
+  static safeBalanceCalculation(balances) {
+    if (!Array.isArray(balances)) {
+      throw new Error('Balances must be an array');
+    }
+    
+    let total = BigInt(0);
+    
+    for (const balance of balances) {
+      if (typeof balance !== 'number' || isNaN(balance)) {
+        throw new Error('Invalid balance in array');
+      }
+      
+      if (balance < 0) {
+        throw new Error(`Negative balance detected: ${balance}`);
+      }
+      
+      total += BigInt(balance);
+      
+      // Check for overflow during accumulation
+      if (total > BigInt(this.MAX_SAFE_INTEGER)) {
+        throw new Error(`Balance overflow detected during calculation`);
+      }
+    }
+    
+    return Number(total);
+  }
+}
+
 class CryptoUtils {
     static hash(data) {
         return crypto.createHash('sha256').update(data).digest('hex');
@@ -408,4 +567,7 @@ class CryptoUtils {
     }
 }
 
-module.exports = CryptoUtils; 
+module.exports = {
+  CryptoUtils,
+  SafeMath
+}; 

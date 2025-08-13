@@ -1,4 +1,4 @@
-const CryptoUtils = require('../utils/crypto');
+const { CryptoUtils, SafeMath } = require('../utils/crypto');
 const { TRANSACTION_TAGS } = require('../utils/constants');
 
 class TransactionInput {
@@ -212,10 +212,67 @@ class Transaction {
   }
 
   /**
+   * CRITICAL: Safe amount validation using SafeMath
+   */
+  validateAmounts() {
+    try {
+      // Validate all output amounts
+      for (const output of this.outputs) {
+        SafeMath.validateAmount(output.amount);
+      }
+      
+      // Validate fee
+      SafeMath.validateAmount(this.fee);
+      
+      // Validate total output amount
+      const totalOutput = this.outputs.reduce((sum, output) => {
+        return SafeMath.safeAdd(sum, output.amount);
+      }, 0);
+      
+      // Validate total input amount (if not coinbase)
+      if (!this.isCoinbase && this.inputs.length > 0) {
+        // This would need to be validated against UTXO amounts
+        // For now, just ensure it's positive
+        if (totalOutput < 0) {
+          throw new Error('Total output amount cannot be negative');
+        }
+      }
+      
+      return true;
+    } catch (error) {
+      throw new Error(`Amount validation failed: ${error.message}`);
+    }
+  }
+
+  /**
+   * CRITICAL: Safe fee calculation using SafeMath
+   */
+  calculateSafeFee(inputAmount, outputAmount) {
+    try {
+      const totalInput = SafeMath.validateAmount(inputAmount);
+      const totalOutput = SafeMath.validateAmount(outputAmount);
+      
+      if (totalInput < totalOutput) {
+        throw new Error('Input amount must be greater than or equal to output amount');
+      }
+      
+      const fee = SafeMath.safeSub(totalInput, totalOutput);
+      SafeMath.validateAmount(fee);
+      
+      return fee;
+    } catch (error) {
+      throw new Error(`Fee calculation failed: ${error.message}`);
+    }
+  }
+
+  /**
    * Calculate transaction hash with replay attack protection
    * CRITICAL: This hash is IMMUTABLE and cannot be changed after creation
    */
   calculateId() {
+    // CRITICAL: Validate atomic sequence before ID calculation
+    this.validateAtomicSequence();
+    
     // CRITICAL: Use immutable data structure to prevent malleability
     const immutableData = {
       inputs: this.inputs.map(input => ({
@@ -233,7 +290,8 @@ class Transaction {
       tag: this.tag,
       nonce: this.nonce,           // Include nonce for replay protection
       expiresAt: this.expiresAt,   // Include expiration for replay protection
-      sequence: this.sequence      // Include sequence for input ordering
+      sequence: this.sequence,     // Include sequence for input ordering
+      atomicSequence: this._atomicSequence // CRITICAL: Include atomic sequence for race protection
     };
     
     // CRITICAL: Freeze the data to prevent modification

@@ -448,6 +448,30 @@ class Blockchain {
   }
 
   /**
+   * CRITICAL: Get memory protection status
+   */
+  getMemoryProtectionStatus() {
+    try {
+      return this.memoryPool.memoryProtection.getMemoryStatus();
+    } catch (error) {
+      logger.error('BLOCKCHAIN', `Failed to get memory protection status: ${error.message}`);
+      return { error: 'Failed to get memory protection status' };
+    }
+  }
+
+  /**
+   * CRITICAL: Get CPU protection status
+   */
+  getCPUProtectionStatus() {
+    try {
+      return this.blockchainValidation.cpuProtection.getCPUStatus();
+    } catch (error) {
+      logger.error('BLOCKCHAIN', `Failed to get CPU protection status: ${error.message}`);
+      return { error: 'Failed to get CPU protection status' };
+    }
+  }
+
+  /**
    * CRITICAL: Get detailed replay protection analysis
    */
   getReplayProtectionAnalysis() {

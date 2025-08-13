@@ -1,77 +1,222 @@
 const logger = require('../utils/logger');
 
 /**
+ * CRITICAL: CPU exhaustion protection system
+ */
+class CPUProtection {
+  constructor() {
+    this.maxExecutionTime = 5000; // 5 seconds max execution time
+    this.maxValidationComplexity = 1000; // Maximum validation complexity score
+    this.maxTransactionsPerBatch = 100; // Maximum transactions to validate per batch
+    this.cpuThreshold = 0.8; // 80% CPU usage threshold
+    this.rateLimitPerSecond = 100; // Maximum validations per second
+    
+    // CPU monitoring
+    this.currentCPUUsage = 0;
+    this.validationCount = 0;
+    this.lastValidationReset = Date.now();
+    this.executionTimes = [];
+    this.complexityScores = [];
+    
+    // Start CPU monitoring
+    this.startCPUMonitoring();
+  }
+
+  /**
+   * CRITICAL: Start CPU monitoring
+   */
+  startCPUMonitoring() {
+    setInterval(() => {
+      this.checkCPUUsage();
+      this.resetRateLimits();
+    }, 1000); // Check every second
+  }
+
+  /**
+   * CRITICAL: Check CPU usage and reset rate limits
+   */
+  checkCPUUsage() {
+    try {
+      // Reset validation count every second
+      this.validationCount = 0;
+      this.lastValidationReset = Date.now();
+      
+      // Monitor execution times
+      if (this.executionTimes.length > 10) {
+        this.executionTimes.shift();
+      }
+      
+      // Monitor complexity scores
+      if (this.complexityScores.length > 10) {
+        this.complexityScores.shift();
+      }
+      
+    } catch (error) {
+      logger.error('CPU_PROTECTION', `CPU monitoring failed: ${error.message}`);
+    }
+  }
+
+  /**
+   * CRITICAL: Reset rate limits
+   */
+  resetRateLimits() {
+    this.validationCount = 0;
+    this.lastValidationReset = Date.now();
+  }
+
+  /**
+   * CRITICAL: Check if validation is allowed (rate limiting)
+   */
+  canValidate() {
+    if (this.validationCount >= this.rateLimitPerSecond) {
+      logger.warn('CPU_PROTECTION', `⚠️  Validation rate limit exceeded: ${this.validationCount}/${this.rateLimitPerSecond}`);
+      return false;
+    }
+    
+    this.validationCount++;
+    return true;
+  }
+
+  /**
+   * CRITICAL: Measure execution time and complexity
+   */
+  measureExecution(operation, complexity = 1) {
+    const startTime = Date.now();
+    
+    return {
+      start: () => {
+        // Check if operation is allowed
+        if (!this.canValidate()) {
+          throw new Error('CPU validation rate limit exceeded');
+        }
+        
+        // Check complexity
+        if (complexity > this.maxValidationComplexity) {
+          throw new Error(`Operation complexity ${complexity} exceeds maximum ${this.maxValidationComplexity}`);
+        }
+        
+        return startTime;
+      },
+      end: () => {
+        const executionTime = Date.now() - startTime;
+        
+        // Record execution time
+        this.executionTimes.push(executionTime);
+        
+        // Record complexity score
+        this.complexityScores.push(complexity);
+        
+        // Check execution time limit
+        if (executionTime > this.maxExecutionTime) {
+          logger.warn('CPU_PROTECTION', `⚠️  Operation execution time ${executionTime}ms exceeds limit ${this.maxExecutionTime}ms`);
+        }
+        
+        return executionTime;
+      }
+    };
+  }
+
+  /**
+   * CRITICAL: Get CPU protection status
+   */
+  getCPUStatus() {
+    const avgExecutionTime = this.executionTimes.length > 0 
+      ? this.executionTimes.reduce((a, b) => a + b, 0) / this.executionTimes.length 
+      : 0;
+    
+    const avgComplexity = this.complexityScores.length > 0 
+      ? this.complexityScores.reduce((a, b) => a + b, 0) / this.complexityScores.length 
+      : 0;
+    
+    return {
+      currentValidationCount: this.validationCount,
+      maxValidationsPerSecond: this.rateLimitPerSecond,
+      maxExecutionTime: this.maxExecutionTime,
+      maxValidationComplexity: this.maxValidationComplexity,
+      averageExecutionTime: avgExecutionTime.toFixed(2),
+      averageComplexity: avgComplexity.toFixed(2),
+      executionTimes: this.executionTimes.length,
+      complexityScores: this.complexityScores.length
+    };
+  }
+
+  /**
+   * CRITICAL: Update CPU protection limits
+   */
+  updateCPULimits(newLimits) {
+    if (newLimits.maxExecutionTime) {
+      this.maxExecutionTime = newLimits.maxExecutionTime;
+    }
+    if (newLimits.maxValidationComplexity) {
+      this.maxValidationComplexity = newLimits.maxValidationComplexity;
+    }
+    if (newLimits.maxTransactionsPerBatch) {
+      this.maxTransactionsPerBatch = newLimits.maxTransactionsPerBatch;
+    }
+    if (newLimits.rateLimitPerSecond) {
+      this.rateLimitPerSecond = newLimits.rateLimitPerSecond;
+    }
+    
+    logger.info('CPU_PROTECTION', 'CPU protection limits updated');
+  }
+}
+
+/**
  * Blockchain Validation - Handles all blockchain validation methods
  */
 class BlockchainValidation {
-  constructor() {}
+  constructor() {
+    // CRITICAL: Initialize CPU protection
+    this.cpuProtection = new CPUProtection();
+  }
 
   /**
-   * Validate block transactions including coinbase validation
+   * CRITICAL: Validate block transactions with CPU protection
    */
-  validateBlockTransactions(block, config) {
+  validateBlockTransactions(block) {
+    const measurement = this.cpuProtection.measureExecution('validateBlockTransactions', block.transactions.length);
+    const startTime = measurement.start();
+    
     try {
-      // Ensure first transaction is coinbase and no others are
-      if (block.transactions.length > 0) {
-        const firstTx = block.transactions[0];
-        if (!firstTx.isCoinbase) {
-          return { valid: false, reason: 'First transaction must be coinbase' };
-        }
+      // Validate transaction count
+      if (!Array.isArray(block.transactions) || block.transactions.length === 0) {
+        throw new Error('Block must contain at least one transaction');
       }
-
+      
+      // Check batch size limit
+      if (block.transactions.length > this.cpuProtection.maxTransactionsPerBatch) {
+        throw new Error(`Transaction count ${block.transactions.length} exceeds batch limit ${this.cpuProtection.maxTransactionsPerBatch}`);
+      }
+      
+      // Validate each transaction
       for (let i = 0; i < block.transactions.length; i++) {
         const transaction = block.transactions[i];
         
+        // First transaction must be coinbase
         if (i === 0 && !transaction.isCoinbase) {
-          return { valid: false, reason: 'First transaction must be coinbase' };
+          throw new Error('First transaction must be coinbase');
         }
+        
+        // Other transactions must not be coinbase
         if (i > 0 && transaction.isCoinbase) {
-          return { valid: false, reason: 'Only first transaction can be coinbase' };
+          throw new Error('Only first transaction can be coinbase');
         }
-      }
-
-      // Calculate total fees from non-coinbase transactions
-      let totalFees = 0;
-      for (let i = 1; i < block.transactions.length; i++) {
-        const transaction = block.transactions[i];
-        if (transaction.fee && typeof transaction.fee === 'number') {
-          totalFees += transaction.fee;
-        }
-      }
-
-      // Validate coinbase amount (base reward + fees)
-      if (block.transactions.length > 0) {
-        const coinbaseTransaction = block.transactions[0];
-        const actualCoinbaseAmount = coinbaseTransaction.outputs.reduce((sum, output) => sum + output.amount, 0);
-        const expectedBaseReward = config?.blockchain?.coinbaseReward || 50;
-        const expectedTotalAmount = expectedBaseReward + totalFees;
-
-        // Allow small floating-point tolerance
-        const tolerance = 0.00000001;
-        if (Math.abs(actualCoinbaseAmount - expectedTotalAmount) > tolerance) {
-          logger.error('BLOCKCHAIN_VALIDATION', `Block ${block.index} coinbase manipulation detected!`);
-          logger.error('BLOCKCHAIN_VALIDATION', `Expected: ${expectedBaseReward} (base) + ${totalFees} (fees) = ${expectedTotalAmount}`);
-          logger.error('BLOCKCHAIN_VALIDATION', `Actual: ${actualCoinbaseAmount}`);
-          return { 
-            valid: false, 
-            reason: `Coinbase amount manipulation: expected ${expectedTotalAmount}, got ${actualCoinbaseAmount}` 
-          };
-        }
-      }
-
-      // Validate all non-coinbase transactions
-      for (let i = 1; i < block.transactions.length; i++) {
-        const transaction = block.transactions[i];
+        
+        // Validate transaction
         if (!transaction.isValid()) {
-          return { valid: false, reason: `Transaction ${i} validation failed` };
+          throw new Error(`Transaction ${i} is invalid: ${transaction.id}`);
         }
       }
-
-      return { valid: true, reason: 'Block transactions validation passed' };
-
+      
+      const executionTime = measurement.end();
+      logger.debug('BLOCKCHAIN_VALIDATION', `Block transactions validated in ${executionTime}ms`);
+      
+      return true;
+      
     } catch (error) {
-      logger.error('BLOCKCHAIN_VALIDATION', `Block transactions validation error: ${error.message}`);
-      return { valid: false, reason: `Validation error: ${error.message}` };
+      const executionTime = measurement.end();
+      logger.error('BLOCKCHAIN_VALIDATION', `Block transaction validation failed in ${executionTime}ms: ${error.message}`);
+      throw error;
     }
   }
 

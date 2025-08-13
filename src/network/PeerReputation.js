@@ -3,25 +3,209 @@ const path = require('path');
 const logger = require('../utils/logger');
 
 /**
- * Peer Reputation System - Handles peer reputation tracking and banning
+ * CRITICAL: Enhanced peer reputation system with manipulation protection
  */
 class PeerReputation {
   constructor(dataDir = './data') {
     this.peerReputation = new Map(); // Map<peerAddress, reputationData>
     this.peerReputationFile = path.join(dataDir, 'peer-reputation.json');
     this.reputationConfig = {
-      initialScore: 100,
       maxScore: 1000,
       minScore: -1000,
-      goodBehaviorBonus: 10,
-      badBehaviorPenalty: 50,
-      banThreshold: -500,
-      banDuration: 24 * 60 * 60 * 1000, // 24 hours in milliseconds
-      scoreDecayRate: 0.95, // Score decays by 5% per hour
-      lastDecayTime: Date.now()
+      initialScore: 100,
+      scoreDecayRate: 0.95, // Score decays by 5% per day
+      manipulationThreshold: 5, // Suspicious reputation changes
+      cooldownPeriod: 60000, // 1 minute cooldown between score changes
+      maxScoreChange: 100, // Maximum score change per action
+      suspiciousPatterns: new Set(), // Track suspicious reputation patterns
+      reputationHistory: new Map(), // Track reputation change history
+      lastScoreChanges: new Map() // Track last score change time per peer
     };
     
+    // Load existing reputation data
     this.loadPeerReputation();
+    
+    // Start reputation monitoring
+    this.startReputationMonitoring();
+  }
+
+  /**
+   * CRITICAL: Start reputation monitoring to detect manipulation
+   */
+  startReputationMonitoring() {
+    setInterval(() => {
+      this.detectReputationManipulation();
+      this.cleanupOldData();
+    }, 30000); // Check every 30 seconds
+  }
+
+  /**
+   * CRITICAL: Detect reputation manipulation patterns
+   */
+  detectReputationManipulation() {
+    try {
+      const suspiciousPeers = [];
+      
+      for (const [peerAddress, reputationData] of this.peerReputation.entries()) {
+        const history = this.reputationConfig.reputationHistory.get(peerAddress) || [];
+        
+        if (history.length >= this.reputationConfig.manipulationThreshold) {
+          // Check for rapid score changes
+          const recentChanges = history.slice(-this.reputationConfig.manipulationThreshold);
+          const scoreChanges = recentChanges.map(change => change.scoreChange);
+          
+          // Detect suspicious patterns
+          const rapidChanges = scoreChanges.filter(change => Math.abs(change) > this.reputationConfig.maxScoreChange);
+          const alternatingChanges = this.detectAlternatingPattern(scoreChanges);
+          const coordinatedChanges = this.detectCoordinatedChanges(peerAddress, recentChanges);
+          
+          if (rapidChanges.length > 0 || alternatingChanges || coordinatedChanges) {
+            suspiciousPeers.push({
+              address: peerAddress,
+              patterns: {
+                rapidChanges: rapidChanges.length,
+                alternatingChanges,
+                coordinatedChanges
+              },
+              recentHistory: recentChanges
+            });
+            
+            // Flag peer as suspicious
+            this.reputationConfig.suspiciousPatterns.add(peerAddress);
+            logger.warn('PEER_REPUTATION', `⚠️  Suspicious reputation pattern detected for peer ${peerAddress}`);
+          }
+        }
+      }
+      
+      if (suspiciousPeers.length > 0) {
+        logger.warn('PEER_REPUTATION', `🚨 Detected ${suspiciousPeers.length} peers with suspicious reputation patterns`);
+      }
+      
+    } catch (error) {
+      logger.error('PEER_REPUTATION', `Reputation manipulation detection failed: ${error.message}`);
+    }
+  }
+
+  /**
+   * CRITICAL: Detect alternating positive/negative score changes
+   */
+  detectAlternatingPattern(scoreChanges) {
+    if (scoreChanges.length < 3) return false;
+    
+    let alternatingCount = 0;
+    for (let i = 1; i < scoreChanges.length; i++) {
+      const prev = scoreChanges[i - 1];
+      const curr = scoreChanges[i];
+      
+      if ((prev > 0 && curr < 0) || (prev < 0 && curr > 0)) {
+        alternatingCount++;
+      }
+    }
+    
+    return alternatingCount >= scoreChanges.length * 0.7; // 70% alternating pattern
+  }
+
+  /**
+   * CRITICAL: Detect coordinated reputation changes
+   */
+  detectCoordinatedChanges(peerAddress, recentChanges) {
+    // Check if multiple peers are changing this peer's reputation simultaneously
+    const recentTime = Date.now() - 60000; // Last minute
+    const simultaneousChanges = recentChanges.filter(change => 
+      change.timestamp > recentTime
+    );
+    
+    return simultaneousChanges.length > 3; // More than 3 changes in 1 minute
+  }
+
+  /**
+   * CRITICAL: Update peer reputation with manipulation protection
+   */
+  updatePeerReputation(peerAddress, scoreChange, reason = '') {
+    try {
+      // Check cooldown period
+      const lastChange = this.reputationConfig.lastScoreChanges.get(peerAddress) || 0;
+      const timeSinceLastChange = Date.now() - lastChange;
+      
+      if (timeSinceLastChange < this.reputationConfig.cooldownPeriod) {
+        logger.warn('PEER_REPUTATION', `⚠️  Reputation update blocked: cooldown period active for ${peerAddress}`);
+        return false;
+      }
+      
+      // Validate score change
+      if (Math.abs(scoreChange) > this.reputationConfig.maxScoreChange) {
+        logger.warn('PEER_REPUTATION', `⚠️  Score change ${scoreChange} exceeds maximum ${this.reputationConfig.maxScoreChange} for ${peerAddress}`);
+        scoreChange = Math.sign(scoreChange) * this.reputationConfig.maxScoreChange;
+      }
+      
+      // Get current reputation
+      const currentReputation = this.peerReputation.get(peerAddress) || {
+        score: this.reputationConfig.initialScore,
+        lastUpdated: Date.now(),
+        changeCount: 0,
+        positiveChanges: 0,
+        negativeChanges: 0
+      };
+      
+      // Calculate new score
+      const newScore = Math.max(
+        this.reputationConfig.minScore,
+        Math.min(
+          this.reputationConfig.maxScore,
+          currentReputation.score + scoreChange
+        )
+      );
+      
+      // Update reputation data
+      currentReputation.score = newScore;
+      currentReputation.lastUpdated = Date.now();
+      currentReputation.changeCount++;
+      
+      if (scoreChange > 0) {
+        currentReputation.positiveChanges++;
+      } else if (scoreChange < 0) {
+        currentReputation.negativeChanges++;
+      }
+      
+      // Record reputation change history
+      const changeRecord = {
+        timestamp: Date.now(),
+        scoreChange: scoreChange,
+        oldScore: currentReputation.score - scoreChange,
+        newScore: currentReputation.score,
+        reason: reason
+      };
+      
+      if (!this.reputationConfig.reputationHistory.has(peerAddress)) {
+        this.reputationConfig.reputationHistory.set(peerAddress, []);
+      }
+      
+      const history = this.reputationConfig.reputationHistory.get(peerAddress);
+      history.push(changeRecord);
+      
+      // Keep only last 50 changes
+      if (history.length > 50) {
+        history.shift();
+      }
+      
+      // Update reputation map
+      this.peerReputation.set(peerAddress, currentReputation);
+      
+      // Update last score change time
+      this.reputationConfig.lastScoreChanges.set(peerAddress, Date.now());
+      
+      // Log reputation change
+      logger.debug('PEER_REPUTATION', `Reputation updated for ${peerAddress}: ${changeRecord.oldScore} → ${changeRecord.newScore} (${scoreChange > 0 ? '+' : ''}${scoreChange})`);
+      
+      // Save to file
+      this.savePeerReputation();
+      
+      return true;
+      
+    } catch (error) {
+      logger.error('PEER_REPUTATION', `Failed to update reputation for ${peerAddress}: ${error.message}`);
+      return false;
+    }
   }
 
   /**
@@ -30,12 +214,27 @@ class PeerReputation {
   loadPeerReputation() {
     try {
       if (fs.existsSync(this.peerReputationFile)) {
-        const data = JSON.parse(fs.readFileSync(this.peerReputationFile, 'utf8'));
-        this.peerReputation = new Map(data.peerReputation || []);
+        const data = fs.readFileSync(this.peerReputationFile, 'utf8');
+        const parsed = JSON.parse(data);
+        
+        // Restore reputation data
+        if (parsed.peerReputation) {
+          for (const [address, repData] of Object.entries(parsed.peerReputation)) {
+            this.peerReputation.set(address, repData);
+          }
+        }
+        
+        // Restore reputation history
+        if (parsed.reputationHistory) {
+          for (const [address, history] of Object.entries(parsed.reputationHistory)) {
+            this.reputationConfig.reputationHistory.set(address, history);
+          }
+        }
+        
         logger.info('PEER_REPUTATION', `Loaded reputation data for ${this.peerReputation.size} peers`);
       }
     } catch (error) {
-      logger.error('PEER_REPUTATION', `Failed to load peer reputation: ${error.message}`);
+      logger.error('PEER_REPUTATION', `Failed to load reputation data: ${error.message}`);
     }
   }
 
@@ -45,36 +244,23 @@ class PeerReputation {
   savePeerReputation() {
     try {
       const data = {
-        peerReputation: Array.from(this.peerReputation.entries()),
-        lastUpdated: Date.now()
+        peerReputation: Object.fromEntries(this.peerReputation),
+        reputationHistory: Object.fromEntries(this.reputationConfig.reputationHistory),
+        timestamp: Date.now()
       };
       
-      // Ensure directory exists
-      const dir = path.dirname(this.peerReputationFile);
-      if (!fs.existsSync(dir)) {
-        fs.mkdirSync(dir, { recursive: true });
-      }
-      
       fs.writeFileSync(this.peerReputationFile, JSON.stringify(data, null, 2));
-      logger.debug('PEER_REPUTATION', 'Peer reputation data saved');
+      logger.debug('PEER_REPUTATION', 'Reputation data saved to file');
     } catch (error) {
-      logger.error('PEER_REPUTATION', `Failed to save peer reputation: ${error.message}`);
+      logger.error('PEER_REPUTATION', `Failed to save reputation data: ${error.message}`);
     }
   }
 
   /**
-   * Get or create reputation data for a peer
+   * Get reputation data for a specific peer
    */
   getReputationData(peerAddress) {
-    if (!this.peerReputation.has(peerAddress)) {
-      this.peerReputation.set(peerAddress, {
-        score: this.reputationConfig.initialScore,
-        lastUpdated: Date.now(),
-        behaviors: [],
-        bannedUntil: null
-      });
-    }
-    return this.peerReputation.get(peerAddress);
+    return this.peerReputation.get(peerAddress) || null;
   }
 
   /**
@@ -158,95 +344,89 @@ class PeerReputation {
    * Check if peer is banned
    */
   isPeerBanned(peerAddress) {
-    const reputationData = this.peerReputation.get(peerAddress);
-    if (!reputationData) {
-      return false;
-    }
+    const reputation = this.peerReputation.get(peerAddress);
+    if (!reputation) return false;
     
-    if (reputationData.bannedUntil && Date.now() < reputationData.bannedUntil) {
-      return true;
-    }
-    
-    // Check if score is below ban threshold
-    if (reputationData.score <= this.reputationConfig.banThreshold) {
-      return true;
-    }
-    
-    return false;
+    return reputation.score <= this.reputationConfig.minScore;
   }
 
   /**
-   * Get peer reputation score
+   * Get peer score
    */
   getPeerScore(peerAddress) {
-    const reputationData = this.peerReputation.get(peerAddress);
-    return reputationData ? reputationData.score : this.reputationConfig.initialScore;
+    const reputation = this.peerReputation.get(peerAddress);
+    return reputation ? reputation.score : this.reputationConfig.initialScore;
   }
 
   /**
-   * Get peer reputation data
+   * Get peer reputation
    */
   getPeerReputation(peerAddress) {
-    return this.peerReputation.get(peerAddress);
+    return this.peerReputation.get(peerAddress) || {
+      score: this.reputationConfig.initialScore,
+      lastUpdated: Date.now(),
+      changeCount: 0,
+      positiveChanges: 0,
+      negativeChanges: 0
+    };
   }
 
   /**
-   * Unban a peer
+   * Unban peer
    */
   unbanPeer(peerAddress) {
-    const reputationData = this.peerReputation.get(peerAddress);
-    if (reputationData) {
-      reputationData.bannedUntil = null;
-      reputationData.score = Math.max(this.reputationConfig.initialScore, reputationData.score);
+    const reputation = this.peerReputation.get(peerAddress);
+    if (reputation) {
+      reputation.score = this.reputationConfig.initialScore;
+      reputation.lastUpdated = Date.now();
+      this.savePeerReputation();
       logger.info('PEER_REPUTATION', `Peer ${peerAddress} unbanned`);
-      return true;
     }
-    return false;
   }
 
   /**
-   * Ban a peer manually
+   * Ban peer
    */
-  banPeer(peerAddress, duration = null) {
-    const reputationData = this.getReputationData(peerAddress);
-    const banDuration = duration || this.reputationConfig.banDuration;
+  banPeer(peerAddress, reason = '') {
+    const reputation = this.peerReputation.get(peerAddress) || {
+      score: this.reputationConfig.initialScore,
+      lastUpdated: Date.now(),
+      changeCount: 0,
+      positiveChanges: 0,
+      negativeChanges: 0
+    };
     
-    reputationData.bannedUntil = Date.now() + banDuration;
-    reputationData.score = this.reputationConfig.minScore;
+    reputation.score = this.reputationConfig.minScore;
+    reputation.lastUpdated = Date.now();
+    reputation.banReason = reason;
     
-    logger.warn('PEER_REPUTATION', `Peer ${peerAddress} manually banned for ${banDuration / 1000 / 60} minutes`);
-    return true;
+    this.peerReputation.set(peerAddress, reputation);
+    this.savePeerReputation();
+    
+    logger.warn('PEER_REPUTATION', `Peer ${peerAddress} banned: ${reason}`);
   }
 
   /**
-   * Apply score decay to all peers
+   * Apply score decay over time
    */
   applyScoreDecay() {
     const now = Date.now();
-    const hoursSinceLastDecay = (now - this.reputationConfig.lastDecayTime) / (1000 * 60 * 60);
+    const decayInterval = 24 * 60 * 60 * 1000; // 24 hours
     
-    if (hoursSinceLastDecay < 1) {
-      return; // Only decay once per hour
-    }
-    
-    let decayedCount = 0;
-    for (const [peerAddress, reputationData] of this.peerReputation.entries()) {
-      // Apply decay to scores above initial
-      if (reputationData.score > this.reputationConfig.initialScore) {
-        const decayFactor = Math.pow(this.reputationConfig.scoreDecayRate, hoursSinceLastDecay);
-        reputationData.score = Math.max(
-          this.reputationConfig.initialScore,
-          Math.floor(reputationData.score * decayFactor)
+    for (const [peerAddress, reputation] of this.peerReputation.entries()) {
+      const timeSinceLastUpdate = now - reputation.lastUpdated;
+      
+      if (timeSinceLastUpdate > decayInterval) {
+        // Apply decay
+        reputation.score = Math.max(
+          this.reputationConfig.minScore,
+          reputation.score * this.reputationConfig.scoreDecayRate
         );
-        decayedCount++;
+        reputation.lastUpdated = now;
       }
     }
     
-    if (decayedCount > 0) {
-      logger.debug('PEER_REPUTATION', `Applied score decay to ${decayedCount} peers`);
-    }
-    
-    this.reputationConfig.lastDecayTime = now;
+    this.savePeerReputation();
   }
 
   /**
@@ -257,78 +437,128 @@ class PeerReputation {
       totalPeers: this.peerReputation.size,
       bannedPeers: 0,
       goodPeers: 0,
-      neutralPeers: 0,
-      badPeers: 0,
-      averageScore: 0
+      averageScore: 0,
+      scoreDistribution: {
+        excellent: 0, // 800-1000
+        good: 0,      // 600-799
+        average: 0,   // 400-599
+        poor: 0,      // 200-399
+        bad: 0        // 0-199
+      }
     };
     
     let totalScore = 0;
     
-    for (const reputationData of this.peerReputation.values()) {
-      totalScore += reputationData.score;
+    for (const reputation of this.peerReputation.values()) {
+      totalScore += reputation.score;
       
-      if (this.isPeerBanned(reputationData)) {
+      if (reputation.score <= this.reputationConfig.minScore) {
         stats.bannedPeers++;
-      } else if (reputationData.score > 150) {
+      } else if (reputation.score >= 600) {
         stats.goodPeers++;
-      } else if (reputationData.score < 50) {
-        stats.badPeers++;
-      } else {
-        stats.neutralPeers++;
       }
+      
+      // Categorize by score
+      if (reputation.score >= 800) stats.scoreDistribution.excellent++;
+      else if (reputation.score >= 600) stats.scoreDistribution.good++;
+      else if (reputation.score >= 400) stats.scoreDistribution.average++;
+      else if (reputation.score >= 200) stats.scoreDistribution.poor++;
+      else stats.scoreDistribution.bad++;
     }
     
-    stats.averageScore = this.peerReputation.size > 0 ? Math.round(totalScore / this.peerReputation.size) : 0;
+    stats.averageScore = stats.totalPeers > 0 ? (totalScore / stats.totalPeers).toFixed(2) : 0;
     
     return stats;
   }
 
   /**
-   * Clean up old reputation data
+   * Cleanup old data
    */
-  cleanupOldData(maxAge = 30 * 24 * 60 * 60 * 1000) { // 30 days
-    const now = Date.now();
-    let cleanedCount = 0;
-    
-    for (const [peerAddress, reputationData] of this.peerReputation.entries()) {
-      if (now - reputationData.lastUpdated > maxAge) {
-        this.peerReputation.delete(peerAddress);
-        cleanedCount++;
+  cleanupOldData() {
+    try {
+      const cutoffTime = Date.now() - (30 * 24 * 60 * 60 * 1000); // 30 days
+      
+      // Cleanup old reputation history
+      for (const [peerAddress, history] of this.reputationConfig.reputationHistory.entries()) {
+        const filteredHistory = history.filter(record => record.timestamp > cutoffTime);
+        if (filteredHistory.length === 0) {
+          this.reputationConfig.reputationHistory.delete(peerAddress);
+        } else {
+          this.reputationConfig.reputationHistory.set(peerAddress, filteredHistory);
+        }
       }
+      
+      // Cleanup old last score changes
+      for (const [peerAddress, lastChange] of this.reputationConfig.lastScoreChanges.entries()) {
+        if (lastChange < cutoffTime) {
+          this.reputationConfig.lastScoreChanges.delete(peerAddress);
+        }
+      }
+      
+    } catch (error) {
+      logger.error('PEER_REPUTATION', `Data cleanup failed: ${error.message}`);
     }
-    
-    if (cleanedCount > 0) {
-      logger.info('PEER_REPUTATION', `Cleaned up ${cleanedCount} old peer reputation records`);
-    }
-    
-    return cleanedCount;
   }
 
   /**
-   * Reset reputation for a peer
+   * Reset peer reputation
    */
   resetPeerReputation(peerAddress) {
     this.peerReputation.delete(peerAddress);
-    logger.info('PEER_REPUTATION', `Reputation reset for peer: ${peerAddress}`);
+    this.reputationConfig.reputationHistory.delete(peerAddress);
+    this.reputationConfig.lastScoreChanges.delete(peerAddress);
+    this.reputationConfig.suspiciousPatterns.delete(peerAddress);
+    
+    this.savePeerReputation();
+    logger.info('PEER_REPUTATION', `Reputation reset for peer ${peerAddress}`);
   }
 
   /**
-   * Get all banned peers
+   * Get banned peers
    */
   getBannedPeers() {
-    const banned = [];
-    for (const [peerAddress, reputationData] of this.peerReputation.entries()) {
-      if (this.isPeerBanned(peerAddress)) {
-        banned.push({
+    const bannedPeers = [];
+    
+    for (const [peerAddress, reputation] of this.peerReputation.entries()) {
+      if (reputation.score <= this.reputationConfig.minScore) {
+        bannedPeers.push({
           address: peerAddress,
-          score: reputationData.score,
-          bannedUntil: reputationData.bannedUntil,
-          lastUpdated: reputationData.lastUpdated
+          score: reputation.score,
+          banReason: reputation.banReason || 'Low reputation score',
+          lastUpdated: reputation.lastUpdated
         });
       }
     }
-    return banned;
+    
+    return bannedPeers;
+  }
+
+  /**
+   * CRITICAL: Get enhanced reputation status
+   */
+  getReputationStatus() {
+    const totalPeers = this.peerReputation.size;
+    const suspiciousPeers = this.reputationConfig.suspiciousPatterns.size;
+    const averageScore = totalPeers > 0 
+      ? Array.from(this.peerReputation.values()).reduce((sum, rep) => sum + rep.score, 0) / totalPeers
+      : 0;
+    
+    return {
+      totalPeers,
+      suspiciousPeers,
+      averageScore: averageScore.toFixed(2),
+      reputationRange: {
+        min: this.reputationConfig.minScore,
+        max: this.reputationConfig.maxScore
+      },
+      manipulationThreshold: this.reputationConfig.manipulationThreshold,
+      cooldownPeriod: this.reputationConfig.cooldownPeriod,
+      maxScoreChange: this.reputationConfig.maxScoreChange,
+      suspiciousPatterns: Array.from(this.reputationConfig.suspiciousPatterns)
+    };
   }
 }
 
 module.exports = PeerReputation;
+
+

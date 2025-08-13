@@ -98,6 +98,15 @@ class InteractiveMode {
       case 'consensus':
         await this.handleConsensusCommand(args.slice(1));
         break;
+      case 'memory':
+        await this.handleMemoryCommand(args.slice(1));
+        break;
+      case 'cpu':
+        await this.handleCPUCommand(args.slice(1));
+        break;
+      case 'reputation':
+        await this.handleReputationCommand(args.slice(1));
+        break;
       default:
         console.log(chalk.red(`❌ Unknown command: ${cmd}`));
         console.log(chalk.cyan('Type "help" for available commands'));
@@ -388,6 +397,135 @@ class InteractiveMode {
     }
   }
 
+  async handleMemoryCommand(args) {
+    if (args.length === 0 || args[0] === 'status') {
+      try {
+        const response = await this.cli.makeApiRequest('/api/blockchain/memory-protection', 'GET');
+        if (response && response.success) {
+          const data = response.data;
+          console.log(chalk.blue.bold('💾 MEMORY PROTECTION STATUS:'));
+          console.log(chalk.cyan('  Current Usage:'), chalk.white(`${(data.currentUsage / 1024 / 1024).toFixed(2)}MB`));
+          console.log(chalk.cyan('  Max Usage:'), chalk.white(`${(data.maxUsage / 1024 / 1024).toFixed(2)}MB`));
+          console.log(chalk.cyan('  Usage Percent:'), chalk.white(`${data.usagePercent}%`));
+          console.log(chalk.cyan('  Max Transaction Size:'), chalk.white(`${(data.maxTransactionSize / 1024).toFixed(2)}KB`));
+          console.log(chalk.cyan('  Max Pool Size:'), chalk.white(data.maxPoolSize));
+          console.log(chalk.cyan('  Memory Threshold:'), chalk.white(`${data.memoryThreshold * 100}%`));
+          console.log(chalk.cyan('  Warnings:'), chalk.white(data.warnings));
+          console.log(chalk.cyan('  Last Cleanup:'), chalk.white(new Date(data.lastCleanup).toLocaleString()));
+          console.log('');
+          
+          // Memory status indicators
+          if (parseFloat(data.usagePercent) > 80) {
+            console.log(chalk.red('  🚨 HIGH MEMORY USAGE DETECTED!'));
+            console.log(chalk.red('     - Consider increasing memory limits'));
+            console.log(chalk.red('     - Check for memory leaks'));
+          } else if (parseFloat(data.usagePercent) > 60) {
+            console.log(chalk.yellow('  ⚠️  MODERATE MEMORY USAGE'));
+            console.log(chalk.yellow('     - Monitor memory usage closely'));
+          } else {
+            console.log(chalk.green('  ✅ Memory usage is healthy'));
+          }
+        }
+      } catch (error) {
+        console.log(chalk.red(`❌ Error: ${error.message}`));
+      }
+    } else {
+      console.log(chalk.yellow('Usage: memory [status]'));
+    }
+  }
+
+  async handleCPUCommand(args) {
+    if (args.length === 0 || args[0] === 'status') {
+      try {
+        const response = await this.cli.makeApiRequest('/api/blockchain/cpu-protection', 'GET');
+        if (response && response.success) {
+          const data = response.data;
+          console.log(chalk.blue.bold('⚡ CPU PROTECTION STATUS:'));
+          console.log(chalk.cyan('  Current Validations:'), chalk.white(data.currentValidationCount));
+          console.log(chalk.cyan('  Max Validations/Second:'), chalk.white(data.maxValidationsPerSecond));
+          console.log(chalk.cyan('  Max Execution Time:'), chalk.white(`${data.maxExecutionTime}ms`));
+          console.log(chalk.cyan('  Max Validation Complexity:'), chalk.white(data.maxValidationComplexity));
+          console.log(chalk.cyan('  Average Execution Time:'), chalk.white(`${data.averageExecutionTime}ms`));
+          console.log(chalk.cyan('  Average Complexity:'), chalk.white(data.averageComplexity));
+          console.log(chalk.cyan('  Execution Times Tracked:'), chalk.white(data.executionTimes));
+          console.log(chalk.cyan('  Complexity Scores Tracked:'), chalk.white(data.complexityScores));
+          console.log('');
+          
+          // CPU status indicators
+          if (parseFloat(data.averageExecutionTime) > data.maxExecutionTime * 0.8) {
+            console.log(chalk.red('  🚨 HIGH CPU USAGE DETECTED!'));
+            console.log(chalk.red('     - Consider increasing execution time limits'));
+            console.log(chalk.red('     - Check for computational bottlenecks'));
+          } else if (parseFloat(data.averageExecutionTime) > data.maxExecutionTime * 0.5) {
+            console.log(chalk.yellow('  ⚠️  MODERATE CPU USAGE'));
+            console.log(chalk.yellow('     - Monitor execution times closely'));
+          } else {
+            console.log(chalk.green('  ✅ CPU usage is healthy'));
+          }
+        }
+      } catch (error) {
+        console.log(chalk.red(`❌ Error: ${error.message}`));
+      }
+    } else {
+      console.log(chalk.yellow('Usage: cpu [status]'));
+    }
+  }
+
+  async handleReputationCommand(args) {
+    if (args.length === 0 || args[0] === 'status') {
+      try {
+        const response = await this.cli.makeApiRequest('/api/network/reputation-status', 'GET');
+        if (response && response.success) {
+          const data = response.data;
+          console.log(chalk.blue.bold('🏆 PEER REPUTATION STATUS:'));
+          console.log(chalk.cyan('  Total Peers:'), chalk.white(data.totalPeers));
+          console.log(chalk.cyan('  Suspicious Peers:'), chalk.white(data.suspiciousPeers));
+          console.log(chalk.cyan('  Average Score:'), chalk.white(data.averageScore));
+          console.log(chalk.cyan('  Score Range:'), chalk.white(`${data.reputationRange.min} to ${data.reputationRange.max}`));
+          console.log(chalk.cyan('  Manipulation Threshold:'), chalk.white(data.manipulationThreshold));
+          console.log(chalk.cyan('  Cooldown Period:'), chalk.white(`${data.cooldownPeriod / 1000}s`));
+          console.log(chalk.cyan('  Max Score Change:'), chalk.white(data.maxScoreChange));
+          console.log('');
+          
+          if (data.suspiciousPatterns.length > 0) {
+            console.log(chalk.red('  🚨 SUSPICIOUS PEERS DETECTED:'));
+            data.suspiciousPatterns.forEach((peer, index) => {
+              console.log(chalk.red(`    ${index + 1}. ${peer}`));
+            });
+            console.log('');
+          }
+          
+          // Reputation status indicators
+          if (data.suspiciousPeers > 0) {
+            console.log(chalk.yellow('  ⚠️  REPUTATION MANIPULATION DETECTED!'));
+            console.log(chalk.yellow('     - Monitor suspicious peers closely'));
+            console.log(chalk.yellow('     - Consider adjusting reputation parameters'));
+          } else {
+            console.log(chalk.green('  ✅ Reputation system is healthy'));
+          }
+        }
+      } catch (error) {
+        console.log(chalk.red(`❌ Error: ${error.message}`));
+      }
+    } else if (args[0] === 'stats') {
+      try {
+        const response = await this.cli.makeApiRequest('/api/network/reputation-status', 'GET');
+        if (response && response.success) {
+          const data = response.data;
+          console.log(chalk.blue.bold('📊 REPUTATION STATISTICS:'));
+          console.log(chalk.cyan('  Total Peers:'), chalk.white(data.totalPeers));
+          console.log(chalk.cyan('  Suspicious Peers:'), chalk.white(data.suspiciousPeers));
+          console.log(chalk.cyan('  Average Score:'), chalk.white(data.averageScore));
+          console.log(chalk.cyan('  Score Range:'), chalk.white(`${data.reputationRange.min} to ${data.reputationRange.max}`));
+        }
+      } catch (error) {
+        console.log(chalk.red(`❌ Error: ${error.message}`));
+      }
+    } else {
+      console.log(chalk.yellow('Usage: reputation [status|stats]'));
+    }
+  }
+
   showInteractiveHelp() {
     console.log(chalk.blue.bold('╔══════════════════════════════════════════════════════════╗'));
     console.log(chalk.blue.bold('║                      📖 COMMANDS 📖                      ║'));
@@ -396,6 +534,9 @@ class InteractiveMode {
     console.log(chalk.blue.bold('║  replay-protection  - Show replay attack protection status ║'));
     console.log(chalk.blue.bold('║  security           - Show comprehensive security analysis ║'));
     console.log(chalk.blue.bold('║  consensus          - Show consensus and mining status    ║'));
+    console.log(chalk.blue.bold('║  memory             - Show memory protection status       ║'));
+    console.log(chalk.blue.bold('║  cpu                - Show CPU protection status          ║'));
+    console.log(chalk.blue.bold('║  reputation         - Show peer reputation status         ║'));
     console.log(chalk.blue.bold('╚══════════════════════════════════════════════════════════╝'));
     console.log('');
     

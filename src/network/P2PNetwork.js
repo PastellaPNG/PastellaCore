@@ -350,12 +350,24 @@ class P2PNetwork {
     return {
       isRunning: this.isRunning,
       port: this.port,
-      peerStats: this.peerManager.getPeerStats(),
-      seedNodeStatus: this.seedNodeManager.getSeedNodeStatus(),
-      reputationStats: this.peerReputation.getReputationStats(),
-      networkSyncStatus: this.networkSync.getNetworkSyncStatus(),
-      messageValidationStats: this.messageHandler.getMessageValidationStats()
+      peerCount: this.peerManager.getPeerCount(),
+      maxPeers: this.peerManager.maxPeers,
+      seedNodeConnections: this.seedNodeManager.getSeedNodeStatus(),
+      networkSync: this.networkSync.getNetworkSyncStatus(),
+      nodeIdentity: this.nodeIdentity.getIdentityInfo()
     };
+  }
+
+  /**
+   * CRITICAL: Get reputation status for API
+   */
+  getReputationStatus() {
+    try {
+      return this.peerReputation.getReputationStatus();
+    } catch (error) {
+      logger.error('P2P_NETWORK', `Failed to get reputation status: ${error.message}`);
+      return { error: 'Failed to get reputation status' };
+    }
   }
 
   /**
