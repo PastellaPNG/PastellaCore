@@ -147,7 +147,7 @@ class PastellaDaemon {
    */
   async start(updatedConfig = null) {
     if (this.isRunning) {
-      console.log('Daemon is already running');
+      logger.info('SYSTEM', 'Daemon is already running');
       return;
     }
 
@@ -205,7 +205,7 @@ class PastellaDaemon {
    */
   async stop() {
     if (!this.isRunning) {
-      console.log(chalk.yellow('⚠️  Daemon is not running'));
+      logger.warn('SYSTEM', '⚠️  Daemon is not running');
       return;
     }
 
@@ -255,7 +255,7 @@ class PastellaDaemon {
       if (this.isRunning) {
         const cleanupResult = this.blockchain.cleanupExpiredTransactions();
         if (cleanupResult.cleaned > 0) {
-          console.log(chalk.yellow(`🧹 Cleaned up ${cleanupResult.cleaned} expired transactions`));
+          logger.info('SYSTEM', `🧹 Cleaned up ${cleanupResult.cleaned} expired transactions`);
         }
       }
     }, 2 * 60 * 1000);
@@ -265,7 +265,7 @@ class PastellaDaemon {
       if (this.isRunning) {
         const cleanupResult = this.blockchain.cleanupOrphanedUTXOs();
         if (cleanupResult.cleaned > 0) {
-          console.log(chalk.yellow(`🧹 Cleaned up ${cleanupResult.cleaned} orphaned UTXOs`));
+          logger.info('SYSTEM', `🧹 Cleaned up ${cleanupResult.cleaned} orphaned UTXOs`);
         }
       }
     }, 10 * 60 * 1000);
@@ -275,7 +275,7 @@ class PastellaDaemon {
       if (this.isRunning) {
         const mempoolStatus = this.blockchain.manageMemoryPool();
         if (mempoolStatus.actions > 0) {
-          console.log(chalk.blue(`💾 Memory pool managed: ${mempoolStatus.actions} actions taken`));
+          logger.info('SYSTEM', `💾 Memory pool managed: ${mempoolStatus.actions} actions taken`);
         }
       }
     }, 5 * 60 * 1000);
@@ -368,9 +368,6 @@ class PastellaDaemon {
           break;
         case 'c':
           this.showChainStatus();
-          break;
-        case 'q':
-          console.log(chalk.yellow('💡 Press Ctrl+C to stop the daemon'));
           break;
       }
     });
@@ -654,16 +651,16 @@ async function main() {
   // Check for debug flag first
   if (args.includes('--debug')) {
     logger.setDebugMode(true);
-    console.log(chalk.yellow('🐛 Debug mode enabled'));
+    logger.info('SYSTEM', '🐛 Debug mode enabled');
   }
   
   if (args.includes('--help') || args.includes('-h')) {
     const version = packageJson.version;
     
     console.log(chalk.blue.bold('╔══════════════════════════════════════════════════════════════╗'));
-    console.log(chalk.blue.bold('║                    🚀 PASTELLA DAEMON                      ║'));
+    console.log(chalk.blue.bold('║                    🚀 PASTELLA DAEMON                        ║'));
     console.log(chalk.blue.bold('║                   NodeJS Cryptocurrency                      ║'));
-    console.log(chalk.blue.bold('║                        Version ' + version + '                        ║'));
+    console.log(chalk.blue.bold('║                       Version ' + version + '                          ║'));
     console.log(chalk.blue.bold('╚══════════════════════════════════════════════════════════════╝'));
     console.log('');
     console.log(chalk.cyan.bold('📖 DESCRIPTION:'));
@@ -1049,7 +1046,7 @@ async function main() {
   if (apiPort) {
     const port = parseInt(apiPort);
     if (isNaN(port) || port < 1 || port > 65535) {
-      console.error(chalk.red('❌ Invalid API port. Must be between 1 and 65535.'));
+      logger.error('SYSTEM', 'Invalid API port. Must be between 1 and 65535.');
       process.exit(1);
     }
     config.api.port = port;
@@ -1059,7 +1056,7 @@ async function main() {
   if (p2pPort) {
     const port = parseInt(p2pPort);
     if (isNaN(port) || port < 1 || port > 65535) {
-      console.error(chalk.red('❌ Invalid P2P port. Must be between 1 and 65535.'));
+      logger.error('SYSTEM', 'Invalid P2P port. Must be between 1 and 65535.');
       process.exit(1);
     }
     config.network.p2pPort = port;
@@ -1074,7 +1071,7 @@ async function main() {
   if (difficulty) {
     const diff = parseInt(difficulty);
     if (isNaN(diff) || diff < 1 || diff > 10) {
-      console.error(chalk.red('❌ Invalid difficulty. Must be between 1 and 10.'));
+      logger.error('SYSTEM', 'Invalid difficulty. Must be between 1 and 10.');
       process.exit(1);
     }
     // Set genesis difficulty instead of blockchain.difficulty to avoid confusion
@@ -1087,18 +1084,18 @@ async function main() {
   const difficultyAlgorithm = parseArgValue('--difficulty-algorithm');
   if (difficultyAlgorithm) {
     if (!['aggressive', 'dogecoin', 'lwma3'].includes(difficultyAlgorithm)) {
-      console.error(chalk.red('❌ Invalid difficulty algorithm. Must be "aggressive", "dogecoin", or "lwma3".'));
+      logger.error('SYSTEM', 'Invalid difficulty algorithm. Must be "aggressive", "dogecoin", or "lwma3".');
       process.exit(1);
     }
     config.blockchain.difficultyAlgorithm = difficultyAlgorithm;
-    console.log(chalk.green(`✅ Difficulty algorithm set to: ${difficultyAlgorithm}`));
+    logger.info('SYSTEM', `Difficulty algorithm set to: ${difficultyAlgorithm}`);
   }
 
   const blockTime = parseArgValue('--block-time');
   if (blockTime) {
     const time = parseInt(blockTime);
     if (isNaN(time) || time < 1000 || time > 300000) {
-      console.error(chalk.red('❌ Invalid block time. Must be between 1000 and 300000 ms.'));
+      logger.error('SYSTEM', 'Invalid block time. Must be between 1000 and 300000 ms.');
       process.exit(1);
     }
     config.blockchain.blockTime = time;
@@ -1108,7 +1105,7 @@ async function main() {
   if (minSeedConn) {
     const minConn = parseInt(minSeedConn);
     if (isNaN(minConn) || minConn < 0 || minConn > 10) {
-      console.error(chalk.red('❌ Invalid minimum seed connections. Must be between 0 and 10.'));
+      logger.error('SYSTEM', 'Invalid minimum seed connections. Must be between 0 and 10.');
       process.exit(1);
     }
     config.network.minSeedConnections = minConn;
@@ -1117,12 +1114,12 @@ async function main() {
   const apiKey = parseArgValue('--api-key');
   if (apiKey) {
     if (apiKey.length < 8) {
-      console.error(chalk.red('❌ API key must be at least 8 characters long.'));
+      logger.error('SYSTEM', 'API key must be at least 8 characters long.');
       process.exit(1);
     }
     config.api = config.api || {};
     config.api.apiKey = apiKey;
-    console.log(chalk.green('🔐 API authentication enabled'));
+    logger.info('SYSTEM', 'API authentication enabled');
   }
 
   // Parse host binding argument
@@ -1131,14 +1128,13 @@ async function main() {
     // Validate host format
     const isValidHost = /^(127\.0\.0\.1|localhost|0\.0\.0\.0|\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})$/.test(host);
     if (!isValidHost) {
-      console.error(chalk.red('❌ Invalid host format. Must be a valid IP address or localhost.'));
-      console.error(chalk.red('   Examples: 127.0.0.1, 192.168.1.100, 0.0.0.0'));
+      logger.error('SYSTEM', 'Invalid host format. Must be a valid IP address or localhost.');
+      logger.error('SYSTEM', 'Examples: 127.0.0.1, 192.168.1.100, 0.0.0.0');
       process.exit(1);
     }
     
     config.api = config.api || {};
     config.api.host = host;
-    console.log(chalk.green(`🌐 API server will bind to: ${host}`));
     
     // CRITICAL: Require API key for non-localhost binding
     if (host !== '127.0.0.1' && host !== 'localhost') {
@@ -1149,13 +1145,11 @@ async function main() {
         console.error(chalk.red('   Or use --host 127.0.0.1 for localhost-only access.'));
         process.exit(1);
       }
-      console.log(chalk.yellow('⚠️  WARNING: Binding to external interface. Ensure your network is secure!'));
     }
   } else {
     // Default to localhost for security
     config.api = config.api || {};
     config.api.host = '127.0.0.1';
-    console.log(chalk.cyan('🔒 API server defaulting to localhost-only (127.0.0.1) for security'));
   }
 
   // Load custom config file if specified
@@ -1165,9 +1159,9 @@ async function main() {
       const customConfig = JSON.parse(fs.readFileSync(configPath, 'utf8'));
       // Merge custom config with defaults
       config = { ...config, ...customConfig };
-      console.log(chalk.cyan(`📁 Loaded custom config from: ${configPath}`));
+      logger.info('SYSTEM', `Loaded custom config from: ${configPath}`);
     } catch (error) {
-      console.error(chalk.red(`❌ Failed to load config file: ${error.message}`));
+      logger.error('SYSTEM', `Failed to load config file: ${error.message}`);
       process.exit(1);
     }
   }
@@ -1175,7 +1169,7 @@ async function main() {
   try {
     await daemon.start(config);
   } catch (error) {
-    console.error(chalk.red.bold('❌ Failed to start daemon:'), error);
+    logger.error('SYSTEM', `Failed to start daemon: ${error.message}`);
     process.exit(1);
   }
 }

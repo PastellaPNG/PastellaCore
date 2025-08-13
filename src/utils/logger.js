@@ -6,11 +6,17 @@ class Logger {
             'API': 'API',
             'P2P': 'P2P',
             'BLOCKCHAIN': 'BLOCKCHAIN',
-            'MINING': 'MINING',
-            'WALLET': 'WALLET',
             'NETWORK': 'NETWORK',
             'SYNC': 'SYNC',
-            'SYSTEM': 'SYSTEM'
+            'SYSTEM': 'SYSTEM',
+            'CHECKPOINT_MANAGER': 'CHECKPOINT_MANAGER',
+            'SEED_NODE_MANAGER': 'SEED_NODE_MANAGER',
+            'PEER_REPUTATION': 'PEER_REPUTATION',
+            'IDENTITY': 'IDENTITY',
+            'RATE_LIMITER': 'RATE_LIMITER',
+            'NETWORK_SYNC': 'NETWORK_SYNC',
+            'AUTH': 'AUTH',
+            'BLOCKS': 'BLOCKS'
         };
         
         this.levels = {
@@ -62,11 +68,17 @@ class Logger {
             'API': chalk.cyan,
             'P2P': chalk.blue,
             'BLOCKCHAIN': chalk.green,
-            'MINING': chalk.yellow,
-            'WALLET': chalk.magenta,
             'NETWORK': chalk.blue,
             'SYNC': chalk.cyan,
-            'SYSTEM': chalk.white
+            'SYSTEM': chalk.white,
+            'CHECKPOINT_MANAGER': chalk.cyan.bold,
+            'SEED_NODE_MANAGER': chalk.blue.bold,
+            'PEER_REPUTATION': chalk.magenta.bold,
+            'IDENTITY': chalk.green.bold,
+            'RATE_LIMITER': chalk.yellow.bold,
+            'NETWORK_SYNC': chalk.blue.bold,
+            'AUTH': chalk.yellow,
+            'BLOCKS': chalk.green.bold
         };
         
         return colors[module] ? colors[module](`[${module}]`) : chalk.white(`[${module}]`);

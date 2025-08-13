@@ -173,7 +173,9 @@ class MemoryPoolManager {
     this.memoryProtection = new MemoryProtection();
     
     // Start periodic cleanup
-    this.startPeriodicCleanup();
+    setTimeout(() => {
+      this.startPeriodicCleanup();
+    }, 1000);
   }
 
   /**
