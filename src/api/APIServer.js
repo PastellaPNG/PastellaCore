@@ -231,7 +231,11 @@ class APIServer {
   getBlockchainStatus(req, res) {
     try {
       const status = this.blockchain.getStatus();
-      res.json(status);
+      // Ensure compatibility with wallet sync by adding height property
+      res.json({
+        ...status,
+        height: status.chainLength
+      });
     } catch (error) {
       res.status(500).json({
         error: error.message
@@ -558,7 +562,18 @@ class APIServer {
         integer: true 
       }) || 10;
       
-      const blocks = this.blockchain.chain.slice(-validatedLimit).map(block => block.toJSON());
+      const blocks = this.blockchain.chain.slice(-validatedLimit).map(block => {
+        // Check if block has toJSON method, if not, convert to proper Block object
+        if (typeof block.toJSON === 'function') {
+          return block.toJSON();
+        } else {
+          // Convert plain object to Block instance and then to JSON
+          const Block = require('../models/Block');
+          const blockInstance = Block.fromJSON(block);
+          return blockInstance.toJSON();
+        }
+      });
+      
       res.json({
         blocks: blocks
       });
@@ -592,7 +607,15 @@ class APIServer {
         });
       }
 
-      res.json(block.toJSON());
+      // Check if block has toJSON method, if not, convert to proper Block object
+      if (typeof block.toJSON === 'function') {
+        res.json(block.toJSON());
+      } else {
+        // Convert plain object to Block instance and then to JSON
+        const Block = require('../models/Block');
+        const blockInstance = Block.fromJSON(block);
+        res.json(blockInstance.toJSON());
+      }
     } catch (error) {
       res.status(500).json({
         error: error.message
@@ -603,7 +626,16 @@ class APIServer {
   getLatestBlock(req, res) {
     try {
       const latestBlock = this.blockchain.getLatestBlock();
-      res.json(latestBlock.toJSON());
+      
+      // Check if block has toJSON method, if not, convert to proper Block object
+      if (typeof latestBlock.toJSON === 'function') {
+        res.json(latestBlock.toJSON());
+      } else {
+        // Convert plain object to Block instance and then to JSON
+        const Block = require('../models/Block');
+        const blockInstance = Block.fromJSON(latestBlock);
+        res.json(blockInstance.toJSON());
+      }
     } catch (error) {
       res.status(500).json({
         error: error.message
