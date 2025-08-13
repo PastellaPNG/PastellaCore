@@ -263,7 +263,7 @@ class Blockchain {
     const firstInput = transaction.inputs[0];
     if (firstInput && firstInput.publicKey) {
       // Create a simple hash of the public key as a sender identifier
-      const CryptoUtils = require('../utils/crypto');
+      const { CryptoUtils } = require('../utils/crypto');
       return CryptoUtils.hash(firstInput.publicKey).substring(0, 16);
     }
     
