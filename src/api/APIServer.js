@@ -109,7 +109,7 @@ class APIServer {
     
     // Blockchain routes
     this.app.get('/api/blockchain/status', this.getBlockchainStatus.bind(this));
-    this.app.get('/api/blockchain/blocks/:index', this.getBlockByIndex.bind(this));
+    this.app.get('/api/blockchain/blocks/:index', this.getBlock.bind(this));
     this.app.post('/api/blocks/submit', this.submitBlock.bind(this));
     this.app.get('/api/blockchain/security', this.getSecurityReport.bind(this));
     this.app.get('/api/blockchain/mempool', this.getMempoolStatus.bind(this));
@@ -613,7 +613,7 @@ class APIServer {
 
   getPendingTransactions(req, res) {
     try {
-      const transactions = this.blockchain.pendingTransactions.map(tx => tx.toJSON());
+      const transactions = this.blockchain.memoryPool.getPendingTransactions().map(tx => tx.toJSON());
       res.json({
         transactions: transactions
       });
@@ -640,7 +640,7 @@ class APIServer {
       }
       
       // Search in pending transactions
-      let transaction = this.blockchain.pendingTransactions.find(tx => tx.id === validatedTxId);
+      let transaction = this.blockchain.memoryPool.getPendingTransactions().find(tx => tx.id === validatedTxId);
       
       // Search in blockchain
       if (!transaction) {
@@ -872,10 +872,11 @@ class APIServer {
         blockchain: {
           height: this.blockchain.chain.length,
           difficulty: this.blockchain.difficulty,
-          pendingTransactions: this.blockchain.pendingTransactions.length
+          pendingTransactions: this.blockchain.memoryPool.getPendingTransactionCount()
         }
       });
     } catch (error) {
+      logger.error('API', `Error getting daemon status: ${error}`);
       res.status(500).json({
         error: error.message
       });
@@ -901,7 +902,7 @@ class APIServer {
         p2pPort: this.p2pPort,
         height: this.blockchain.chain.length,
         difficulty: this.blockchain.difficulty,
-        pendingTransactions: this.blockchain.pendingTransactions.length,
+        pendingTransactions: this.blockchain.memoryPool.getPendingTransactionCount(),
         blockTime: this.config.blockchain.blockTime,
         coinbaseReward: this.config.blockchain.coinbaseReward,
         premineReward: this.config.blockchain.genesis.premineAmount,
@@ -972,18 +973,32 @@ class APIServer {
 
   getPendingBlocks(req, res) {
     try {
-      // Return pending transactions that can be mined into blocks
-      const pendingTransactions = this.blockchain.pendingTransactions;
+      const pendingTransactions = this.blockchain.memoryPool.getPendingTransactions();
+      
+      // Group transactions by potential block
+      const blockGroups = [];
+      let currentGroup = [];
+      let currentSize = 0;
+      
+      for (const tx of pendingTransactions) {
+        if (currentSize + tx.size > this.config.blockchain.blockSize) {
+          blockGroups.push(currentGroup);
+          currentGroup = [];
+          currentSize = 0;
+        }
+        currentGroup.push(tx);
+        currentSize += tx.size;
+      }
+      if (currentGroup.length > 0) {
+        blockGroups.push(currentGroup);
+      }
       
       res.json({
-        pendingTransactions: pendingTransactions.map(tx => ({
-          id: tx.id,
-          inputs: tx.inputs.length,
-          outputs: tx.outputs.length,
-          fee: tx.fee,
-          timestamp: tx.timestamp
+        pendingTransactions: blockGroups.map(group => ({
+          transactions: group.map(tx => tx.toJSON()),
+          totalSize: group.reduce((sum, tx) => sum + tx.size, 0)
         })),
-        count: pendingTransactions.length
+        count: blockGroups.length
       });
     } catch (error) {
       res.status(500).json({

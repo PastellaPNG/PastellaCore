@@ -1136,7 +1136,7 @@ async function main() {
   try {
     await daemon.start(config);
   } catch (error) {
-    console.error(chalk.red.bold('❌ Failed to start daemon:'), error.message);
+    console.error(chalk.red.bold('❌ Failed to start daemon:'), error);
     process.exit(1);
   }
 }

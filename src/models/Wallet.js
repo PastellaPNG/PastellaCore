@@ -1,7 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
-const CryptoUtils = require('../utils/crypto');
+const { CryptoUtils } = require('../utils/crypto');
 const { Transaction, TransactionInput, TransactionOutput } = require('./Transaction');
 const { TRANSACTION_TAGS } = require('../utils/constants');
 

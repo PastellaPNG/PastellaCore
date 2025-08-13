@@ -116,8 +116,11 @@ class PastellaCLI {
       }
 
       const response = await fetch(url, options);
-      
-      //console.log(await response.text());
+
+      if(response.status !== 200) {
+        console.log(`[ERROR] ${url} ${method} ${response.status}`);
+        console.log(await response.text());
+      }
 
       if (!response.ok) {
         throw new Error(`HTTP ${response.status}: ${response.statusText}`);
