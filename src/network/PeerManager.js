@@ -6,23 +6,38 @@ const logger = require('../utils/logger');
  */
 class PeerManager {
   constructor(maxPeers = 10) {
+    logger.debug('PEER_MANAGER', `Initializing PeerManager: maxPeers=${maxPeers}`);
+    
     this.peers = new Set();
     this.maxPeers = maxPeers;
     this.peerAddresses = new Map(); // Map<WebSocket, string> for address tracking
+    
+    logger.debug('PEER_MANAGER', `PeerManager configuration:`);
+    logger.debug('PEER_MANAGER', `  Max Peers: ${this.maxPeers}`);
+    logger.debug('PEER_MANAGER', `  Initial peer count: ${this.peers.size}`);
+    
+    logger.debug('PEER_MANAGER', `PeerManager initialized successfully`);
   }
 
   /**
    * Add a new peer connection
    */
   addPeer(ws, peerAddress) {
+    logger.debug('PEER_MANAGER', `Adding peer: address=${peerAddress}, currentPeers=${this.peers.size}, maxPeers=${this.maxPeers}`);
+    logger.debug('PEER_MANAGER', `WebSocket instance: ${ws ? 'present' : 'null'}, type: ${typeof ws}`);
+    
     if (this.peers.size >= this.maxPeers) {
       logger.warn('PEER_MANAGER', `Max peers reached (${this.maxPeers}), rejecting connection`);
+      logger.debug('PEER_MANAGER', `Cannot accept peer ${peerAddress}: peer limit exceeded`);
       return false;
     }
 
+    logger.debug('PEER_MANAGER', `Adding peer ${peerAddress} to peer set and address map...`);
     this.peers.add(ws);
     this.peerAddresses.set(ws, peerAddress);
+    
     logger.info('PEER_MANAGER', `Peer added: ${peerAddress} (${this.peers.size}/${this.maxPeers})`);
+    logger.debug('PEER_MANAGER', `Peer added successfully: address=${peerAddress}, newPeerCount=${this.peers.size}`);
     return true;
   }
 

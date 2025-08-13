@@ -352,43 +352,69 @@ class Block {
    * Verify block transactions are valid
    */
   hasValidTransactions(config = null) {
+    logger.debug('BLOCK', `Validating transactions for block ${this.index}: count=${this.transactions?.length || 0}, config=${config ? 'present' : 'null'}`);
+    
     if (!this.transactions || this.transactions.length === 0) {
+      logger.debug('BLOCK', `Block ${this.index} has no transactions, validation passed (genesis block)`);
       return true; // Genesis block has no transactions
     }
 
     // CRITICAL: First transaction must be coinbase
     if (this.transactions.length > 0) {
       const firstTx = this.transactions[0];
+      logger.debug('BLOCK', `Checking first transaction: id=${firstTx.id}, isCoinbase=${firstTx.isCoinbase}, type=${typeof firstTx.isCoinbase}`);
       if (!firstTx.isCoinbase) {
+        logger.debug('BLOCK', `Block ${this.index} validation failed: first transaction is not coinbase`);
         return false; // First transaction must be coinbase
       }
     }
 
+    logger.debug('BLOCK', `Validating ${this.transactions.length} transactions individually`);
     for (let i = 0; i < this.transactions.length; i++) {
       const transaction = this.transactions[i];
+      logger.debug('BLOCK', `Validating transaction ${i}: id=${transaction.id}, isCoinbase=${transaction.isCoinbase}, hasIsValid=${typeof transaction.isValid === 'function'}`);
       
       // Check if transaction has isValid method (Transaction class instance)
       if (typeof transaction.isValid === 'function') {
-        if (!transaction.isValid(config)) {
+        logger.debug('BLOCK', `Transaction ${i} has isValid method, calling it with config`);
+        try {
+          if (!transaction.isValid(config)) {
+            logger.debug('BLOCK', `Transaction ${i} validation failed: isValid() returned false`);
+            return false;
+          }
+          logger.debug('BLOCK', `Transaction ${i} validation passed`);
+        } catch (error) {
+          logger.error('BLOCK', `Transaction ${i} validation error: ${error.message}`);
+          logger.error('BLOCK', `Error stack: ${error.stack}`);
           return false;
         }
       } else {
+        logger.debug('BLOCK', `Transaction ${i} is plain object, doing basic validation`);
         // For plain objects loaded from JSON, do basic validation
         if (!transaction.id || !transaction.outputs || transaction.outputs.length === 0) {
+          logger.debug('BLOCK', `Transaction ${i} basic validation failed: missing required fields`);
+          logger.debug('BLOCK', `  id: ${transaction.id} (${typeof transaction.id})`);
+          logger.debug('BLOCK', `  outputs: ${transaction.outputs} (${typeof transaction.outputs})`);
+          logger.debug('BLOCK', `  outputs.length: ${transaction.outputs?.length || 'undefined'}`);
           return false;
         }
         
         // Additional validation for plain objects
         if (i === 0 && !transaction.isCoinbase) {
+          logger.debug('BLOCK', `Transaction ${i} validation failed: first transaction must be coinbase`);
           return false; // First transaction must be coinbase
         }
         
         if (i > 0 && transaction.isCoinbase) {
+          logger.debug('BLOCK', `Transaction ${i} validation failed: only first transaction can be coinbase`);
           return false; // Only first transaction can be coinbase
         }
+        
+        logger.debug('BLOCK', `Transaction ${i} basic validation passed`);
       }
     }
 
+    logger.debug('BLOCK', `All ${this.transactions.length} transactions validated successfully`);
     return true;
   }
 
@@ -396,27 +422,44 @@ class Block {
    * Verify the entire block is valid
    */
   isValid() {
+    logger.debug('BLOCK', `Validating block ${this.index}: timestamp=${this.timestamp}, previousHash=${this.previousHash?.substring(0, 16)}..., hash=${this.hash?.substring(0, 16)}...`);
+    
     // Check if block has required properties
     if (this.index === null || this.index === undefined || this.timestamp === null || this.timestamp === undefined || !this.previousHash || !this.hash) {
+      logger.debug('BLOCK', `Block ${this.index} validation failed: missing required properties`);
+      logger.debug('BLOCK', `  index: ${this.index} (${typeof this.index})`);
+      logger.debug('BLOCK', `  timestamp: ${this.timestamp} (${typeof this.timestamp})`);
+      logger.debug('BLOCK', `  previousHash: ${this.previousHash} (${typeof this.previousHash})`);
+      logger.debug('BLOCK', `  hash: ${this.hash} (${typeof this.hash})`);
       return false;
     }
 
     // Check if hash is valid for the current algorithm
+    logger.debug('BLOCK', `Checking hash validity for algorithm: ${this.algorithm}`);
     if (!this.hasValidHashForAlgorithm(this.algorithm)) {
+      logger.debug('BLOCK', `Block ${this.index} validation failed: invalid hash for algorithm ${this.algorithm}`);
       return false;
     }
 
     // Check if transactions are valid
+    logger.debug('BLOCK', `Validating ${this.transactions?.length || 0} transactions`);
     if (!this.hasValidTransactions(this.config)) {
+      logger.debug('BLOCK', `Block ${this.index} validation failed: invalid transactions`);
       return false;
     }
 
     // Check if merkle root is valid
+    logger.debug('BLOCK', `Checking merkle root validity: current=${this.merkleRoot?.substring(0, 16)}...`);
     const calculatedMerkleRoot = this.calculateMerkleRoot();
+    logger.debug('BLOCK', `Calculated merkle root: ${calculatedMerkleRoot?.substring(0, 16)}...`);
     if (this.merkleRoot !== calculatedMerkleRoot) {
+      logger.debug('BLOCK', `Block ${this.index} validation failed: merkle root mismatch`);
+      logger.debug('BLOCK', `  Expected: ${this.merkleRoot}`);
+      logger.debug('BLOCK', `  Calculated: ${calculatedMerkleRoot}`);
       return false;
     }
 
+    logger.debug('BLOCK', `Block ${this.index} validation passed successfully`);
     return true;
   }
 
@@ -506,22 +549,35 @@ class Block {
    * Create block from JSON data
    */
   static fromJSON(data) {
+    logger.debug('BLOCK', `Creating Block instance from JSON data: index=${data.index}, timestamp=${data.timestamp}, transactions=${data.transactions?.length || 0}`);
+    
     // Convert transactions to Transaction instances if they're plain objects
     let transactions = data.transactions;
     if (transactions && Array.isArray(transactions)) {
+      logger.debug('BLOCK', `Processing ${transactions.length} transactions for conversion`);
       try {
         const { Transaction } = require('./Transaction');
-        transactions = transactions.map(tx => {
+        transactions = transactions.map((tx, index) => {
+          logger.debug('BLOCK', `Converting transaction ${index}: id=${tx.id}, isCoinbase=${tx.isCoinbase}, hasIsValid=${typeof tx.isValid === 'function'}`);
           if (typeof tx === 'object' && !tx.isValid) {
-            return Transaction.fromJSON(tx);
+            const convertedTx = Transaction.fromJSON(tx);
+            logger.debug('BLOCK', `Successfully converted transaction ${index} to Transaction instance: id=${convertedTx.id}`);
+            return convertedTx;
           }
+          logger.debug('BLOCK', `Transaction ${index} already a Transaction instance or invalid: id=${tx.id}`);
           return tx;
         });
+        logger.debug('BLOCK', `Successfully converted ${transactions.length} transactions`);
       } catch (error) {
-        // If Transaction class can't be loaded, keep original transactions
-        console.warn('BLOCK', `Failed to convert transactions to Transaction instances: ${error.message}`);
+        logger.error('BLOCK', `Failed to convert transactions to Transaction instances: ${error.message}`);
+        logger.error('BLOCK', `Error stack: ${error.stack}`);
+        logger.warn('BLOCK', `Keeping original transactions due to conversion failure`);
       }
+    } else {
+      logger.debug('BLOCK', `No transactions to convert or invalid transactions array: ${JSON.stringify(transactions)}`);
     }
+    
+    logger.debug('BLOCK', `Creating Block constructor with: index=${data.index}, timestamp=${data.timestamp}, transactions=${transactions?.length || 0}, previousHash=${data.previousHash}, nonce=${data.nonce}, difficulty=${data.difficulty}`);
     
     const block = new Block(
       data.index,
@@ -535,6 +591,8 @@ class Block {
     block.hash = data.hash;
     block.merkleRoot = data.merkleRoot;
     block.algorithm = data.algorithm || 'kawpow'; // Default to KawPow for new blocks
+    
+    logger.debug('BLOCK', `Block instance created successfully: index=${block.index}, hash=${block.hash?.substring(0, 16)}..., merkleRoot=${block.merkleRoot?.substring(0, 16)}...`);
     
     return block;
   }

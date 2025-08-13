@@ -7,6 +7,10 @@ const WebSocket = require('ws');
  */
 class MessageHandler {
   constructor(blockchain, peerReputation) {
+    logger.debug('MESSAGE_HANDLER', `Initializing MessageHandler...`);
+    logger.debug('MESSAGE_HANDLER', `Blockchain instance: ${blockchain ? 'present' : 'null'}, type: ${typeof blockchain}`);
+    logger.debug('MESSAGE_HANDLER', `PeerReputation instance: ${peerReputation ? 'present' : 'null'}, type: ${typeof peerReputation}`);
+    
     this.blockchain = blockchain;
     this.peerReputation = peerReputation;
     this.messageHandlers = new Map();
@@ -18,14 +22,24 @@ class MessageHandler {
       validationErrors: new Map() // Map<errorType, count>
     };
     
+    logger.debug('MESSAGE_HANDLER', `MessageHandler components initialized:`);
+    logger.debug('MESSAGE_HANDLER', `  MessageHandlers Map: ${this.messageHandlers.size} handlers`);
+    logger.debug('MESSAGE_HANDLER', `  MessageValidator: ${this.messageValidator ? 'present' : 'null'}`);
+    logger.debug('MESSAGE_HANDLER', `  MessageValidationStats: initialized with ${this.messageValidationStats.totalMessages} total messages`);
+    
+    logger.debug('MESSAGE_HANDLER', `Setting up message handlers...`);
     this.setupMessageHandlers();
+    logger.debug('MESSAGE_HANDLER', `MessageHandler initialized successfully`);
   }
 
   /**
    * Setup message handlers
    */
   setupMessageHandlers() {
+    logger.debug('MESSAGE_HANDLER', `Setting up message handlers...`);
+    
     // Core blockchain message handlers
+    logger.debug('MESSAGE_HANDLER', `Setting up core blockchain message handlers...`);
     this.messageHandlers.set('QUERY_LATEST', this.handleQueryLatest.bind(this));
     this.messageHandlers.set('QUERY_ALL', this.handleQueryAll.bind(this));
     this.messageHandlers.set('RESPONSE_BLOCKCHAIN', this.handleResponseBlockchain.bind(this));
@@ -34,36 +48,53 @@ class MessageHandler {
     this.messageHandlers.set('NEW_BLOCK', this.handleNewBlock.bind(this));
     this.messageHandlers.set('NEW_TRANSACTION', this.handleNewTransaction.bind(this));
     this.messageHandlers.set('SEED_NODE_INFO', this.handleSeedNodeInfo.bind(this));
+    logger.debug('MESSAGE_HANDLER', `Core blockchain handlers configured: ${this.messageHandlers.size} handlers`);
     
     // Authentication message handlers
+    logger.debug('MESSAGE_HANDLER', `Setting up authentication message handlers...`);
     this.messageHandlers.set('HANDSHAKE', this.handleHandshake.bind(this));
     this.messageHandlers.set('AUTH_CHALLENGE', this.handleAuthChallenge.bind(this));
     this.messageHandlers.set('AUTH_RESPONSE', this.handleAuthResponse.bind(this));
     this.messageHandlers.set('AUTH_SUCCESS', this.handleAuthSuccess.bind(this));
     this.messageHandlers.set('AUTH_FAILURE', this.handleAuthFailure.bind(this));
+    logger.debug('MESSAGE_HANDLER', `Authentication handlers configured: ${this.messageHandlers.size} total handlers`);
     
     // Partition handling message handlers
+    logger.debug('MESSAGE_HANDLER', `Setting up partition handling message handlers...`);
     this.messageHandlers.set('HEALTH_STATUS', this.handleHealthStatus.bind(this));
     this.messageHandlers.set('REQUEST_PEER_LIST', this.handleRequestPeerList.bind(this));
     this.messageHandlers.set('HEARTBEAT', this.handleHeartbeat.bind(this));
+    logger.debug('MESSAGE_HANDLER', `Partition handling handlers configured: ${this.messageHandlers.size} total handlers`);
+    
+    logger.debug('MESSAGE_HANDLER', `All message handlers configured successfully: ${this.messageHandlers.size} total handlers`);
   }
 
   /**
    * Handle incoming message
    */
   handleMessage(ws, message, peerAddress, isPeerAuthenticated) {
+    logger.debug('MESSAGE_HANDLER', `Handling incoming message from peer ${peerAddress}...`);
+    logger.debug('MESSAGE_HANDLER', `Message type: ${message?.type}, WebSocket: ${ws ? 'present' : 'null'}, Authenticated: ${isPeerAuthenticated}`);
+    logger.debug('MESSAGE_HANDLER', `Message content: ${JSON.stringify(message)}`);
+    
     // Update message statistics
     this.messageValidationStats.totalMessages++;
+    logger.debug('MESSAGE_HANDLER', `Message statistics updated: totalMessages=${this.messageValidationStats.totalMessages}`);
     
     // Comprehensive message validation
+    logger.debug('MESSAGE_HANDLER', `Validating message from peer ${peerAddress}...`);
     const validation = this.messageValidator.validateMessage(message, peerAddress);
+    logger.debug('MESSAGE_HANDLER', `Message validation result: ${JSON.stringify(validation)}`);
+    
     if (!validation.valid) {
       this.messageValidationStats.invalidMessages++;
+      logger.debug('MESSAGE_HANDLER', `Message validation failed, updating statistics: invalidMessages=${this.messageValidationStats.invalidMessages}`);
       
       // Track validation errors
       const errorType = validation.error || 'unknown_error';
       const currentCount = this.messageValidationStats.validationErrors.get(errorType) || 0;
       this.messageValidationStats.validationErrors.set(errorType, currentCount + 1);
+      logger.debug('MESSAGE_HANDLER', `Validation error tracking updated: ${errorType}=${currentCount + 1}`);
       
       logger.warn('MESSAGE_HANDLER', `[MESSAGE_VALIDATION] Invalid message from ${peerAddress}: ${validation.error}`);
       if (validation.details) {
@@ -71,15 +102,18 @@ class MessageHandler {
       }
       logger.debug('MESSAGE_HANDLER', `[MESSAGE_VALIDATION] Invalid message content: ${JSON.stringify(message)}`);
       
+      logger.debug('MESSAGE_HANDLER', `Updating peer reputation for invalid message...`);
       this.peerReputation.updatePeerReputation(peerAddress, 'invalid_message', { 
         reason: 'message_validation_failed',
         error: validation.error,
         details: validation.details
       });
+      logger.debug('MESSAGE_HANDLER', `Peer reputation updated for invalid message`);
       return false;
     }
     
     this.messageValidationStats.validMessages++;
+    logger.debug('MESSAGE_HANDLER', `Message validation passed, updating statistics: validMessages=${this.messageValidationStats.validMessages}`);
 
     // Check authentication for sensitive operations
     const sensitiveOperations = ['NEW_BLOCK', 'NEW_TRANSACTION', 'RESPONSE_BLOCKCHAIN', 'RESPONSE_TRANSACTION_POOL'];

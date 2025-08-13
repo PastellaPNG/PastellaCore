@@ -224,34 +224,70 @@ class BlockchainValidation {
    * Check if block is valid
    */
   isValidBlock(block, config = null) {
+    logger.debug('BLOCKCHAIN_VALIDATION', `Validating block: index=${block?.index}, timestamp=${block?.timestamp}, previousHash=${block?.previousHash?.substring(0, 16) || 'none'}..., hash=${block?.hash?.substring(0, 16) || 'none'}...`);
+    logger.debug('BLOCKCHAIN_VALIDATION', `Config present: ${config ? 'yes' : 'no'}, config type: ${typeof config}`);
+    
     try {
       // Basic block validation
+      logger.debug('BLOCKCHAIN_VALIDATION', `Running basic block validation for block ${block?.index}`);
       if (!block || !block.index || !block.timestamp || !block.previousHash || !block.hash) {
+        logger.debug('BLOCKCHAIN_VALIDATION', `Basic validation failed for block ${block?.index}:`);
+        logger.debug('BLOCKCHAIN_VALIDATION', `  block exists: ${!!block}`);
+        logger.debug('BLOCKCHAIN_VALIDATION', `  block.index: ${block?.index} (${typeof block?.index})`);
+        logger.debug('BLOCKCHAIN_VALIDATION', `  block.timestamp: ${block?.timestamp} (${typeof block?.timestamp})`);
+        logger.debug('BLOCKCHAIN_VALIDATION', `  block.previousHash: ${block?.previousHash} (${typeof block?.previousHash})`);
+        logger.debug('BLOCKCHAIN_VALIDATION', `  block.hash: ${block?.hash} (${typeof block?.hash})`);
         return false;
       }
+      logger.debug('BLOCKCHAIN_VALIDATION', `Basic validation passed for block ${block.index}`);
 
       // Validate block structure
+      logger.debug('BLOCKCHAIN_VALIDATION', `Checking block structure for block ${block.index}`);
+      logger.debug('BLOCKCHAIN_VALIDATION', `  block.isValid exists: ${!!block.isValid}`);
+      logger.debug('BLOCKCHAIN_VALIDATION', `  block.isValid type: ${typeof block.isValid}`);
+      
       if (!block.isValid || typeof block.isValid !== 'function') {
+        logger.debug('BLOCKCHAIN_VALIDATION', `Block structure validation failed: isValid method missing or not a function`);
         return false;
       }
+      logger.debug('BLOCKCHAIN_VALIDATION', `Block structure validation passed for block ${block.index}`);
 
+      logger.debug('BLOCKCHAIN_VALIDATION', `Calling block.isValid() for block ${block.index}`);
       if (!block.isValid()) {
+        logger.debug('BLOCKCHAIN_VALIDATION', `Block ${block.index} isValid() returned false`);
         return false;
       }
+      logger.debug('BLOCKCHAIN_VALIDATION', `Block ${block.index} isValid() passed`);
 
       // Validate block transactions (except genesis)
       if (block.index > 0) {
+        logger.debug('BLOCKCHAIN_VALIDATION', `Block ${block.index} is not genesis, validating transactions`);
         const validationResult = this.validateBlockTransactions(block, config);
+        logger.debug('BLOCKCHAIN_VALIDATION', `Transaction validation result for block ${block.index}: ${JSON.stringify(validationResult)}`);
+        
         if (!validationResult.valid) {
           logger.error('BLOCKCHAIN_VALIDATION', `Block ${block.index} REJECTED: ${validationResult.reason}`);
+          logger.debug('BLOCKCHAIN_VALIDATION', `Transaction validation failed for block ${block.index}: ${validationResult.reason}`);
           return false;
         }
+        logger.debug('BLOCKCHAIN_VALIDATION', `Transaction validation passed for block ${block.index}`);
+      } else {
+        logger.debug('BLOCKCHAIN_VALIDATION', `Block ${block.index} is genesis, skipping transaction validation`);
       }
 
+      logger.debug('BLOCKCHAIN_VALIDATION', `Block ${block.index} validation completed successfully`);
       return true;
 
     } catch (error) {
-      logger.error('BLOCKCHAIN_VALIDATION', `Block validation error: ${error.message}`);
+      logger.error('BLOCKCHAIN_VALIDATION', `Block validation error for block ${block?.index}: ${error.message}`);
+      logger.error('BLOCKCHAIN_VALIDATION', `Error stack: ${error.stack}`);
+      logger.error('BLOCKCHAIN_VALIDATION', `Block data: ${JSON.stringify({
+        index: block?.index,
+        timestamp: block?.timestamp,
+        previousHash: block?.previousHash,
+        hash: block?.hash,
+        hasIsValid: typeof block?.isValid === 'function'
+      })}`);
       return false;
     }
   }

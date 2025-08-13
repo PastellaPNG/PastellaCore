@@ -905,27 +905,55 @@ class APIServer {
 
   // Daemon endpoints
   getDaemonStatus(req, res) {
+    logger.debug('API', `Daemon status request received`);
+    logger.debug('API', `Request headers: ${JSON.stringify(req.headers)}`);
+    
     try {
-      res.json({
+      logger.debug('API', `Gathering daemon status information...`);
+      
+      const apiStatus = {
+        isRunning: this.isRunning,
+        port: this.port
+      };
+      logger.debug('API', `API status: ${JSON.stringify(apiStatus)}`);
+      
+      const networkStatus = {
+        isRunning: this.p2pNetwork ? this.p2pNetwork.isRunning : false,
+        port: this.p2pNetwork ? this.p2pNetwork.port : null
+      };
+      logger.debug('API', `Network status: ${JSON.stringify(networkStatus)}`);
+      
+      const blockchainHeight = this.blockchain.chain.length;
+      const difficulty = this.blockchain.difficulty;
+      const pendingTransactions = this.blockchain.memoryPool.getPendingTransactionCount();
+      
+      const blockchainStatus = {
+        height: blockchainHeight,
+        difficulty: difficulty,
+        pendingTransactions: pendingTransactions
+      };
+      logger.debug('API', `Blockchain status: height=${blockchainHeight}, difficulty=${difficulty}, pendingTransactions=${pendingTransactions}`);
+      
+      const status = {
         isRunning: true,
-        api: {
-          isRunning: this.isRunning,
-          port: this.port
-        },
-        network: {
-          isRunning: this.p2pNetwork ? this.p2pNetwork.isRunning : false,
-          port: this.p2pNetwork ? this.p2pNetwork.port : null
-        },
-        blockchain: {
-          height: this.blockchain.chain.length,
-          difficulty: this.blockchain.difficulty,
-          pendingTransactions: this.blockchain.memoryPool.getPendingTransactionCount()
-        }
-      });
+        api: apiStatus,
+        network: networkStatus,
+        blockchain: blockchainStatus
+      };
+      
+      logger.debug('API', `Daemon status response prepared successfully`);
+      logger.debug('API', `Full response data: ${JSON.stringify(status)}`);
+      
+      res.json(status);
     } catch (error) {
-      logger.error('API', `Error getting daemon status: ${error}`);
+      logger.error('API', `Error getting daemon status: ${error.message}`);
+      logger.error('API', `Error stack: ${error.stack}`);
+      logger.error('API', `Request details: headers=${JSON.stringify(req.headers)}`);
+      
       res.status(500).json({
-        error: error.message
+        error: 'Internal server error while getting daemon status',
+        details: error.message,
+        timestamp: new Date().toISOString()
       });
     }
   }
@@ -961,42 +989,93 @@ class APIServer {
 
   // Block submission endpoints
   submitBlock(req, res) {
+    logger.debug('API', `Block submission request received`);
+    logger.debug('API', `Request body: ${JSON.stringify(req.body)}`);
+    logger.debug('API', `Request headers: ${JSON.stringify(req.headers)}`);
+    
     try {
       const { block } = req.body;
+      logger.debug('API', `Extracted block data: ${block ? 'present' : 'missing'}`);
       
       if (!block) {
+        logger.debug('API', `Block submission failed: no block data in request body`);
         return res.status(400).json({
           error: 'Block data is required'
         });
       }
 
+      logger.debug('API', `Block data received: index=${block.index}, timestamp=${block.timestamp}, transactions=${block.transactions?.length || 0}`);
+      logger.debug('API', `Block hash: ${block.hash?.substring(0, 16) || 'none'}..., previousHash: ${block.previousHash?.substring(0, 16) || 'none'}...`);
+
       // Import Block class
+      logger.debug('API', `Importing Block class`);
       const Block = require('../models/Block');
+      logger.debug('API', `Block class imported successfully`);
       
       // Create block object from JSON
+      logger.debug('API', `Creating Block instance from JSON data`);
       const blockObj = Block.fromJSON(block);
+      logger.debug('API', `Block instance created: index=${blockObj.index}, hash=${blockObj.hash?.substring(0, 16)}...`);
+      logger.debug('API', `Block instance type: ${typeof blockObj}, has isValid: ${typeof blockObj.isValid === 'function'}`);
       
       // Validate block
-      if (!blockObj.isValid()) {
+      logger.debug('API', `Validating block ${blockObj.index}`);
+      try {
+        const isValidResult = blockObj.isValid();
+        logger.debug('API', `Block validation result: ${isValidResult}`);
+        
+        if (!isValidResult) {
+          logger.debug('API', `Block ${blockObj.index} validation failed`);
+          return res.status(400).json({
+            error: 'Invalid block submitted',
+            details: 'Block validation failed'
+          });
+        }
+        logger.debug('API', `Block ${blockObj.index} validation passed`);
+      } catch (validationError) {
+        logger.error('API', `Block validation error: ${validationError.message}`);
+        logger.error('API', `Validation error stack: ${validationError.stack}`);
         return res.status(400).json({
-          error: 'Invalid block submitted'
+          error: 'Block validation error',
+          details: validationError.message
         });
       }
 
       // Check if block already exists
-      if (this.blockchain.chain.some(b => b.hash === blockObj.hash)) {
+      logger.debug('API', `Checking if block ${blockObj.index} already exists in chain`);
+      const existingBlock = this.blockchain.chain.find(b => b.hash === blockObj.hash);
+      if (existingBlock) {
+        logger.debug('API', `Block ${blockObj.index} already exists in chain at index ${existingBlock.index}`);
         return res.status(409).json({
-          error: 'Block already exists in chain'
+          error: 'Block already exists in chain',
+          details: `Block with hash ${blockObj.hash.substring(0, 16)}... already exists at index ${existingBlock.index}`
         });
       }
+      logger.debug('API', `Block ${blockObj.index} is not a duplicate`);
 
       // Add block to blockchain
-      if (this.blockchain.addBlock(blockObj)) {
-                  // Broadcast to network
-          if (this.p2pNetwork) {
-            this.p2pNetwork.broadcastNewBlock(blockObj);
-          }
+      logger.debug('API', `Adding block ${blockObj.index} to blockchain`);
+      const addResult = this.blockchain.addBlock(blockObj);
+      logger.debug('API', `Blockchain addBlock result: ${addResult}`);
+      
+      if (addResult) {
+        logger.debug('API', `Block ${blockObj.index} added to blockchain successfully`);
         
+        // Broadcast to network
+        if (this.p2pNetwork) {
+          logger.debug('API', `Broadcasting new block to P2P network`);
+          try {
+            this.p2pNetwork.broadcastNewBlock(blockObj);
+            logger.debug('API', `Block broadcasted successfully`);
+          } catch (broadcastError) {
+            logger.warn('API', `Failed to broadcast block: ${broadcastError.message}`);
+            logger.debug('API', `Broadcast error stack: ${broadcastError.stack}`);
+          }
+        } else {
+          logger.debug('API', `P2P network not available, skipping broadcast`);
+        }
+        
+        logger.debug('API', `Sending success response for block ${blockObj.index}`);
         res.json({
           success: true,
           message: 'Block submitted successfully',
@@ -1007,13 +1086,21 @@ class APIServer {
           }
         });
       } else {
+        logger.debug('API', `Failed to add block ${blockObj.index} to blockchain`);
         res.status(400).json({
-          error: 'Failed to add block to chain'
+          error: 'Failed to add block to chain',
+          details: 'Blockchain rejected the block'
         });
       }
     } catch (error) {
+      logger.error('API', `Block submission error: ${error.message}`);
+      logger.error('API', `Error stack: ${error.stack}`);
+      logger.error('API', `Request body: ${JSON.stringify(req.body)}`);
+      
       res.status(500).json({
-        error: error.message
+        error: 'Internal server error during block submission',
+        details: error.message,
+        timestamp: new Date().toISOString()
       });
     }
   }

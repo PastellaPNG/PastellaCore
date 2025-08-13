@@ -178,45 +178,76 @@ class Blockchain {
    * Add new block to the chain
    */
   addBlock(block, skipValidation = false) {
+    logger.debug('BLOCKCHAIN', `Adding block to chain: index=${block.index}, hash=${block.hash?.substring(0, 16)}..., previousHash=${block.previousHash?.substring(0, 16)}..., skipValidation=${skipValidation}`);
+    logger.debug('BLOCKCHAIN', `Current chain length: ${this.chain.length}, config present: ${this.config ? 'yes' : 'no'}`);
+    
     try {
-      if (!skipValidation && !this.blockchainValidation.isValidBlock(block, this.config)) {
-        logger.error('BLOCKCHAIN', `Block ${block.index} validation failed`);
-        return false;
+      if (!skipValidation) {
+        logger.debug('BLOCKCHAIN', `Running block validation for block ${block.index}`);
+        const validationResult = this.blockchainValidation.isValidBlock(block, this.config);
+        logger.debug('BLOCKCHAIN', `Block validation result: ${validationResult}`);
+        if (!validationResult) {
+          logger.error('BLOCKCHAIN', `Block ${block.index} validation failed`);
+          return false;
+        }
+        logger.debug('BLOCKCHAIN', `Block ${block.index} validation passed`);
+      } else {
+        logger.debug('BLOCKCHAIN', `Skipping validation for block ${block.index}`);
       }
 
       // Check if block is already in chain
-      if (this.chain.some(existingBlock => existingBlock.hash === block.hash)) {
-        logger.warn('BLOCKCHAIN', `Block ${block.index} already exists in chain`);
+      logger.debug('BLOCKCHAIN', `Checking if block ${block.index} already exists in chain`);
+      const existingBlock = this.chain.find(existingBlock => existingBlock.hash === block.hash);
+      if (existingBlock) {
+        logger.warn('BLOCKCHAIN', `Block ${block.index} already exists in chain at index ${existingBlock.index}`);
+        logger.debug('BLOCKCHAIN', `Existing block: index=${existingBlock.index}, hash=${existingBlock.hash?.substring(0, 16)}...`);
         return false;
       }
+      logger.debug('BLOCKCHAIN', `Block ${block.index} is not a duplicate`);
 
       // Check if block links properly
+      logger.debug('BLOCKCHAIN', `Checking block linking for block ${block.index}`);
       const latestBlock = this.getLatestBlock();
+      logger.debug('BLOCKCHAIN', `Latest block: index=${latestBlock?.index || 'none'}, hash=${latestBlock?.hash?.substring(0, 16) || 'none'}...`);
+      logger.debug('BLOCKCHAIN', `Block previousHash: ${block.previousHash?.substring(0, 16)}...`);
+      
       if (block.previousHash !== latestBlock.hash) {
         logger.error('BLOCKCHAIN', `Block ${block.index} does not link to latest block`);
+        logger.error('BLOCKCHAIN', `  Block previousHash: ${block.previousHash}`);
+        logger.error('BLOCKCHAIN', `  Latest block hash: ${latestBlock.hash}`);
         return false;
       }
+      logger.debug('BLOCKCHAIN', `Block ${block.index} links properly to latest block`);
 
       // CRITICAL: Add transactions to historical database for replay attack protection
+      logger.debug('BLOCKCHAIN', `Adding transactions to historical database for block ${block.index}`);
       this.addTransactionsToHistoricalDatabase(block);
 
       // Add block to chain
+      logger.debug('BLOCKCHAIN', `Adding block ${block.index} to chain array`);
       this.chain.push(block);
+      logger.debug('BLOCKCHAIN', `Chain length after adding block: ${this.chain.length}`);
       
       // Update UTXO set
+      logger.debug('BLOCKCHAIN', `Updating UTXO set for block ${block.index}`);
       this.utxoManager.updateUTXOSet(block);
       
       // Remove transactions from pending pool
+      logger.debug('BLOCKCHAIN', `Removing transactions from pending pool for block ${block.index}`);
       this.memoryPool.removeTransactions(block.transactions);
       
       // Adjust difficulty
+      logger.debug('BLOCKCHAIN', `Adjusting difficulty after adding block ${block.index}`);
       this.adjustDifficulty();
       
-      logger.info('BLOCKCHAIN', `Block ${block.index} added to chain. Hash: ${block.hash}`);
+      logger.info('BLOCKCHAIN', `Block ${block.index} added to chain successfully. Hash: ${block.hash}`);
+      logger.debug('BLOCKCHAIN', `Final chain length: ${this.chain.length}, new difficulty: ${this.difficulty}`);
       return true;
 
     } catch (error) {
-      logger.error('BLOCKCHAIN', `Error adding block: ${error.message}`);
+      logger.error('BLOCKCHAIN', `Error adding block ${block.index}: ${error.message}`);
+      logger.error('BLOCKCHAIN', `Error stack: ${error.stack}`);
+      logger.error('BLOCKCHAIN', `Block data: index=${block.index}, hash=${block.hash}, previousHash=${block.previousHash}`);
       return false;
     }
   }
@@ -796,54 +827,83 @@ class Blockchain {
    * Load blockchain from file
    */
   loadFromFile(filePath) {
+    logger.debug('BLOCKCHAIN', `Loading blockchain from file: ${filePath}`);
     try {
       if (fs.existsSync(filePath)) {
-        const data = JSON.parse(fs.readFileSync(filePath, 'utf8'));
+        logger.debug('BLOCKCHAIN', `File exists, reading and parsing JSON data`);
+        const fileContent = fs.readFileSync(filePath, 'utf8');
+        logger.debug('BLOCKCHAIN', `File content length: ${fileContent.length} characters`);
+        
+        const data = JSON.parse(fileContent);
+        logger.debug('BLOCKCHAIN', `JSON parsed successfully: chain=${data.chain?.length || 0} blocks, difficulty=${data.difficulty}, miningReward=${data.miningReward}`);
         
         // Convert loaded blocks to proper Block instances
         if (data.chain && Array.isArray(data.chain)) {
-          this.chain = data.chain.map(blockData => {
+          logger.debug('BLOCKCHAIN', `Processing ${data.chain.length} blocks from file`);
+          this.chain = data.chain.map((blockData, index) => {
+            logger.debug('BLOCKCHAIN', `Converting block ${index}: index=${blockData.index}, timestamp=${blockData.timestamp}, transactions=${blockData.transactions?.length || 0}`);
             try {
               const Block = require('./Block');
-              return Block.fromJSON(blockData);
+              logger.debug('BLOCKCHAIN', `Block class loaded successfully, calling fromJSON`);
+              const blockInstance = Block.fromJSON(blockData);
+              logger.debug('BLOCKCHAIN', `Block ${index} converted successfully: index=${blockInstance.index}, hash=${blockInstance.hash?.substring(0, 16)}...`);
+              return blockInstance;
             } catch (error) {
-              logger.warn('BLOCKCHAIN', `Failed to convert block ${blockData.index || 'unknown'} to Block instance: ${error.message}`);
+              logger.error('BLOCKCHAIN', `Failed to convert block ${blockData.index || 'unknown'} to Block instance: ${error.message}`);
+              logger.error('BLOCKCHAIN', `Error stack: ${error.stack}`);
+              logger.warn('BLOCKCHAIN', `Returning original block data for block ${index}`);
               return blockData; // Return original if conversion fails
             }
           });
+          logger.debug('BLOCKCHAIN', `Successfully converted ${this.chain.length} blocks to Block instances`);
         } else {
+          logger.debug('BLOCKCHAIN', `No chain data found in file or invalid format, initializing empty chain`);
           this.chain = [];
         }
         
+        logger.debug('BLOCKCHAIN', `Setting blockchain properties: difficulty=${data.difficulty || 1000}, miningReward=${data.miningReward || 50}, blockTime=${data.blockTime || 60000}`);
         this.difficulty = data.difficulty || 1000;
         this.miningReward = data.miningReward || 50;
         this.blockTime = data.blockTime || 60000;
         
         // CRITICAL: Load historical transaction database for replay attack protection
         if (data.historicalTransactions && Array.isArray(data.historicalTransactions)) {
+          logger.debug('BLOCKCHAIN', `Loading ${data.historicalTransactions.length} historical transactions from file`);
           this.historicalTransactions = new Map(data.historicalTransactions);
           logger.info('BLOCKCHAIN', `Loaded ${this.historicalTransactions.size} historical transactions from file`);
+        } else {
+          logger.debug('BLOCKCHAIN', `No historical transactions data found in file`);
         }
         
         if (data.historicalTransactionIds && Array.isArray(data.historicalTransactionIds)) {
+          logger.debug('BLOCKCHAIN', `Loading ${data.historicalTransactionIds.length} historical transaction IDs from file`);
           this.historicalTransactionIds = new Set(data.historicalTransactionIds);
           logger.info('BLOCKCHAIN', `Loaded ${this.historicalTransactionIds.size} historical transaction IDs from file`);
+        } else {
+          logger.debug('BLOCKCHAIN', `No historical transaction IDs data found in file`);
         }
         
         // If no historical data in file, rebuild from chain
         if (this.historicalTransactions.size === 0) {
+          logger.debug('BLOCKCHAIN', `No historical data found, rebuilding from chain`);
           this.rebuildHistoricalTransactionDatabase();
         }
         
         // Update UTXO set from loaded chain
+        logger.debug('BLOCKCHAIN', `Rebuilding UTXO set from ${this.chain.length} blocks`);
         this.utxoManager.rebuildUTXOSet(this.chain);
         
         logger.info('BLOCKCHAIN', `Blockchain loaded from file with ${this.chain.length} blocks`);
+        logger.debug('BLOCKCHAIN', `Final blockchain state: chain.length=${this.chain.length}, difficulty=${this.difficulty}, miningReward=${this.miningReward}`);
         return true;
+      } else {
+        logger.debug('BLOCKCHAIN', `File does not exist: ${filePath}`);
+        return false;
       }
-      return false;
     } catch (error) {
       logger.error('BLOCKCHAIN', `Failed to load blockchain: ${error.message}`);
+      logger.error('BLOCKCHAIN', `Error stack: ${error.stack}`);
+      logger.error('BLOCKCHAIN', `File path: ${filePath}`);
       return false;
     }
   }

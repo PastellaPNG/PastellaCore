@@ -502,54 +502,103 @@ class Transaction {
    * Check if transaction is valid with MANDATORY replay attack protection
    */
   isValid(config = null) {
-    if (this.outputs.length === 0) return false;
+    logger.debug('TRANSACTION', `Validating transaction: id=${this.id}, isCoinbase=${this.isCoinbase}, outputs=${this.outputs?.length || 0}`);
+    logger.debug('TRANSACTION', `Transaction data: timestamp=${this.timestamp}, expiresAt=${this.expiresAt}, fee=${this.fee}, nonce=${this.nonce}`);
+    
+    // Check outputs exist
+    if (this.outputs.length === 0) {
+      logger.debug('TRANSACTION', `Transaction validation failed: no outputs`);
+      return false;
+    }
+    logger.debug('TRANSACTION', `Outputs check passed: ${this.outputs.length} outputs`);
     
     // MANDATORY PROTECTION: ALL non-coinbase transactions must have replay protection
     if (!this.isCoinbase && (!this.nonce || !this.expiresAt)) {
+      logger.debug('TRANSACTION', `Transaction validation failed: missing replay protection`);
+      logger.debug('TRANSACTION', `  isCoinbase: ${this.isCoinbase}`);
+      logger.debug('TRANSACTION', `  nonce: ${this.nonce} (${typeof this.nonce})`);
+      logger.debug('TRANSACTION', `  expiresAt: ${this.expiresAt} (${typeof this.expiresAt})`);
       return false; // Reject unprotected transactions
     }
+    logger.debug('TRANSACTION', `Replay protection check passed`);
     
     // REPLAY ATTACK PROTECTION: Check if transaction has expired
+    logger.debug('TRANSACTION', `Checking if transaction is expired...`);
     if (this.isExpired()) {
+      logger.debug('TRANSACTION', `Transaction validation failed: transaction expired`);
+      logger.debug('TRANSACTION', `  Current time: ${Date.now()}`);
+      logger.debug('TRANSACTION', `  Expires at: ${this.expiresAt}`);
+      logger.debug('TRANSACTION', `  Age: ${this.expiresAt ? Date.now() - this.expiresAt : 'N/A'}ms`);
       return false;
     }
+    logger.debug('TRANSACTION', `Expiration check passed`);
     
-    if (!this.verify()) return false;
+    // Verify transaction signature
+    logger.debug('TRANSACTION', `Verifying transaction signature...`);
+    if (!this.verify()) {
+      logger.debug('TRANSACTION', `Transaction validation failed: signature verification failed`);
+      return false;
+    }
+    logger.debug('TRANSACTION', `Signature verification passed`);
     
     const outputAmount = this.getOutputAmount();
+    logger.debug('TRANSACTION', `Output amount calculated: ${outputAmount}`);
     
     if (this.isCoinbase) {
+      logger.debug('TRANSACTION', `Validating coinbase transaction...`);
       // CRITICAL: Validate coinbase transaction amount
       if (outputAmount <= 0) {
+        logger.debug('TRANSACTION', `Transaction validation failed: invalid coinbase amount`);
+        logger.debug('TRANSACTION', `  outputAmount: ${outputAmount}`);
         return false;
       }
       
+      logger.debug('TRANSACTION', `Coinbase transaction validation passed`);
       // Additional coinbase validation can be done at blockchain level
       return true;
     }
     
+    logger.debug('TRANSACTION', `Validating non-coinbase transaction...`);
+    
     // Validate minimum fee if config is provided
     if (config && config.wallet && config.wallet.minFee !== undefined) {
+      logger.debug('TRANSACTION', `Checking minimum fee requirement: minFee=${config.wallet.minFee}, actualFee=${this.fee}`);
       if (this.fee < config.wallet.minFee) {
+        logger.debug('TRANSACTION', `Transaction validation failed: fee below minimum`);
+        logger.debug('TRANSACTION', `  Required: ${config.wallet.minFee}`);
+        logger.debug('TRANSACTION', `  Actual: ${this.fee}`);
         return false;
       }
+      logger.debug('TRANSACTION', `Minimum fee check passed`);
     }
     
     // Validate fee is a positive number
+    logger.debug('TRANSACTION', `Validating fee: ${this.fee} (${typeof this.fee})`);
     if (typeof this.fee !== 'number' || this.fee < 0) {
+      logger.debug('TRANSACTION', `Transaction validation failed: invalid fee`);
+      logger.debug('TRANSACTION', `  Fee: ${this.fee} (${typeof this.fee})`);
       return false;
     }
+    logger.debug('TRANSACTION', `Fee validation passed`);
     
     // For non-coinbase transactions, validate inputs and outputs
+    logger.debug('TRANSACTION', `Validating inputs: ${this.inputs.length} inputs`);
     if (this.inputs.length === 0) {
+      logger.debug('TRANSACTION', `Transaction validation failed: no inputs for non-coinbase transaction`);
       return false; // Must have inputs
     }
+    logger.debug('TRANSACTION', `Inputs validation passed`);
     
     // Validate output amount is positive
+    logger.debug('TRANSACTION', `Validating output amount: ${outputAmount}`);
     if (outputAmount <= 0) {
+      logger.debug('TRANSACTION', `Transaction validation failed: invalid output amount`);
+      logger.debug('TRANSACTION', `  outputAmount: ${outputAmount}`);
       return false;
     }
+    logger.debug('TRANSACTION', `Output amount validation passed`);
     
+    logger.debug('TRANSACTION', `Transaction ${this.id} validation completed successfully`);
     return true;
   }
 

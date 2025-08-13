@@ -39,6 +39,9 @@ const dnsResolve = promisify(dns.resolve);
  */
 class P2PNetwork {
   constructor(blockchain, port = 3001, config = null) {
+    logger.debug('P2P_NETWORK', `Initializing P2P Network: port=${port}, config=${config ? 'present' : 'null'}`);
+    logger.debug('P2P_NETWORK', `Blockchain instance: ${blockchain ? 'present' : 'null'}, type: ${typeof blockchain}`);
+    
     this.blockchain = blockchain;
     this.port = port;
     this.wss = null;
@@ -47,27 +50,70 @@ class P2PNetwork {
     
     // Get data directory from config
     const dataDir = config?.storage?.dataDir || './data';
+    logger.debug('P2P_NETWORK', `Data directory: ${dataDir}`);
     
     // Initialize modular components
-    this.peerManager = new PeerManager(config?.network?.maxPeers || 10);
-    this.seedNodeManager = new SeedNodeManager(config, port);
-    this.peerReputation = new PeerReputation(dataDir);
-    this.messageHandler = new MessageHandler(blockchain, this.peerReputation);
-    this.networkSync = new NetworkSync(blockchain, this.peerManager, this.seedNodeManager);
+    logger.debug('P2P_NETWORK', `Initializing P2P Network components...`);
+    try {
+      this.peerManager = new PeerManager(config?.network?.maxPeers || 10);
+      logger.debug('P2P_NETWORK', `PeerManager initialized: maxPeers=${config?.network?.maxPeers || 10}`);
+      
+      this.seedNodeManager = new SeedNodeManager(config, port);
+      logger.debug('P2P_NETWORK', `SeedNodeManager initialized: port=${port}`);
+      
+      this.peerReputation = new PeerReputation(dataDir);
+      logger.debug('P2P_NETWORK', `PeerReputation initialized: dataDir=${dataDir}`);
+      
+      this.messageHandler = new MessageHandler(blockchain, this.peerReputation);
+      logger.debug('P2P_NETWORK', `MessageHandler initialized with blockchain and peerReputation`);
+      
+      this.networkSync = new NetworkSync(blockchain, this.peerManager, this.seedNodeManager);
+      logger.debug('P2P_NETWORK', `NetworkSync initialized with blockchain, peerManager, and seedNodeManager`);
+      
+      logger.debug('P2P_NETWORK', `All modular components initialized successfully`);
+    } catch (error) {
+      logger.error('P2P_NETWORK', `Failed to initialize P2P Network components: ${error.message}`);
+      logger.error('P2P_NETWORK', `Error stack: ${error.stack}`);
+      throw error;
+    }
     
     // Node identity and authentication system
-    this.nodeIdentity = new NodeIdentity(null, null, dataDir);
-    this.authenticatedPeers = new Map(); // Map<peerAddress, {nodeId, publicKey, authenticatedAt}>
-    this.pendingChallenges = new Map(); // Map<peerAddress, {challenge, timestamp, nodeId}>
-    this.initiatedAuthentication = new Set(); // Set<peerAddress> - track which peers we've initiated auth with
-    this.authenticationTimeout = 10000; // 10 seconds for authentication
+    logger.debug('P2P_NETWORK', `Initializing node identity and authentication system...`);
+    try {
+      this.nodeIdentity = new NodeIdentity(null, null, dataDir);
+      logger.debug('P2P_NETWORK', `NodeIdentity initialized successfully`);
+      
+      this.authenticatedPeers = new Map(); // Map<peerAddress, {nodeId, publicKey, authenticatedAt}>
+      this.pendingChallenges = new Map(); // Map<peerAddress, {challenge, timestamp, nodeId}>
+      this.initiatedAuthentication = new Set(); // Set<peerAddress> - track which peers we've initiated auth with
+      this.authenticationTimeout = 10000; // 10 seconds for authentication
+      
+      logger.debug('P2P_NETWORK', `Authentication system initialized: timeout=${this.authenticationTimeout}ms`);
+    } catch (error) {
+      logger.error('P2P_NETWORK', `Failed to initialize authentication system: ${error.message}`);
+      logger.error('P2P_NETWORK', `Error stack: ${error.stack}`);
+      throw error;
+    }
     
     // Network partition handling system
-    this.partitionHandler = new NetworkPartitionHandler(this);
+    logger.debug('P2P_NETWORK', `Initializing network partition handler...`);
+    try {
+      this.partitionHandler = new NetworkPartitionHandler(this);
+      logger.debug('P2P_NETWORK', `NetworkPartitionHandler initialized successfully`);
+    } catch (error) {
+      logger.error('P2P_NETWORK', `Failed to initialize NetworkPartitionHandler: ${error.message}`);
+      logger.error('P2P_NETWORK', `Error stack: ${error.stack}`);
+      throw error;
+    }
     
     // Force IPv4-only DNS resolution
+    logger.debug('P2P_NETWORK', `Setting up IPv4-only DNS resolution...`);
     this.setupIPv4OnlyDNS();
+    
+    logger.debug('P2P_NETWORK', `Loading seed nodes from config...`);
     this.loadSeedNodes();
+    
+    logger.debug('P2P_NETWORK', `P2P Network constructor completed successfully`);
   }
 
   /**
@@ -100,51 +146,93 @@ class P2PNetwork {
    * Start P2P network
    */
   async start() {
+    logger.debug('P2P_NETWORK', `Starting P2P network...`);
+    logger.debug('P2P_NETWORK', `Current state: isRunning=${this.isRunning}, port=${this.port}, host=${this.host || '0.0.0.0'}`);
+    
     if (this.isRunning) {
+      logger.debug('P2P_NETWORK', `Network already running, skipping start operation`);
       return false;
     }
 
-    // Create HTTP server bound to IPv4 only
-    const http = require('http');
-    const server = http.createServer();
-    
-    // Bind to IPv4 only
-    server.listen(this.port, '0.0.0.0', () => {
-      logger.info('P2P', `P2P server listening on IPv4 0.0.0.0:${this.port}`);
-    });
-    
-    this.wss = new WebSocket.Server({ server });
-    
-    this.wss.on('connection', (ws, req) => {
-      const remoteAddress = req.socket.remoteAddress;
-      logger.info('P2P', `New peer connected: ${remoteAddress}:${req.socket.remotePort}`);
-      this.handleConnection(ws);
-    });
+    try {
+      logger.info('P2P', `Starting P2P network on port ${this.port}`);
+      logger.debug('P2P_NETWORK', `Creating HTTP server bound to IPv4 only...`);
+      
+      // Create HTTP server bound to IPv4 only
+      const http = require('http');
+      const server = http.createServer();
+      logger.debug('P2P_NETWORK', `HTTP server created successfully`);
+      
+      // Bind to IPv4 only
+      logger.debug('P2P_NETWORK', `Binding HTTP server to IPv4 0.0.0.0:${this.port}...`);
+      server.listen(this.port, '0.0.0.0', () => {
+        logger.info('P2P', `P2P server listening on IPv4 0.0.0.0:${this.port}`);
+        logger.debug('P2P_NETWORK', `HTTP server bound successfully to port ${this.port}`);
+      });
+      
+      logger.debug('P2P_NETWORK', `Creating WebSocket server...`);
+      this.wss = new WebSocket.Server({ server });
+      logger.debug('P2P_NETWORK', `WebSocket server created successfully`);
+      
+      logger.debug('P2P_NETWORK', `Setting up WebSocket connection handler...`);
+      this.wss.on('connection', (ws, req) => {
+        const remoteAddress = req.socket.remoteAddress;
+        logger.info('P2P', `New peer connected: ${remoteAddress}:${req.socket.remotePort}`);
+        logger.debug('P2P_NETWORK', `Handling new connection from ${remoteAddress}:${req.socket.remotePort}`);
+        this.handleConnection(ws);
+      });
+      logger.debug('P2P_NETWORK', `WebSocket connection handler configured successfully`);
 
-    this.isRunning = true;
-    
-    // Start reputation maintenance
-    this.startReputationMaintenance();
-    
-    // Start partition handling
-    this.partitionHandler.start();
-    
-    // Connect to seed nodes if not running as seed node
-    if (!this.seedNodeManager.isSeedNode && this.seedNodeManager.seedNodes.length > 0) {
-      try {
-        await this.networkSync.connectToSeedNodes(this.connectToPeer.bind(this));
-        // Wait for authentication to complete before syncing
-        logger.info('P2P', 'Waiting for authentication to complete before network sync...');
-        await new Promise(resolve => setTimeout(resolve, 2000)); // Wait 2 seconds for authentication
-        // Start network synchronization after successful seed node connections
-        await this.networkSync.syncWithNetwork();
-      } catch (error) {
-        console.error(`❌ Failed to establish network connectivity: ${error.message}`);
-        throw error;
+      this.isRunning = true;
+      logger.debug('P2P_NETWORK', `Network state updated: isRunning=${this.isRunning}`);
+      
+      // Start reputation maintenance
+      logger.debug('P2P_NETWORK', `Starting reputation maintenance...`);
+      this.startReputationMaintenance();
+      logger.debug('P2P_NETWORK', `Reputation maintenance started successfully`);
+      
+      // Start partition handling
+      logger.debug('P2P_NETWORK', `Starting network partition handler...`);
+      this.partitionHandler.start();
+      logger.debug('P2P_NETWORK', `Network partition handler started successfully`);
+      
+      // Connect to seed nodes if not running as seed node
+      logger.debug('P2P_NETWORK', `Checking seed node configuration: isSeedNode=${this.seedNodeManager.isSeedNode}, seedNodes=${this.seedNodeManager.seedNodes.length}`);
+      if (!this.seedNodeManager.isSeedNode && this.seedNodeManager.seedNodes.length > 0) {
+        logger.debug('P2P_NETWORK', `Not running as seed node, connecting to ${this.seedNodeManager.seedNodes.length} seed nodes...`);
+        try {
+          logger.debug('P2P_NETWORK', `Connecting to seed nodes...`);
+          await this.networkSync.connectToSeedNodes(this.connectToPeer.bind(this));
+          logger.debug('P2P_NETWORK', `Seed node connections established successfully`);
+          
+          // Wait for authentication to complete before syncing
+          logger.info('P2P', 'Waiting for authentication to complete before network sync...');
+          logger.debug('P2P_NETWORK', `Waiting 2 seconds for authentication to complete...`);
+          await new Promise(resolve => setTimeout(resolve, 2000)); // Wait 2 seconds for authentication
+          
+          // Start network synchronization after successful seed node connections
+          logger.debug('P2P_NETWORK', `Starting network synchronization...`);
+          await this.networkSync.syncWithNetwork();
+          logger.debug('P2P_NETWORK', `Network synchronization completed successfully`);
+        } catch (error) {
+          logger.error('P2P_NETWORK', `Failed to establish network connectivity: ${error.message}`);
+          logger.error('P2P_NETWORK', `Error stack: ${error.stack}`);
+          console.error(`❌ Failed to establish network connectivity: ${error.message}`);
+          throw error;
+        }
+      } else {
+        logger.debug('P2P_NETWORK', `Running as seed node or no seed nodes configured, skipping seed node connection`);
       }
+      
+      logger.debug('P2P_NETWORK', `P2P network started successfully`);
+      return true;
+      
+    } catch (error) {
+      logger.error('P2P_NETWORK', `Failed to start P2P network: ${error.message}`);
+      logger.error('P2P_NETWORK', `Error stack: ${error.stack}`);
+      logger.error('P2P_NETWORK', `Network state at failure: isRunning=${this.isRunning}, port=${this.port}`);
+      throw error;
     }
-    
-    return true;
   }
 
   /**
@@ -189,15 +277,21 @@ class P2PNetwork {
    * Handle new WebSocket connection
    */
   handleConnection(ws) {
+    logger.debug('P2P_NETWORK', `Handling new WebSocket connection...`);
+    
     // Get peer address for reputation tracking
     const peerAddress = this.getPeerAddress(ws);
+    logger.debug('P2P_NETWORK', `Peer address extracted: ${peerAddress}`);
     
     // Check if peer is banned
+    logger.debug('P2P_NETWORK', `Checking if peer ${peerAddress} is banned...`);
     if (this.peerReputation.isPeerBanned(peerAddress)) {
       logger.warn('P2P', `[REPUTATION] Rejecting banned peer: ${peerAddress}`);
+      logger.debug('P2P_NETWORK', `Closing connection to banned peer ${peerAddress}`);
       ws.close();
       return;
     }
+    logger.debug('P2P_NETWORK', `Peer ${peerAddress} is not banned, proceeding with connection`);
     
     // Check if we can accept more peers
     if (!this.peerManager.canAcceptPeers()) {
