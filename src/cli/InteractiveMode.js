@@ -92,6 +92,12 @@ class InteractiveMode {
       case 'replay-protection':
         await this.handleReplayProtectionCommand(args.slice(1));
         break;
+      case 'security':
+        await this.handleSecurityCommand(args.slice(1));
+        break;
+      case 'consensus':
+        await this.handleConsensusCommand(args.slice(1));
+        break;
       default:
         console.log(chalk.red(`❌ Unknown command: ${cmd}`));
         console.log(chalk.cyan('Type "help" for available commands'));
@@ -228,12 +234,168 @@ class InteractiveMode {
     }
   }
 
+  async handleSecurityCommand(args) {
+    if (args.length === 0 || args[0] === 'status') {
+      try {
+        const response = await this.cli.makeApiRequest('/api/blockchain/security-analysis', 'GET');
+        if (response) {
+          console.log(chalk.blue.bold('🛡️  COMPREHENSIVE SECURITY ANALYSIS:'));
+          console.log(chalk.cyan('  Timestamp:'), chalk.white(response.timestamp));
+          console.log('');
+          
+          console.log(chalk.cyan('  Blockchain Status:'));
+          console.log(chalk.white(`    Height: ${response.blockchain.height}`));
+          console.log(chalk.white(`    Difficulty: ${response.blockchain.difficulty}`));
+          console.log(chalk.white(`    Last Block: ${response.blockchain.lastBlockHash.substring(0, 16)}...`));
+          console.log('');
+          
+          console.log(chalk.cyan('  Consensus Status:'));
+          console.log(chalk.white(`    Security Level: ${response.consensus.securityLevel}/100`));
+          console.log(chalk.white(`    Network Partition: ${response.consensus.networkPartition ? '⚠️  YES' : '✅ NO'}`));
+          console.log(chalk.white(`    Suspicious Miners: ${response.consensus.suspiciousMiners.length}`));
+          console.log('');
+          
+          if (response.threats.length > 0) {
+            console.log(chalk.red('  🚨 ACTIVE THREATS:'));
+            response.threats.forEach((threat, index) => {
+              const severityColor = threat.severity === 'HIGH' ? chalk.red : 
+                                  threat.severity === 'MEDIUM' ? chalk.yellow : chalk.blue;
+              console.log(severityColor(`    ${index + 1}. [${threat.severity}] ${threat.type}`));
+              console.log(chalk.white(`       ${threat.description}`));
+              console.log(chalk.gray(`       Recommendation: ${threat.recommendation}`));
+              console.log('');
+            });
+          } else {
+            console.log(chalk.green('  ✅ No active threats detected'));
+            console.log('');
+          }
+          
+          if (response.recommendations.length > 0) {
+            console.log(chalk.cyan('  📋 SECURITY RECOMMENDATIONS:'));
+            response.recommendations.forEach((rec, index) => {
+              const priorityColor = rec.priority === 'HIGH' ? chalk.red : 
+                                  rec.priority === 'MEDIUM' ? chalk.yellow : chalk.blue;
+              console.log(priorityColor(`    ${index + 1}. [${rec.priority}] ${rec.action}`));
+              console.log(chalk.white(`       ${rec.description}`));
+            });
+          }
+        }
+      } catch (error) {
+        console.log(chalk.red(`❌ Error: ${error.message}`));
+      }
+    } else if (args[0] === 'threats') {
+      try {
+        const response = await this.cli.makeApiRequest('/api/blockchain/security-analysis', 'GET');
+        if (response && response.threats.length > 0) {
+          console.log(chalk.red.bold('🚨 SECURITY THREATS DETECTED:'));
+          response.threats.forEach((threat, index) => {
+            const severityColor = threat.severity === 'HIGH' ? chalk.red : 
+                                threat.severity === 'MEDIUM' ? chalk.yellow : chalk.blue;
+            console.log(severityColor(`  ${index + 1}. [${threat.severity}] ${threat.type}`));
+            console.log(chalk.white(`     Description: ${threat.description}`));
+            console.log(chalk.gray(`     Recommendation: ${threat.recommendation}`));
+            console.log('');
+          });
+        } else {
+          console.log(chalk.green('✅ No security threats detected'));
+        }
+      } catch (error) {
+        console.log(chalk.red(`❌ Error: ${error.message}`));
+      }
+    } else {
+      console.log(chalk.yellow('Usage: security [status|threats]'));
+    }
+  }
+
+  async handleConsensusCommand(args) {
+    if (args.length === 0 || args[0] === 'status') {
+      try {
+        const response = await this.cli.makeApiRequest('/api/blockchain/consensus', 'GET');
+        if (response) {
+          console.log(chalk.blue.bold('🔗 CONSENSUS & MINING STATUS:'));
+          console.log(chalk.cyan('  Security Level:'), chalk.white(`${response.securityLevel}/100`));
+          console.log(chalk.cyan('  Total Network Hash Rate:'), chalk.white(`${(response.totalNetworkHashRate / 1000000).toFixed(2)} MH/s`));
+          console.log(chalk.cyan('  Validator Count:'), chalk.white(response.validatorCount));
+          console.log(chalk.cyan('  Total Stake:'), chalk.white(`${response.totalStake} PAS`));
+          console.log(chalk.cyan('  Consensus Threshold:'), chalk.white(`${response.consensusThreshold * 100}%`));
+          console.log('');
+          
+          console.log(chalk.cyan('  Network Status:'));
+          console.log(chalk.white(`    Partitioned: ${response.networkPartition ? '⚠️  YES' : '✅ NO'}`));
+          console.log(chalk.white(`    Consecutive Late Blocks: ${response.consecutiveLateBlocks}`));
+          console.log('');
+          
+          if (response.miningPowerDistribution.length > 0) {
+            console.log(chalk.cyan('  Top Miners:'));
+            response.miningPowerDistribution.slice(0, 5).forEach((miner, index) => {
+              const riskColor = parseFloat(miner.share) > 30 ? chalk.red : 
+                              parseFloat(miner.share) > 20 ? chalk.yellow : chalk.green;
+              console.log(riskColor(`    ${index + 1}. ${miner.address.substring(0, 16)}... - ${miner.share}%`));
+            });
+            console.log('');
+          }
+          
+          if (response.suspiciousMiners.length > 0) {
+            console.log(chalk.red('  ⚠️  Suspicious Miners:'));
+            response.suspiciousMiners.forEach((miner, index) => {
+              console.log(chalk.red(`    ${index + 1}. ${miner}`));
+            });
+            console.log('');
+          }
+          
+          // Security recommendations based on consensus status
+          if (response.securityLevel < 70) {
+            console.log(chalk.red('  🚨 IMMEDIATE ACTION REQUIRED:'));
+            console.log(chalk.red('     - Security level is critically low'));
+            console.log(chalk.red('     - Review all mining operations'));
+            console.log(chalk.red('     - Check for network attacks'));
+          } else if (response.securityLevel < 80) {
+            console.log(chalk.yellow('  ⚠️  ATTENTION REQUIRED:'));
+            console.log(chalk.yellow('     - Security level below recommended threshold'));
+            console.log(chalk.yellow('     - Consider adding more validators'));
+          } else {
+            console.log(chalk.green('  ✅ Security status is good'));
+          }
+        }
+      } catch (error) {
+        console.log(chalk.red(`❌ Error: ${error.message}`));
+      }
+    } else if (args[0] === 'miners') {
+      try {
+        const response = await this.cli.makeApiRequest('/api/blockchain/consensus', 'GET');
+        if (response && response.miningPowerDistribution.length > 0) {
+          console.log(chalk.blue.bold('⛏️  MINING POWER DISTRIBUTION:'));
+          response.miningPowerDistribution.forEach((miner, index) => {
+            const riskColor = parseFloat(miner.share) > 30 ? chalk.red : 
+                            parseFloat(miner.share) > 20 ? chalk.yellow : chalk.green;
+            const riskLevel = parseFloat(miner.share) > 30 ? 'HIGH RISK' : 
+                            parseFloat(miner.share) > 20 ? 'MEDIUM RISK' : 'LOW RISK';
+            
+            console.log(riskColor(`  ${index + 1}. ${miner.address.substring(0, 16)}...`));
+            console.log(chalk.white(`     Hash Rate: ${(miner.hashRate / 1000000).toFixed(2)} MH/s`));
+            console.log(chalk.white(`     Network Share: ${miner.share}%`));
+            console.log(riskColor(`     Risk Level: ${riskLevel}`));
+            console.log('');
+          });
+        } else {
+          console.log(chalk.gray('No mining data available'));
+        }
+      } catch (error) {
+        console.log(chalk.red(`❌ Error: ${error.message}`));
+      }
+    } else {
+      console.log(chalk.yellow('Usage: consensus [status|miners]'));
+    }
+  }
+
   showInteractiveHelp() {
     console.log(chalk.blue.bold('╔══════════════════════════════════════════════════════════╗'));
     console.log(chalk.blue.bold('║                      📖 COMMANDS 📖                      ║'));
     console.log(chalk.blue.bold('║  mempool status     - Show memory pool status            ║'));
     console.log(chalk.blue.bold('║  spam-protection    - Manage spam protection system      ║'));
     console.log(chalk.blue.bold('║  replay-protection  - Show replay attack protection status ║'));
+    console.log(chalk.blue.bold('║  security           - Show comprehensive security analysis ║'));
+    console.log(chalk.blue.bold('║  consensus          - Show consensus and mining status    ║'));
     console.log(chalk.blue.bold('╚══════════════════════════════════════════════════════════╝'));
     console.log('');
     

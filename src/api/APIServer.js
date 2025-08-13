@@ -115,6 +115,9 @@ class APIServer {
     this.app.get('/api/blockchain/mempool', this.getMempoolStatus.bind(this));
     this.app.get('/api/blockchain/replay-protection', this.getReplayProtectionAnalysis.bind(this));
     this.app.post('/api/blockchain/test-replay-protection', this.testReplayProtection.bind(this));
+    this.app.get('/api/blockchain/consensus', this.getConsensusStatus.bind(this));
+    this.app.get('/api/blockchain/security-analysis', this.getSecurityAnalysis.bind(this));
+    this.app.post('/api/blockchain/validator-signature', this.addValidatorSignature.bind(this));
     this.app.post('/api/blockchain/reset', this.resetBlockchain.bind(this));                                // Behind Key
     this.app.get('/api/blockchain/blocks', this.getBlocks.bind(this));
     this.app.get('/api/blockchain/latest', this.getLatestBlock.bind(this));
@@ -322,6 +325,197 @@ class APIServer {
         error: error.message
       });
     }
+  }
+
+  getConsensusStatus(req, res) {
+    try {
+      const consensusStatus = this.blockchain.getConsensusStatus();
+      res.json(consensusStatus);
+    } catch (error) {
+      res.status(500).json({
+        error: error.message
+      });
+    }
+  }
+
+  getSecurityAnalysis(req, res) {
+    try {
+      const securityAnalysis = {
+        timestamp: new Date().toISOString(),
+        blockchain: {
+          height: this.blockchain.getHeight(),
+          difficulty: this.blockchain.difficulty,
+          lastBlockHash: this.blockchain.getLatestBlock()?.hash || 'none'
+        },
+        consensus: this.blockchain.getConsensusStatus(),
+        replayProtection: this.blockchain.getReplayProtectionStats(),
+        threats: this._analyzeThreats(),
+        recommendations: this._generateSecurityRecommendations()
+      };
+      
+      res.json(securityAnalysis);
+    } catch (error) {
+      res.status(500).json({
+        error: error.message
+      });
+    }
+  }
+
+  addValidatorSignature(req, res) {
+    try {
+      const { blockHash, validatorAddress, stakeAmount } = req.body;
+      
+      // Input validation
+      if (!blockHash || !validatorAddress || !stakeAmount) {
+        return res.status(400).json({
+          error: 'Missing required fields: blockHash, validatorAddress, stakeAmount'
+        });
+      }
+
+      // Validate inputs
+      const InputValidator = require('../utils/validation');
+      const validatedHash = InputValidator.validateHash(blockHash);
+      const validatedAddress = InputValidator.validateCryptocurrencyAddress(validatorAddress);
+      const validatedStake = InputValidator.validateAmount(stakeAmount, { min: 0 });
+
+      if (!validatedHash || !validatedAddress || validatedStake === null) {
+        return res.status(400).json({
+          error: 'Invalid input data'
+        });
+      }
+
+      // Add validator signature
+      this.blockchain.addValidatorSignature(validatedHash, validatedAddress, validatedStake);
+      
+      res.json({
+        success: true,
+        message: 'Validator signature added successfully',
+        blockHash: validatedHash,
+        validator: validatedAddress,
+        stake: validatedStake
+      });
+    } catch (error) {
+      res.status(500).json({
+        error: error.message
+      });
+    }
+  }
+
+  /**
+   * CRITICAL: Analyze current security threats
+   */
+  _analyzeThreats() {
+    const threats = [];
+    
+    try {
+      const consensus = this.blockchain.getConsensusStatus();
+      
+      // Check for 51% attack indicators
+      if (consensus.miningPowerDistribution.length > 0) {
+        const topMiner = consensus.miningPowerDistribution[0];
+        if (parseFloat(topMiner.share) > 40) {
+          threats.push({
+            type: '51%_ATTACK_RISK',
+            severity: 'HIGH',
+            description: `Top miner controls ${topMiner.share}% of network hash rate`,
+            recommendation: 'Implement additional consensus mechanisms and monitor closely'
+          });
+        }
+      }
+      
+      // Check for network partition
+      if (consensus.networkPartition) {
+        threats.push({
+          type: 'NETWORK_PARTITION',
+          severity: 'MEDIUM',
+          description: 'Network partition detected - consecutive late blocks',
+          recommendation: 'Investigate network connectivity and peer synchronization'
+        });
+      }
+      
+      // Check for suspicious miners
+      if (consensus.suspiciousMiners.length > 0) {
+        threats.push({
+          type: 'SUSPICIOUS_ACTIVITY',
+          severity: 'MEDIUM',
+          description: `${consensus.suspiciousMiners.length} miners flagged for suspicious activity`,
+          recommendation: 'Review mining patterns and implement additional monitoring'
+        });
+      }
+      
+      // Check security level
+      if (consensus.securityLevel < 70) {
+        threats.push({
+          type: 'LOW_SECURITY_LEVEL',
+          severity: 'HIGH',
+          description: `Overall security level is ${consensus.securityLevel}/100`,
+          recommendation: 'Immediate security review and mitigation required'
+        });
+      }
+      
+    } catch (error) {
+      threats.push({
+        type: 'ANALYSIS_ERROR',
+        severity: 'HIGH',
+        description: `Failed to analyze threats: ${error.message}`,
+        recommendation: 'Check system logs and restart security monitoring'
+      });
+    }
+    
+    return threats;
+  }
+
+  /**
+   * CRITICAL: Generate security recommendations
+   */
+  _generateSecurityRecommendations() {
+    const recommendations = [];
+    
+    try {
+      const consensus = this.blockchain.getConsensusStatus();
+      
+      if (consensus.securityLevel < 80) {
+        recommendations.push({
+          priority: 'HIGH',
+          action: 'Implement additional consensus validators',
+          description: 'Add more proof-of-stake validators to improve network security'
+        });
+      }
+      
+      if (consensus.miningPowerDistribution.length > 0) {
+        const topMiner = consensus.miningPowerDistribution[0];
+        if (parseFloat(topMiner.share) > 30) {
+          recommendations.push({
+            priority: 'MEDIUM',
+            action: 'Diversify mining power',
+            description: 'Encourage more miners to join the network to reduce centralization'
+          });
+        }
+      }
+      
+      if (consensus.validatorCount < 10) {
+        recommendations.push({
+          priority: 'MEDIUM',
+          action: 'Increase validator count',
+          description: 'Aim for at least 10 active validators for robust consensus'
+        });
+      }
+      
+      recommendations.push({
+        priority: 'LOW',
+        action: 'Regular security audits',
+        description: 'Conduct monthly security audits and penetration testing'
+      });
+      
+    } catch (error) {
+      recommendations.push({
+        priority: 'HIGH',
+        action: 'System recovery',
+        description: `System error detected: ${error.message}. Immediate attention required.`
+      });
+    }
+    
+    return recommendations;
   }
 
   resetBlockchain(req, res) {

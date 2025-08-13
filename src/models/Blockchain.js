@@ -50,6 +50,35 @@ class Blockchain {
     // CRITICAL: Historical transaction database for replay attack protection
     this.historicalTransactions = new Map(); // Key: "nonce:senderAddress", Value: {txId, blockHeight, timestamp}
     this.historicalTransactionIds = new Set(); // Track all transaction IDs ever processed
+
+    // CRITICAL: 51% Attack Protection System
+    this.consensusManager = {
+      // Track mining power distribution
+      miningPowerDistribution: new Map(), // address -> hashRate
+      totalNetworkHashRate: 0,
+      
+      // Proof-of-Stake validation (hybrid consensus)
+      stakedValidators: new Map(), // address -> stakeAmount
+      totalStake: 0,
+      minStakeForValidation: 1000, // Minimum PAS required to be a validator
+      
+      // Network partition detection
+      partitionDetection: {
+        lastBlockTime: Date.now(),
+        expectedBlockTime: this.blockTime,
+        consecutiveLateBlocks: 0,
+        partitionThreshold: 5, // Consecutive late blocks before partition warning
+        isPartitioned: false
+      },
+      
+      // Consensus validation
+      consensusThreshold: 0.67, // 67% consensus required
+      validatorSignatures: new Map(), // blockHash -> [validatorSignatures]
+      
+      // Anti-51% measures
+      maxSingleMinerHashRate: 0.4, // Max 40% hash rate per single miner
+      suspiciousActivity: new Set() // Track suspicious mining patterns
+    };
   }
 
   /**
@@ -290,6 +319,132 @@ class Blockchain {
       duplicateDetection: 'enabled',
       protectionLevel: 'comprehensive'
     };
+  }
+
+  /**
+   * CRITICAL: 51% Attack Protection - Validate consensus
+   */
+  validateConsensus(block, minerAddress, hashRate) {
+    try {
+      // Update mining power distribution
+      this.consensusManager.miningPowerDistribution.set(minerAddress, hashRate);
+      this.consensusManager.totalNetworkHashRate = Array.from(this.consensusManager.miningPowerDistribution.values())
+        .reduce((total, rate) => total + rate, 0);
+
+      // Check for 51% attack
+      const minerShare = hashRate / this.consensusManager.totalNetworkHashRate;
+      if (minerShare > this.consensusManager.maxSingleMinerHashRate) {
+        logger.warn('CONSENSUS', `⚠️  51% Attack Warning: Miner ${minerAddress} controls ${(minerShare * 100).toFixed(2)}% of network hash rate`);
+        this.consensusManager.suspiciousActivity.add(minerAddress);
+        return { valid: false, reason: 'Miner controls too much hash rate', attackType: '51%_ATTACK' };
+      }
+
+      // Check for network partition
+      const currentTime = Date.now();
+      const timeSinceLastBlock = currentTime - this.consensusManager.partitionDetection.lastBlockTime;
+      
+      if (timeSinceLastBlock > this.consensusManager.partitionDetection.expectedBlockTime * 2) {
+        this.consensusManager.partitionDetection.consecutiveLateBlocks++;
+        
+        if (this.consensusManager.partitionDetection.consecutiveLateBlocks >= this.consensusManager.partitionDetection.partitionThreshold) {
+          this.consensusManager.partitionDetection.isPartitioned = true;
+          logger.warn('CONSENSUS', `⚠️  Network Partition Detected: ${this.consensusManager.partitionDetection.consecutiveLateBlocks} consecutive late blocks`);
+          return { valid: false, reason: 'Network partition detected', attackType: 'NETWORK_PARTITION' };
+        }
+      } else {
+        this.consensusManager.partitionDetection.consecutiveLateBlocks = 0;
+      }
+
+      // Update partition detection
+      this.consensusManager.partitionDetection.lastBlockTime = currentTime;
+
+      // Validate proof-of-stake consensus (hybrid approach)
+      const validatorCount = this.consensusManager.stakedValidators.size;
+      if (validatorCount > 0) {
+        const requiredValidators = Math.ceil(validatorCount * this.consensusManager.consensusThreshold);
+        const currentValidators = this.consensusManager.validatorSignatures.get(block.hash)?.length || 0;
+        
+        if (currentValidators < requiredValidators) {
+          logger.warn('CONSENSUS', `⚠️  Insufficient validator consensus: ${currentValidators}/${requiredValidators} required`);
+          return { valid: false, reason: 'Insufficient validator consensus', attackType: 'INSUFFICIENT_CONSENSUS' };
+        }
+      }
+
+      return { valid: true, reason: 'Consensus validation passed' };
+
+    } catch (error) {
+      logger.error('CONSENSUS', `Consensus validation error: ${error.message}`);
+      return { valid: false, reason: `Consensus validation error: ${error.message}`, attackType: 'VALIDATION_ERROR' };
+    }
+  }
+
+  /**
+   * CRITICAL: Add validator signature for hybrid consensus
+   */
+  addValidatorSignature(blockHash, validatorAddress, stakeAmount) {
+    if (stakeAmount >= this.consensusManager.minStakeForValidation) {
+      if (!this.consensusManager.validatorSignatures.has(blockHash)) {
+        this.consensusManager.validatorSignatures.set(blockHash, []);
+      }
+      
+      this.consensusManager.validatorSignatures.get(blockHash).push({
+        validator: validatorAddress,
+        stake: stakeAmount,
+        timestamp: Date.now()
+      });
+      
+      logger.debug('CONSENSUS', `Validator ${validatorAddress} signed block ${blockHash} with stake ${stakeAmount}`);
+    }
+  }
+
+  /**
+   * CRITICAL: Get consensus status and security metrics
+   */
+  getConsensusStatus() {
+    const miningPower = Array.from(this.consensusManager.miningPowerDistribution.entries())
+      .map(([address, hashRate]) => ({
+        address,
+        hashRate,
+        share: (hashRate / this.consensusManager.totalNetworkHashRate * 100).toFixed(2)
+      }))
+      .sort((a, b) => b.share - a.share);
+
+    return {
+      totalNetworkHashRate: this.consensusManager.totalNetworkHashRate,
+      miningPowerDistribution: miningPower,
+      suspiciousMiners: Array.from(this.consensusManager.suspiciousActivity),
+      networkPartition: this.consensusManager.partitionDetection.isPartitioned,
+      consecutiveLateBlocks: this.consensusManager.partitionDetection.consecutiveLateBlocks,
+      validatorCount: this.consensusManager.stakedValidators.size,
+      totalStake: this.consensusManager.totalStake,
+      consensusThreshold: this.consensusManager.consensusThreshold,
+      securityLevel: this._calculateSecurityLevel()
+    };
+  }
+
+  /**
+   * CRITICAL: Calculate overall security level
+   */
+  _calculateSecurityLevel() {
+    let securityScore = 100;
+    
+    // Deduct points for suspicious activity
+    securityScore -= this.consensusManager.suspiciousActivity.size * 10;
+    
+    // Deduct points for network partition
+    if (this.consensusManager.partitionDetection.isPartitioned) {
+      securityScore -= 30;
+    }
+    
+    // Deduct points for high hash rate concentration
+    const topMiner = Array.from(this.consensusManager.miningPowerDistribution.values())
+      .sort((a, b) => b - a)[0] || 0;
+    const topMinerShare = topMiner / this.consensusManager.totalNetworkHashRate;
+    if (topMinerShare > 0.3) {
+      securityScore -= Math.floor((topMinerShare - 0.3) * 100);
+    }
+    
+    return Math.max(0, Math.min(100, securityScore));
   }
 
   /**

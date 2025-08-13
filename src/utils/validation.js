@@ -334,7 +334,12 @@ class InputValidator {
       .replace(/>/g, '&gt;')
       .replace(/"/g, '&quot;')
       .replace(/'/g, '&#x27;')
-      .replace(/\//g, '&#x2F;');
+      .replace(/\//g, '&#x2F;')
+      // CRITICAL: Additional XSS protection
+      .replace(/javascript:/gi, '')
+      .replace(/on\w+\s*=/gi, '')
+      .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '')
+      .replace(/<iframe\b[^<]*(?:(?!<\/iframe>)<[^<]*)*<\/iframe>/gi, '');
   }
 
   /**
@@ -357,7 +362,179 @@ class InputValidator {
       .replace(/drop\s+table/gi, '')
       .replace(/delete\s+from/gi, '')
       .replace(/insert\s+into/gi, '')
-      .replace(/update\s+set/gi, '');
+      .replace(/update\s+set/gi, '')
+      // CRITICAL: Additional SQL injection protection
+      .replace(/exec\s*\(/gi, '')
+      .replace(/xp_cmdshell/gi, '')
+      .replace(/sp_executesql/gi, '')
+      .replace(/waitfor\s+delay/gi, '')
+      .replace(/benchmark\s*\(/gi, '');
+  }
+
+  /**
+   * CRITICAL: Validate cryptocurrency address with enhanced security
+   * @param {string} input - The address input
+   * @param {Object} options - Validation options
+   * @returns {string|null} - Sanitized address or null if invalid
+   */
+  static validateCryptocurrencyAddress(input, options = {}) {
+    const {
+      minLength = 26,
+      maxLength = 35,
+      required = false,
+      allowTestnet = false
+    } = options;
+
+    // Basic string validation
+    const sanitized = this.validateString(input, { minLength, maxLength, required });
+    if (!sanitized) return null;
+
+    // CRITICAL: Enhanced address pattern validation
+    const mainnetPattern = /^[13][a-km-zA-HJ-NP-Z1-9]{25,34}$/;
+    const testnetPattern = /^[2mn][a-km-zA-HJ-NP-Z1-9]{25,34}$/;
+    
+    const isValidMainnet = mainnetPattern.test(sanitized);
+    const isValidTestnet = allowTestnet && testnetPattern.test(sanitized);
+    
+    if (!isValidMainnet && !isValidTestnet) {
+      logger.debug('VALIDATION', `Cryptocurrency address validation failed: invalid format`);
+      return null;
+    }
+
+    // CRITICAL: Check for common attack patterns
+    const attackPatterns = [
+      /^0x[a-fA-F0-9]{40}$/, // Ethereum address (potential confusion)
+      /^[LM3][a-km-zA-HJ-NP-Z1-9]{26,33}$/, // Litecoin address (potential confusion)
+      /^[DA][a-km-zA-HJ-NP-Z1-9]{33}$/, // Dogecoin address (potential confusion)
+    ];
+
+    for (const pattern of attackPatterns) {
+      if (pattern.test(sanitized)) {
+        logger.warn('VALIDATION', `⚠️  Potential address confusion attack detected: ${sanitized}`);
+        return null;
+      }
+    }
+
+    return sanitized;
+  }
+
+  /**
+   * CRITICAL: Validate transaction data with comprehensive security checks
+   * @param {Object} transaction - The transaction object
+   * @returns {Object|null} - Validated transaction or null if invalid
+   */
+  static validateTransaction(transaction) {
+    if (!transaction || typeof transaction !== 'object') {
+      return null;
+    }
+
+    try {
+      const validated = {
+        inputs: [],
+        outputs: [],
+        fee: 0,
+        timestamp: Date.now()
+      };
+
+      // Validate inputs
+      if (Array.isArray(transaction.inputs)) {
+        for (const input of transaction.inputs) {
+          if (!input || typeof input !== 'object') continue;
+          
+          const validatedInput = {
+            txId: this.validateHash(input.txId, { required: true }),
+            outputIndex: this.validateNumber(input.outputIndex, { min: 0, required: true }),
+            signature: this.validateString(input.signature, { required: true, maxLength: 200 }),
+            publicKey: this.validateString(input.publicKey, { required: true, maxLength: 200 })
+          };
+
+          if (Object.values(validatedInput).some(v => v === null)) {
+            logger.warn('VALIDATION', `⚠️  Invalid transaction input detected`);
+            return null;
+          }
+
+          validated.inputs.push(validatedInput);
+        }
+      }
+
+      // Validate outputs
+      if (Array.isArray(transaction.outputs)) {
+        for (const output of transaction.outputs) {
+          if (!output || typeof output !== 'object') continue;
+          
+          const validatedOutput = {
+            address: this.validateCryptocurrencyAddress(output.address, { required: true }),
+            amount: this.validateAmount(output.amount, { min: 0.00000001, required: true })
+          };
+
+          if (Object.values(validatedOutput).some(v => v === null)) {
+            logger.warn('VALIDATION', `⚠️  Invalid transaction output detected`);
+            return null;
+          }
+
+          validated.outputs.push(validatedOutput);
+        }
+      }
+
+      // Validate fee
+      validated.fee = this.validateAmount(transaction.fee, { min: 0, required: true });
+      if (validated.fee === null) return null;
+
+      // Validate timestamp
+      if (transaction.timestamp) {
+        const timestamp = this.validateNumber(transaction.timestamp, { min: 0, required: true });
+        if (timestamp === null) return null;
+        validated.timestamp = timestamp;
+      }
+
+      return validated;
+
+    } catch (error) {
+      logger.error('VALIDATION', `Transaction validation error: ${error.message}`);
+      return null;
+    }
+  }
+
+  /**
+   * CRITICAL: Validate block data with security checks
+   * @param {Object} block - The block object
+   * @returns {Object|null} - Validated block or null if invalid
+   */
+  static validateBlock(block) {
+    if (!block || typeof block !== 'object') {
+      return null;
+    }
+
+    try {
+      const validated = {
+        index: this.validateNumber(block.index, { min: 0, required: true }),
+        timestamp: this.validateNumber(block.timestamp, { min: 0, required: true }),
+        previousHash: this.validateHash(block.previousHash, { required: true }),
+        nonce: this.validateNumber(block.nonce, { min: 0, required: true }),
+        difficulty: this.validateNumber(block.difficulty, { min: 1, required: true }),
+        transactions: []
+      };
+
+      if (Object.values(validated).some(v => v === null)) {
+        return null;
+      }
+
+      // Validate transactions array
+      if (Array.isArray(block.transactions)) {
+        for (const tx of block.transactions) {
+          const validatedTx = this.validateTransaction(tx);
+          if (validatedTx) {
+            validated.transactions.push(validatedTx);
+          }
+        }
+      }
+
+      return validated;
+
+    } catch (error) {
+      logger.error('VALIDATION', `Block validation error: ${error.message}`);
+      return null;
+    }
   }
 }
 

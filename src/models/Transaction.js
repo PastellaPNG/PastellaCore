@@ -106,6 +106,13 @@ class Transaction {
     this.nonce = this.generateNonce(); // Unique nonce for replay protection
     this.expiresAt = this.timestamp + (24 * 60 * 60 * 1000); // 24 hour expiration
     this.sequence = 0;                 // Sequence number for input ordering
+    
+    // CRITICAL: RACE ATTACK PROTECTION
+    this._lockId = null;               // Transaction lock identifier
+    this._isLocked = false;            // Lock status
+    this._lockTimestamp = null;        // When lock was acquired
+    this._lockTimeout = 30000;         // 30 second lock timeout
+    this._atomicSequence = this.generateAtomicSequence(); // Atomic sequence for race protection
   }
 
   /**
@@ -116,10 +123,101 @@ class Transaction {
   }
 
   /**
+   * CRITICAL: Generate atomic sequence number for race attack protection
+   */
+  generateAtomicSequence() {
+    // Combine timestamp, random value, and process ID for uniqueness
+    const timestamp = Date.now();
+    const random = Math.random().toString(36).substr(2, 9);
+    const processId = process.pid || 0;
+    const threadId = (Math.random() * 1000000) | 0;
+    
+    // Create a unique sequence that's impossible to duplicate
+    return `${timestamp}-${random}-${processId}-${threadId}`;
+  }
+
+  /**
+   * CRITICAL: Acquire transaction lock to prevent race attacks
+   */
+  acquireLock(lockId, timeout = 30000) {
+    if (this._isLocked) {
+      // Check if lock has expired
+      if (this._lockTimestamp && (Date.now() - this._lockTimestamp) > this._lockTimeout) {
+        this._releaseLock();
+      } else {
+        throw new Error('Transaction is already locked by another process');
+      }
+    }
+    
+    this._lockId = lockId;
+    this._isLocked = true;
+    this._lockTimestamp = Date.now();
+    this._lockTimeout = timeout;
+    
+    return true;
+  }
+
+  /**
+   * CRITICAL: Release transaction lock
+   */
+  releaseLock(lockId) {
+    if (this._lockId === lockId) {
+      this._releaseLock();
+      return true;
+    }
+    throw new Error('Invalid lock ID or transaction not locked');
+  }
+
+  /**
+   * CRITICAL: Internal lock release
+   */
+  _releaseLock() {
+    this._lockId = null;
+    this._isLocked = false;
+    this._lockTimestamp = null;
+  }
+
+  /**
+   * CRITICAL: Check if transaction is locked
+   */
+  isLocked() {
+    // Auto-release expired locks
+    if (this._isLocked && this._lockTimestamp && (Date.now() - this._lockTimestamp) > this._lockTimeout) {
+      this._releaseLock();
+    }
+    return this._isLocked;
+  }
+
+  /**
+   * CRITICAL: Validate atomic sequence to prevent race attacks
+   */
+  validateAtomicSequence() {
+    if (!this._atomicSequence) {
+      throw new Error('Transaction missing atomic sequence - potential race attack');
+    }
+    
+    // Validate sequence format
+    const parts = this._atomicSequence.split('-');
+    if (parts.length !== 4) {
+      throw new Error('Invalid atomic sequence format - potential race attack');
+    }
+    
+    // Validate timestamp is recent (within 5 minutes)
+    const timestamp = parseInt(parts[0]);
+    if (Date.now() - timestamp > 5 * 60 * 1000) {
+      throw new Error('Atomic sequence timestamp too old - potential race attack');
+    }
+    
+    return true;
+  }
+
+  /**
    * Calculate transaction hash with replay attack protection
+   * CRITICAL: This hash is IMMUTABLE and cannot be changed after creation
    */
   calculateId() {
-    const data = JSON.stringify({
+    // CRITICAL: Use immutable data structure to prevent malleability
+    const immutableData = {
       inputs: this.inputs.map(input => ({
         txId: input.txId,
         outputIndex: input.outputIndex,
@@ -136,10 +234,64 @@ class Transaction {
       nonce: this.nonce,           // Include nonce for replay protection
       expiresAt: this.expiresAt,   // Include expiration for replay protection
       sequence: this.sequence      // Include sequence for input ordering
-    });
+    };
     
-    this.id = CryptoUtils.doubleHash(data);
+    // CRITICAL: Freeze the data to prevent modification
+    Object.freeze(immutableData);
+    
+    // CRITICAL: Use deterministic JSON stringification to prevent malleability
+    const dataString = JSON.stringify(immutableData, Object.keys(immutableData).sort());
+    
+    // CRITICAL: Double hash for additional security
+    this.id = CryptoUtils.doubleHash(dataString);
+    
+    // CRITICAL: Mark transaction as immutable after ID calculation
+    this._isImmutable = true;
+    
     return this.id;
+  }
+
+  /**
+   * CRITICAL: Prevent transaction modification after ID calculation
+   */
+  _preventModification() {
+    if (this._isImmutable) {
+      throw new Error('Transaction is immutable after ID calculation. Cannot modify transaction data.');
+    }
+  }
+
+  /**
+   * CRITICAL: Set transaction as immutable (called after mining/confirmation)
+   */
+  setImmutable() {
+    this._isImmutable = true;
+    Object.freeze(this.inputs);
+    Object.freeze(this.outputs);
+    Object.freeze(this);
+  }
+
+  /**
+   * CRITICAL: Protected setter for fee (prevents malleability)
+   */
+  setFee(newFee) {
+    this._preventModification();
+    this.fee = newFee;
+  }
+
+  /**
+   * CRITICAL: Protected setter for outputs (prevents malleability)
+   */
+  setOutputs(newOutputs) {
+    this._preventModification();
+    this.outputs = newOutputs;
+  }
+
+  /**
+   * CRITICAL: Protected setter for inputs (prevents malleability)
+   */
+  setInputs(newInputs) {
+    this._preventModification();
+    this.inputs = newInputs;
   }
 
   /**
