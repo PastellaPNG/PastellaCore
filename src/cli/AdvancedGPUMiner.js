@@ -1516,7 +1516,9 @@ class AdvancedGPUMiner {
   async syncWithDaemon() {
     try {
       const status = await this.cli.makeApiRequest('/api/blockchain/status');
-      if (!status || !status.height) {
+      if(status.height == 0) {
+        // Do nothing
+      } else if (!status || !status.height) {
         return null;
       }
 

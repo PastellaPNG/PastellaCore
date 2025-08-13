@@ -118,8 +118,12 @@ class PastellaCLI {
       const response = await fetch(url, options);
 
       if(response.status !== 200) {
-        console.log(`[ERROR] ${url} ${method} ${response.status}`);
-        console.log(await response.text());
+        if(response.status === 404 && endpoint.includes(`/api/blockchain/blocks/`)) {
+          // Do nothing
+        } else {
+          console.log(`[ERROR] ${url} ${method} ${response.status}`);
+          console.log(await response.text());
+        }
       }
 
       if (!response.ok) {
