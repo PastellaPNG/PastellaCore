@@ -692,8 +692,12 @@ class WalletManager {
       await this.syncWalletWithDaemon();
 
       // Restore pending transactions after sync
-      this.cli.localBlockchain.pendingTransactions = pendingTransactions;
-      console.log(chalk.green(`✅ Restored ${pendingTransactions.length} pending transactions`));
+      if (this.cli.localBlockchain.memoryPool && pendingTransactions.length > 0) {
+        pendingTransactions.forEach(tx => {
+          this.cli.localBlockchain.memoryPool.addTransaction(tx);
+        });
+        console.log(chalk.green(`✅ Restored ${pendingTransactions.length} pending transactions`));
+      }
 
       // Save the restored pending transactions to file
       if (pendingTransactions.length > 0) {
@@ -702,7 +706,7 @@ class WalletManager {
           this.cli.localBlockchain.saveToFile(blockchainPath);
           console.log(chalk.green(`💾 Saved ${pendingTransactions.length} pending transactions to blockchain.json`));
         } catch (saveError) {
-          console.log(chalk.red(`❌ Failed to save pending transactions: ${saveerror}`));
+          console.log(chalk.red(`❌ Failed to save pending transactions: ${saveError}`));
         }
       }
 
