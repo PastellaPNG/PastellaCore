@@ -73,17 +73,17 @@ class TransactionManager {
       }
     }
 
-    // REPLAY ATTACK PROTECTION: Check for duplicate nonces from same sender
+    // REPLAY ATTACK PROTECTION: Check for duplicate nonces from same sender in pending pool
     if (transactionInstance.isReplayAttack && typeof transactionInstance.isReplayAttack === 'function') {
       if (transactionInstance.isReplayAttack(this.memoryPool.getPendingTransactions())) {
-        logger.warn('TRANSACTION_MANAGER', `Transaction ${transactionInstance.id} detected as replay attack`);
+        logger.warn('TRANSACTION_MANAGER', `Transaction ${transactionInstance.id} detected as replay attack in pending pool`);
         return false;
       }
     }
 
-    // REPLAY ATTACK PROTECTION: Check for duplicate nonces in confirmed blocks
-    // Note: This would need access to the blockchain chain, so we'll skip it here
-    // and handle it at the blockchain level
+    // CRITICAL: REPLAY ATTACK PROTECTION against historical blockchain
+    // This requires access to the blockchain instance, so we'll need to pass it
+    // For now, we'll handle this at the blockchain level when adding transactions
 
     if (transactionInstance.isValid()) {
       this.memoryPool.addTransaction(transactionInstance);

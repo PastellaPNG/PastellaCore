@@ -109,18 +109,20 @@ class APIServer {
     
     // Blockchain routes
     this.app.get('/api/blockchain/status', this.getBlockchainStatus.bind(this));
+    this.app.get('/api/blockchain/blocks/:index', this.getBlockByIndex.bind(this));
+    this.app.post('/api/blocks/submit', this.submitBlock.bind(this));
     this.app.get('/api/blockchain/security', this.getSecurityReport.bind(this));
-    this.app.get('/api/blockchain/mempool', this.getReplayProtectionStats.bind(this));
+    this.app.get('/api/blockchain/mempool', this.getMempoolStatus.bind(this));
+    this.app.get('/api/blockchain/replay-protection', this.getReplayProtectionAnalysis.bind(this));
+    this.app.post('/api/blockchain/test-replay-protection', this.testReplayProtection.bind(this));
     this.app.post('/api/blockchain/reset', this.resetBlockchain.bind(this));                                // Behind Key
     this.app.get('/api/blockchain/blocks', this.getBlocks.bind(this));
-    this.app.get('/api/blockchain/blocks/:index', this.getBlock.bind(this));
     this.app.get('/api/blockchain/latest', this.getLatestBlock.bind(this));
     this.app.get('/api/blockchain/transactions', this.getPendingTransactions.bind(this));
     this.app.get('/api/blockchain/transactions/:txId', this.getTransaction.bind(this));
     this.app.post('/api/blockchain/transactions', this.submitTransaction.bind(this));
 
     // Block submission routes
-    this.app.post('/api/blocks/submit', this.submitBlock.bind(this));                                       // Behind Key
     this.app.get('/api/blocks/pending', this.getPendingBlocks.bind(this));
     this.app.post('/api/blocks/validate', this.validateBlock.bind(this));                                   // Behind Key
 
@@ -246,6 +248,75 @@ class APIServer {
     try {
       const replayProtectionStats = this.blockchain.getReplayProtectionStats();
       res.json(replayProtectionStats);
+    } catch (error) {
+      res.status(500).json({
+        error: error.message
+      });
+    }
+  }
+
+  getMempoolStatus(req, res) {
+    try {
+      const mempoolStatus = {
+        pendingTransactions: this.blockchain.memoryPool.getPendingTransactionCount(),
+        memoryUsage: this.blockchain.memoryPool.estimateMemoryUsage(),
+        poolSize: this.blockchain.memoryPool.getPendingTransactions().length,
+        recentTransactions: this.blockchain.memoryPool.getPendingTransactions().slice(-10).map(tx => ({
+          id: tx.id,
+          fee: tx.fee,
+          timestamp: tx.timestamp,
+          isExpired: tx.isExpired ? tx.isExpired() : false
+        }))
+      };
+      res.json(mempoolStatus);
+    } catch (error) {
+      res.status(500).json({
+        error: error.message
+      });
+    }
+  }
+
+  getReplayProtectionAnalysis(req, res) {
+    try {
+      const analysis = this.blockchain.getReplayProtectionAnalysis();
+      res.json(analysis);
+    } catch (error) {
+      res.status(500).json({
+        error: error.message
+      });
+    }
+  }
+
+  testReplayProtection(req, res) {
+    try {
+      // Create a test transaction to validate replay protection
+      const { Transaction, TransactionInput, TransactionOutput } = require('../models/Transaction');
+      
+      // Create a test transaction with replay protection
+      const testInputs = [
+        new TransactionInput('test-tx-hash', 0, 'test-signature', 'test-public-key')
+      ];
+      
+      const testOutputs = [
+        new TransactionOutput('test-address', 10)
+      ];
+      
+      const testTransaction = new Transaction(testInputs, testOutputs, 0.001);
+      testTransaction.calculateId();
+      
+      // Test the replay protection
+      const testResults = this.blockchain.testReplayProtection(testTransaction);
+      
+      res.json({
+        message: 'Replay protection test completed',
+        testTransaction: {
+          id: testTransaction.id,
+          nonce: testTransaction.nonce,
+          expiresAt: testTransaction.expiresAt,
+          isExpired: testTransaction.isExpired()
+        },
+        testResults: testResults
+      });
     } catch (error) {
       res.status(500).json({
         error: error.message

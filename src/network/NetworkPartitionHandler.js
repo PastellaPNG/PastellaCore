@@ -1,4 +1,5 @@
 const logger = require('../utils/logger');
+const WebSocket = require('ws');
 
 class NetworkPartitionHandler {
   constructor(p2pNetwork) {
@@ -89,7 +90,7 @@ class NetworkPartitionHandler {
    */
   performHealthCheck() {
     const now = Date.now();
-    const totalPeers = this.p2pNetwork.peers.size;
+    const totalPeers = this.p2pNetwork.peerManager.getPeerCount();
     const connectedPeers = this.getConnectedPeerCount();
     const connectionRatio = totalPeers > 0 ? connectedPeers / totalPeers : 1;
 
@@ -115,7 +116,7 @@ class NetworkPartitionHandler {
    */
   getConnectedPeerCount() {
     let connectedCount = 0;
-    this.p2pNetwork.peers.forEach(peer => {
+    this.p2pNetwork.peerManager.getAllPeers().forEach(peer => {
       if (peer.readyState === 1) { // WebSocket.OPEN
         connectedCount++;
       }
@@ -153,9 +154,9 @@ class NetworkPartitionHandler {
   identifyDisconnectedPeers() {
     this.partitionState.disconnectedPeers.clear();
     
-    this.p2pNetwork.peers.forEach(peer => {
+    this.p2pNetwork.peerManager.getAllPeers().forEach(peer => {
       if (peer.readyState !== 1) { // Not WebSocket.OPEN
-        const peerAddress = this.p2pNetwork.getPeerAddress(peer);
+        const peerAddress = this.p2pNetwork.peerManager.getPeerAddress(peer);
         if (peerAddress) {
           this.partitionState.disconnectedPeers.add(peerAddress);
         }
@@ -235,11 +236,11 @@ class NetworkPartitionHandler {
   async reconnectSeedNodes() {
     logger.info('P2P', 'Attempting to reconnect to seed nodes...');
     
-    const originalSeedCount = this.p2pNetwork.connectedSeedNodes;
-    await this.p2pNetwork.connectToSeedNodes();
+    const originalSeedCount = this.p2pNetwork.seedNodeManager.getConnectedSeedNodes().length;
+    await this.p2pNetwork.seedNodeManager.attemptSeedNodeReconnection();
     
     // Check if we gained new seed connections
-    const newSeedCount = this.p2pNetwork.connectedSeedNodes;
+    const newSeedCount = this.p2pNetwork.seedNodeManager.getConnectedSeedNodes().length;
     const improvement = newSeedCount > originalSeedCount;
     
     if (improvement) {
@@ -260,14 +261,24 @@ class NetworkPartitionHandler {
       data: {
         nodeId: this.p2pNetwork.nodeIdentity.nodeId,
         timestamp: Date.now(),
-        peerCount: this.p2pNetwork.peers.size,
+        peerCount: this.p2pNetwork.peerManager.getPeerCount(),
         connectedCount: this.getConnectedPeerCount(),
         isPartitioned: this.partitionState.isPartitioned,
         blockchainHeight: this.p2pNetwork.blockchain.getLatestBlock().index
       }
     };
 
-    this.p2pNetwork.broadcast(healthMessage);
+    // Broadcast health message to all peers
+    const peers = this.p2pNetwork.peerManager.getAllPeers();
+    peers.forEach(peer => {
+      if (peer.readyState === 1) { // WebSocket.OPEN
+        try {
+          peer.send(JSON.stringify(healthMessage));
+        } catch (error) {
+          logger.debug('P2P', `Failed to send health message to peer: ${error.message}`);
+        }
+      }
+    });
     return true; // Consider it successful if we can broadcast
   }
 
@@ -285,7 +296,17 @@ class NetworkPartitionHandler {
       }
     };
 
-    this.p2pNetwork.broadcast(peerListMessage);
+    // Broadcast peer list request to all peers
+    const peers = this.p2pNetwork.peerManager.getAllPeers();
+    peers.forEach(peer => {
+      if (peer.readyState === 1) { // WebSocket.OPEN
+        try {
+          peer.send(JSON.stringify(peerListMessage));
+        } catch (error) {
+          logger.debug('P2P', `Failed to send peer list request to peer: ${error.message}`);
+        }
+      }
+    });
     return true;
   }
 
@@ -296,8 +317,7 @@ class NetworkPartitionHandler {
     logger.info('P2P', 'Forcing blockchain synchronization...');
     
     try {
-      await this.p2pNetwork.syncBlockchain();
-      await this.p2pNetwork.syncTransactionPool();
+      await this.p2pNetwork.syncWithNetwork();
       return true;
     } catch (error) {
       logger.error('P2P', `Force sync failed: ${error.message}`);
@@ -329,7 +349,7 @@ class NetworkPartitionHandler {
    * Send heartbeat to connected peers
    */
   sendHeartbeat() {
-    if (this.p2pNetwork.peers.size === 0) {
+    if (this.p2pNetwork.peerManager.getPeerCount() === 0) {
       return;
     }
 
@@ -342,7 +362,17 @@ class NetworkPartitionHandler {
       }
     };
 
-    this.p2pNetwork.broadcast(heartbeatMessage);
+    // Broadcast heartbeat to all peers
+    const peers = this.p2pNetwork.peerManager.getAllPeers();
+    peers.forEach(peer => {
+      if (peer.readyState === 1) { // WebSocket.OPEN
+        try {
+          peer.send(JSON.stringify(heartbeatMessage));
+        } catch (error) {
+          logger.debug('P2P', `Failed to send heartbeat to peer: ${error.message}`);
+        }
+      }
+    });
   }
 
   /**

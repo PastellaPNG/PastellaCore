@@ -2,12 +2,10 @@ const fs = require('fs');
 const path = require('path');
 const chalk = require('chalk');
 const os = require('os');
-const readline = require('readline');
 const logger = require('./utils/logger');
 
 // Import core modules
 const Blockchain = require('./models/Blockchain');
-const Wallet = require('./models/Wallet');
 const P2PNetwork = require('./network/P2PNetwork');
 const APIServer = require('./api/APIServer');
 
@@ -31,13 +29,8 @@ class PastellaDaemon {
    */
   displayIntro(currentConfig = config) {
     const version = packageJson.version;
-    const nodeVersion = process.version;
-    const platform = os.platform();
-    const arch = os.arch();
-    const totalMem = Math.round(os.totalmem() / (1024 * 1024 * 1024));
     const freeMem = Math.round(os.freemem() / (1024 * 1024 * 1024));
     const cpuCores = os.cpus().length;
-    const cpuModel = os.cpus()[0].model;
 
     console.log(chalk.blue.bold('╔══════════════════════════════════════════════════════════════╗'));
     console.log(chalk.blue.bold('║                    🚀 PASTELLA DAEMON                        ║'));
@@ -299,10 +292,13 @@ class PastellaDaemon {
     // in the minePendingTransactions method, so no periodic adjustment needed
 
     // Sync with network every 30 seconds
-    setInterval(() => {
+    setInterval(async () => {
       if (this.isRunning && this.p2pNetwork) {
-        this.p2pNetwork.syncBlockchain();
-        this.p2pNetwork.syncTransactionPool();
+        try {
+          await this.p2pNetwork.syncWithNetwork();
+        } catch (error) {
+          console.error(chalk.yellow(`⚠️  Network sync failed: ${error.message}`));
+        }
       }
     }, 30 * 1000);
   }
