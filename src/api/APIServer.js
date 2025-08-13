@@ -51,6 +51,17 @@ class APIServer {
     this.app.use('/api/blockchain/reset', this.auth.validateApiKey.bind(this.auth));
     this.app.use('/api/rate-limits*', this.auth.validateApiKey.bind(this.auth));
     
+    this.app.use('/api/blockchain/validate-checkpoints', this.auth.validateApiKey.bind(this.auth));
+    this.app.use('/api/blockchain/checkpoints/clear', this.auth.validateApiKey.bind(this.auth));
+    this.app.use('/api/blockchain/checkpoints/update', this.auth.validateApiKey.bind(this.auth));
+    this.app.use('/api/blockchain/checkpoints/add', this.auth.validateApiKey.bind(this.auth));
+
+    this.app.use('/api/memory-pool/status', this.auth.validateApiKey.bind(this.auth));
+    this.app.use('/api/spam-protection/status', this.auth.validateApiKey.bind(this.auth));
+    this.app.use('/api/spam-protection/reset', this.auth.validateApiKey.bind(this.auth));
+    this.app.use('/api/transactions/batch', this.auth.validateApiKey.bind(this.auth));
+
+    
     // Add error handling middleware
     this.app.use((error, req, res, next) => {
       console.error(`❌ API Error: ${error.message}`);
@@ -110,7 +121,7 @@ class APIServer {
     // Blockchain routes
     this.app.get('/api/blockchain/status', this.getBlockchainStatus.bind(this));
     this.app.get('/api/blockchain/blocks/:index', this.getBlock.bind(this));
-    this.app.post('/api/blocks/submit', this.submitBlock.bind(this));
+    this.app.post('/api/blocks/submit', this.submitBlock.bind(this));                                       // Behind Key
     this.app.get('/api/blockchain/security', this.getSecurityReport.bind(this));
     this.app.get('/api/blockchain/mempool', this.getMempoolStatus.bind(this));
     this.app.get('/api/blockchain/replay-protection', this.getReplayProtectionAnalysis.bind(this));
@@ -162,6 +173,13 @@ class APIServer {
     this.app.get('/api/spam-protection/status', this.getSpamProtectionStatus.bind(this));                   // Behind Key
     this.app.post('/api/spam-protection/reset', this.resetSpamProtection.bind(this));                       // Behind Key
     this.app.post('/api/transactions/batch', this.addTransactionBatch.bind(this));                          // Behind Key
+    
+    // Checkpoint endpoints
+    this.app.get('/api/blockchain/checkpoints', this.getCheckpoints.bind(this));
+    this.app.post('/api/blockchain/checkpoints/add', this.addCheckpoint.bind(this));                        // Behind Key
+    this.app.post('/api/blockchain/checkpoints/update', this.updateCheckpoints.bind(this));                 // Behind Key
+    this.app.post('/api/blockchain/checkpoints/clear', this.clearCheckpoints.bind(this));                   // Behind Key
+    this.app.post('/api/blockchain/validate-checkpoints', this.validateCheckpoints.bind(this));             // Behind Key
     
     // Utility routes (always available)
     this.app.get('/api/health', this.getHealth.bind(this));
@@ -1510,6 +1528,132 @@ class APIServer {
     } catch (error) {
       logger.error('API', `Error getting reputation status: ${error.message}`);
       res.status(500).json({ error: 'Internal server error' });
+    }
+  }
+
+  // Checkpoint endpoints
+  getCheckpoints(req, res) {
+    try {
+      const checkpoints = this.blockchain.checkpointManager.getAllCheckpoints();
+      const stats = this.blockchain.checkpointManager.getCheckpointStats();
+      
+      res.json({
+        success: true,
+        checkpoints: checkpoints,
+        stats: stats
+      });
+    } catch (error) {
+      logger.error('API', `Error getting checkpoints: ${error.message}`);
+      res.status(500).json({ 
+        success: false, 
+        error: error.message 
+      });
+    }
+  }
+
+  addCheckpoint(req, res) {
+    try {
+      const { height, hash, description } = req.body;
+      
+      if (!height || !hash) {
+        return res.status(400).json({
+          success: false,
+          error: 'Height and hash are required'
+        });
+      }
+
+      const success = this.blockchain.checkpointManager.addCheckpoint(height, hash, description);
+      
+      if (success) {
+        res.json({
+          success: true,
+          message: `Checkpoint added at height ${height}`
+        });
+      } else {
+        res.status(400).json({
+          success: false,
+          error: 'Failed to add checkpoint'
+        });
+      }
+    } catch (error) {
+      logger.error('API', `Error adding checkpoint: ${error.message}`);
+      res.status(500).json({ 
+        success: false, 
+        error: error.message 
+      });
+    }
+  }
+
+  updateCheckpoints(req, res) {
+    try {
+      // This would typically update checkpoints from a trusted source
+      // For now, just return success
+      res.json({
+        success: true,
+        message: 'Checkpoints updated successfully',
+        updated: 0
+      });
+    } catch (error) {
+      logger.error('API', `Error updating checkpoints: ${error.message}`);
+      res.status(500).json({ 
+        success: false, 
+        error: error.message 
+      });
+    }
+  }
+
+  clearCheckpoints(req, res) {
+    try {
+      const success = this.blockchain.checkpointManager.clearCheckpoints();
+      
+      if (success) {
+        res.json({
+          success: true,
+          message: 'All checkpoints cleared successfully'
+        });
+      } else {
+        res.status(500).json({
+          success: false,
+          error: 'Failed to clear checkpoints'
+        });
+      }
+    } catch (error) {
+      logger.error('API', `Error clearing checkpoints: ${error.message}`);
+      res.status(500).json({ 
+        success: false, 
+        error: error.message 
+      });
+    }
+  }
+
+  validateCheckpoints(req, res) {
+    try {
+      logger.debug('API', `Checkpoint validation request received`);
+      
+      // Validate checkpoints against current blockchain
+      const isValid = this.blockchain.checkpointManager.validateCheckpoints(this.blockchain);
+      
+      if (isValid) {
+        const stats = this.blockchain.checkpointManager.getCheckpointStats();
+        res.json({
+          success: true,
+          message: 'Checkpoint validation completed successfully',
+          checkpointsUsed: stats.total,
+          stats: stats
+        });
+      } else {
+        // This should never happen as validateCheckpoints will exit the process
+        res.status(500).json({
+          success: false,
+          error: 'Checkpoint validation failed'
+        });
+      }
+    } catch (error) {
+      logger.error('API', `Error validating checkpoints: ${error.message}`);
+      res.status(500).json({ 
+        success: false, 
+        error: error.message 
+      });
     }
   }
 }

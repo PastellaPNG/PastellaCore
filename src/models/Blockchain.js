@@ -11,6 +11,7 @@ const SpamProtection = require('./SpamProtection');
 const MemoryPoolManager = require('./MemoryPoolManager');
 const TransactionManager = require('./TransactionManager');
 const BlockchainValidation = require('./BlockchainValidation');
+const CheckpointManager = require('./CheckpointManager');
 
 /**
  * MODULAR & SECURE BLOCKCHAIN CLASS
@@ -46,6 +47,9 @@ class Blockchain {
     this.memoryPool = new MemoryPoolManager();
     this.transactionManager = new TransactionManager(this.utxoManager, this.spamProtection, this.memoryPool);
     this.blockchainValidation = new BlockchainValidation();
+    
+    // CRITICAL: Initialize checkpoint manager for blockchain validation
+    this.checkpointManager = new CheckpointManager(dataDir);
 
     // CRITICAL: Historical transaction database for replay attack protection
     this.historicalTransactions = new Map(); // Key: "nonce:senderAddress", Value: {txId, blockHeight, timestamp}
@@ -888,6 +892,23 @@ class Blockchain {
           logger.debug('BLOCKCHAIN', `No historical data found, rebuilding from chain`);
           this.rebuildHistoricalTransactionDatabase();
         }
+        
+        // CRITICAL: Load and validate checkpoints before blockchain validation
+        logger.debug('BLOCKCHAIN', `Loading and validating checkpoints...`);
+        if (!this.checkpointManager.loadCheckpoints()) {
+          logger.error('BLOCKCHAIN', `Failed to load checkpoints`);
+          return false;
+        }
+        
+        // CRITICAL: Validate checkpoints against loaded blockchain
+        logger.debug('BLOCKCHAIN', `Validating checkpoints against loaded blockchain...`);
+        if (!this.checkpointManager.validateCheckpoints(this)) {
+          logger.error('BLOCKCHAIN', `Checkpoint validation failed - daemon will stop`);
+          // Note: validateCheckpoints will call process.exit(1) if invalid checkpoints are found
+          return false;
+        }
+        
+        logger.debug('BLOCKCHAIN', `Checkpoint validation passed`);
         
         // Update UTXO set from loaded chain
         logger.debug('BLOCKCHAIN', `Rebuilding UTXO set from ${this.chain.length} blocks`);
