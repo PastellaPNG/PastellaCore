@@ -371,6 +371,18 @@ class P2PNetwork {
   }
 
   /**
+   * CRITICAL: Get reputation statistics for API
+   */
+  getReputationStats() {
+    try {
+      return this.peerReputation.getReputationStats();
+    } catch (error) {
+      logger.error('P2P_NETWORK', `Failed to get reputation stats: ${error.message}`);
+      return { error: 'Failed to get reputation stats' };
+    }
+  }
+
+  /**
    * Broadcast new block to all peers
    */
   broadcastNewBlock(block) {

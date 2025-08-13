@@ -92,9 +92,6 @@ class InteractiveMode {
       case 'replay-protection':
         await this.handleReplayProtectionCommand(args.slice(1));
         break;
-      case 'security':
-        await this.handleSecurityCommand(args.slice(1));
-        break;
       case 'consensus':
         await this.handleConsensusCommand(args.slice(1));
         break;
@@ -240,79 +237,6 @@ class InteractiveMode {
       }
     } else {
       console.log(chalk.yellow('Usage: replay-protection [status|stats|test]'));
-    }
-  }
-
-  async handleSecurityCommand(args) {
-    if (args.length === 0 || args[0] === 'status') {
-      try {
-        const response = await this.cli.makeApiRequest('/api/blockchain/security-analysis', 'GET');
-        if (response) {
-          console.log(chalk.blue.bold('🛡️  COMPREHENSIVE SECURITY ANALYSIS:'));
-          console.log(chalk.cyan('  Timestamp:'), chalk.white(response.timestamp));
-          console.log('');
-          
-          console.log(chalk.cyan('  Blockchain Status:'));
-          console.log(chalk.white(`    Height: ${response.blockchain.height}`));
-          console.log(chalk.white(`    Difficulty: ${response.blockchain.difficulty}`));
-          console.log(chalk.white(`    Last Block: ${response.blockchain.lastBlockHash.substring(0, 16)}...`));
-          console.log('');
-          
-          console.log(chalk.cyan('  Consensus Status:'));
-          console.log(chalk.white(`    Security Level: ${response.consensus.securityLevel}/100`));
-          console.log(chalk.white(`    Network Partition: ${response.consensus.networkPartition ? '⚠️  YES' : '✅ NO'}`));
-          console.log(chalk.white(`    Suspicious Miners: ${response.consensus.suspiciousMiners.length}`));
-          console.log('');
-          
-          if (response.threats.length > 0) {
-            console.log(chalk.red('  🚨 ACTIVE THREATS:'));
-            response.threats.forEach((threat, index) => {
-              const severityColor = threat.severity === 'HIGH' ? chalk.red : 
-                                  threat.severity === 'MEDIUM' ? chalk.yellow : chalk.blue;
-              console.log(severityColor(`    ${index + 1}. [${threat.severity}] ${threat.type}`));
-              console.log(chalk.white(`       ${threat.description}`));
-              console.log(chalk.gray(`       Recommendation: ${threat.recommendation}`));
-              console.log('');
-            });
-          } else {
-            console.log(chalk.green('  ✅ No active threats detected'));
-            console.log('');
-          }
-          
-          if (response.recommendations.length > 0) {
-            console.log(chalk.cyan('  📋 SECURITY RECOMMENDATIONS:'));
-            response.recommendations.forEach((rec, index) => {
-              const priorityColor = rec.priority === 'HIGH' ? chalk.red : 
-                                  rec.priority === 'MEDIUM' ? chalk.yellow : chalk.blue;
-              console.log(priorityColor(`    ${index + 1}. [${rec.priority}] ${rec.action}`));
-              console.log(chalk.white(`       ${rec.description}`));
-            });
-          }
-        }
-      } catch (error) {
-        console.log(chalk.red(`❌ Error: ${error.message}`));
-      }
-    } else if (args[0] === 'threats') {
-      try {
-        const response = await this.cli.makeApiRequest('/api/blockchain/security-analysis', 'GET');
-        if (response && response.threats.length > 0) {
-          console.log(chalk.red.bold('🚨 SECURITY THREATS DETECTED:'));
-          response.threats.forEach((threat, index) => {
-            const severityColor = threat.severity === 'HIGH' ? chalk.red : 
-                                threat.severity === 'MEDIUM' ? chalk.yellow : chalk.blue;
-            console.log(severityColor(`  ${index + 1}. [${threat.severity}] ${threat.type}`));
-            console.log(chalk.white(`     Description: ${threat.description}`));
-            console.log(chalk.gray(`     Recommendation: ${threat.recommendation}`));
-            console.log('');
-          });
-        } else {
-          console.log(chalk.green('✅ No security threats detected'));
-        }
-      } catch (error) {
-        console.log(chalk.red(`❌ Error: ${error.message}`));
-      }
-    } else {
-      console.log(chalk.yellow('Usage: security [status|threats]'));
     }
   }
 
@@ -529,14 +453,6 @@ class InteractiveMode {
   showInteractiveHelp() {
     console.log(chalk.blue.bold('╔══════════════════════════════════════════════════════════╗'));
     console.log(chalk.blue.bold('║                      📖 COMMANDS 📖                      ║'));
-    console.log(chalk.blue.bold('║  mempool status     - Show memory pool status            ║'));
-    console.log(chalk.blue.bold('║  spam-protection    - Manage spam protection system      ║'));
-    console.log(chalk.blue.bold('║  replay-protection  - Show replay attack protection status ║'));
-    console.log(chalk.blue.bold('║  security           - Show comprehensive security analysis ║'));
-    console.log(chalk.blue.bold('║  consensus          - Show consensus and mining status    ║'));
-    console.log(chalk.blue.bold('║  memory             - Show memory protection status       ║'));
-    console.log(chalk.blue.bold('║  cpu                - Show CPU protection status          ║'));
-    console.log(chalk.blue.bold('║  reputation         - Show peer reputation status         ║'));
     console.log(chalk.blue.bold('╚══════════════════════════════════════════════════════════╝'));
     console.log('');
     
@@ -563,8 +479,6 @@ class InteractiveMode {
     console.log(chalk.cyan('  gpu-mine log                       - Toggle GPU mining logs'));
     console.log('');
     
-
-    
     console.log(chalk.yellow.bold('🔗 BLOCKCHAIN COMMANDS:'));
     console.log(chalk.cyan('  chain status                       - Show blockchain status'));
     console.log(chalk.cyan('  chain blocks                       - Show recent blocks'));
@@ -590,6 +504,15 @@ class InteractiveMode {
     console.log(chalk.cyan('  network message-validation-reset   - Reset validation statistics'));
     console.log(chalk.cyan('  network partition-stats            - Show network partition statistics'));
     console.log(chalk.cyan('  network partition-reset            - Reset partition statistics'));
+    console.log('');
+    
+    console.log(chalk.yellow.bold('🛡️  SECURITY & PROTECTION COMMANDS:'));
+    console.log(chalk.cyan('  mempool status                     - Show memory pool status'));
+    console.log(chalk.cyan('  spam-protection                    - Manage spam protection system'));
+    console.log(chalk.cyan('  replay-protection                  - Show replay attack protection status'));
+    console.log(chalk.cyan('  consensus                          - Show consensus and mining status'));
+    console.log(chalk.cyan('  memory                             - Show memory protection status'));
+    console.log(chalk.cyan('  reputation                         - Show peer reputation status'));
     console.log('');
     
     console.log(chalk.yellow.bold('⚙️  DAEMON COMMANDS:'));

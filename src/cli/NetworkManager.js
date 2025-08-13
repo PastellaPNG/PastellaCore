@@ -18,7 +18,7 @@ class NetworkManager {
         await this.showChainStatus();
         break;
       case 'security':
-        await this.showSecurityReport();
+        await this.showChainSecurity();
         break;
       case 'replay-protection':
         await this.showReplayProtectionStatus();
@@ -95,7 +95,7 @@ class NetworkManager {
     }
   }
 
-  async showSecurityReport() {
+  async showChainSecurity() {
     try {
       const connected = await this.cli.checkDaemonConnection();
       if (!connected) {
@@ -103,33 +103,55 @@ class NetworkManager {
         return;
       }
 
-      const response = await this.cli.makeApiRequest('/api/blockchain/security');
+      const response = await this.cli.makeApiRequest('/api/blockchain/security-analysis', 'GET');
       if (response) {
         console.log(chalk.red('═══════════════════════════════════════════════════════════════'));
-        console.log(chalk.red.bold('                    SECURITY REPORT'));
+        console.log(chalk.red.bold('                    CHAIN SECURITY REPORT'));
         console.log(chalk.red('═══════════════════════════════════════════════════════════════'));
-        console.log(chalk.cyan('  Chain Length:'), chalk.white(response.chainLength || 0));
-        console.log(chalk.cyan('  Total Chain Work:'), chalk.white(response.totalChainWork || 0));
-        console.log(chalk.cyan('  Security Level:'), chalk.white(response.securityLevel || 'UNKNOWN'));
-        console.log(chalk.cyan('  Average Block Time:'), chalk.white(`${response.averageBlockTime || 0}ms`));
-        console.log(chalk.cyan('  Current Difficulty:'), chalk.white(response.currentDifficulty || 0));
-        console.log(chalk.cyan('  Difficulty Variance:'), chalk.white(response.difficultyVariance || 0));
-        console.log(chalk.cyan('  Pending Transactions:'), chalk.white(response.pendingTransactions || 0));
+        console.log(chalk.cyan('  Timestamp:'), chalk.white(response.timestamp));
+        console.log('');
         
-        if (response.securityIssues && response.securityIssues.length > 0) {
-          console.log(chalk.red('\n  🚨 SECURITY ISSUES DETECTED:'));
-          response.securityIssues.forEach(issue => {
-            console.log(chalk.red(`    • ${issue}`));
+        console.log(chalk.cyan('  Blockchain Status:'));
+        console.log(chalk.white(`    Height: ${response.blockchain.height}`));
+        console.log(chalk.white(`    Difficulty: ${response.blockchain.difficulty}`));
+        console.log(chalk.white(`    Last Block: ${response.blockchain.lastBlockHash.substring(0, 16)}...`));
+        console.log('');
+        
+        console.log(chalk.cyan('  Consensus Status:'));
+        console.log(chalk.white(`    Security Level: ${response.consensus.securityLevel}/100`));
+        console.log(chalk.white(`    Network Partition: ${response.consensus.networkPartition ? '⚠️  YES' : '✅ NO'}`));
+        console.log(chalk.white(`    Suspicious Miners: ${response.consensus.suspiciousMiners.length}`));
+        console.log('');
+        
+        if (response.threats.length > 0) {
+          console.log(chalk.red('  🚨 ACTIVE THREATS:'));
+          response.threats.forEach((threat, index) => {
+            const severityColor = threat.severity === 'HIGH' ? chalk.red : 
+                                threat.severity === 'MEDIUM' ? chalk.yellow : chalk.blue;
+            console.log(severityColor(`    ${index + 1}. [${threat.severity}] ${threat.type}`));
+            console.log(chalk.white(`       ${threat.description}`));
+            console.log(chalk.gray(`       Recommendation: ${threat.recommendation}`));
+            console.log('');
           });
-          console.log(chalk.red(`\n  Recommendation: ${response.recommendation}`));
         } else {
-          console.log(chalk.green('\n  ✅ No security issues detected'));
+          console.log(chalk.green('  ✅ No active threats detected'));
+          console.log('');
+        }
+        
+        if (response.recommendations.length > 0) {
+          console.log(chalk.cyan('  📋 SECURITY RECOMMENDATIONS:'));
+          response.recommendations.forEach((rec, index) => {
+            const priorityColor = rec.priority === 'HIGH' ? chalk.red : 
+                                rec.priority === 'MEDIUM' ? chalk.yellow : chalk.blue;
+            console.log(priorityColor(`    ${index + 1}. [${rec.priority}] ${rec.action}`));
+            console.log(chalk.white(`       ${rec.description}`));
+          });
         }
         
         console.log(chalk.red('═══════════════════════════════════════════════════════════════'));
       }
     } catch (error) {
-      console.log(chalk.red('❌ Failed to get security report:'), error.message);
+      console.log(chalk.red('❌ Failed to get chain security report:'), error.message);
     }
   }
 
