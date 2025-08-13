@@ -1,5 +1,6 @@
 const logger = require('../utils/logger');
 const MessageValidator = require('../utils/MessageValidator');
+const WebSocket = require('ws');
 
 /**
  * Message Handler - Handles all message processing and routing

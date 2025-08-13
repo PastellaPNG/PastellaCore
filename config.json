@@ -49,8 +49,7 @@
   },
   "storage": {
     "dataDir": "./data",
-    "blockchainFile": "blockchain.json",
-    "mempoolFile": "mempool.json"
+    "blockchainFile": "blockchain.json"
   },
   "seedNode": {
     "enabled": false,

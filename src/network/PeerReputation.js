@@ -17,6 +17,10 @@ class PeerReputation {
       manipulationThreshold: 5, // Suspicious reputation changes
       cooldownPeriod: 60000, // 1 minute cooldown between score changes
       maxScoreChange: 100, // Maximum score change per action
+      goodBehaviorBonus: 10, // Bonus for good behavior
+      badBehaviorPenalty: 20, // Penalty for bad behavior
+      banThreshold: -500, // Score threshold for banning
+      banDuration: 24 * 60 * 60 * 1000, // 24 hours ban duration
       suspiciousPatterns: new Set(), // Track suspicious reputation patterns
       reputationHistory: new Map(), // Track reputation change history
       lastScoreChanges: new Map() // Track last score change time per peer
@@ -118,95 +122,7 @@ class PeerReputation {
     return simultaneousChanges.length > 3; // More than 3 changes in 1 minute
   }
 
-  /**
-   * CRITICAL: Update peer reputation with manipulation protection
-   */
-  updatePeerReputation(peerAddress, scoreChange, reason = '') {
-    try {
-      // Check cooldown period
-      const lastChange = this.reputationConfig.lastScoreChanges.get(peerAddress) || 0;
-      const timeSinceLastChange = Date.now() - lastChange;
-      
-      if (timeSinceLastChange < this.reputationConfig.cooldownPeriod) {
-        logger.warn('PEER_REPUTATION', `⚠️  Reputation update blocked: cooldown period active for ${peerAddress}`);
-        return false;
-      }
-      
-      // Validate score change
-      if (Math.abs(scoreChange) > this.reputationConfig.maxScoreChange) {
-        logger.warn('PEER_REPUTATION', `⚠️  Score change ${scoreChange} exceeds maximum ${this.reputationConfig.maxScoreChange} for ${peerAddress}`);
-        scoreChange = Math.sign(scoreChange) * this.reputationConfig.maxScoreChange;
-      }
-      
-      // Get current reputation
-      const currentReputation = this.peerReputation.get(peerAddress) || {
-        score: this.reputationConfig.initialScore,
-        lastUpdated: Date.now(),
-        changeCount: 0,
-        positiveChanges: 0,
-        negativeChanges: 0
-      };
-      
-      // Calculate new score
-      const newScore = Math.max(
-        this.reputationConfig.minScore,
-        Math.min(
-          this.reputationConfig.maxScore,
-          currentReputation.score + scoreChange
-        )
-      );
-      
-      // Update reputation data
-      currentReputation.score = newScore;
-      currentReputation.lastUpdated = Date.now();
-      currentReputation.changeCount++;
-      
-      if (scoreChange > 0) {
-        currentReputation.positiveChanges++;
-      } else if (scoreChange < 0) {
-        currentReputation.negativeChanges++;
-      }
-      
-      // Record reputation change history
-      const changeRecord = {
-        timestamp: Date.now(),
-        scoreChange: scoreChange,
-        oldScore: currentReputation.score - scoreChange,
-        newScore: currentReputation.score,
-        reason: reason
-      };
-      
-      if (!this.reputationConfig.reputationHistory.has(peerAddress)) {
-        this.reputationConfig.reputationHistory.set(peerAddress, []);
-      }
-      
-      const history = this.reputationConfig.reputationHistory.get(peerAddress);
-      history.push(changeRecord);
-      
-      // Keep only last 50 changes
-      if (history.length > 50) {
-        history.shift();
-      }
-      
-      // Update reputation map
-      this.peerReputation.set(peerAddress, currentReputation);
-      
-      // Update last score change time
-      this.reputationConfig.lastScoreChanges.set(peerAddress, Date.now());
-      
-      // Log reputation change
-      logger.debug('PEER_REPUTATION', `Reputation updated for ${peerAddress}: ${changeRecord.oldScore} → ${changeRecord.newScore} (${scoreChange > 0 ? '+' : ''}${scoreChange})`);
-      
-      // Save to file
-      this.savePeerReputation();
-      
-      return true;
-      
-    } catch (error) {
-      logger.error('PEER_REPUTATION', `Failed to update reputation for ${peerAddress}: ${error.message}`);
-      return false;
-    }
-  }
+
 
   /**
    * Load peer reputation from file
@@ -267,8 +183,25 @@ class PeerReputation {
    * Update peer reputation based on behavior
    */
   updatePeerReputation(peerAddress, behavior, details = {}) {
-    const reputationData = this.getReputationData(peerAddress);
+    let reputationData = this.getReputationData(peerAddress);
     const now = Date.now();
+    
+    // If no reputation data exists, create new entry
+    if (!reputationData) {
+      reputationData = {
+        score: this.reputationConfig.initialScore,
+        lastUpdated: now,
+        changeCount: 0,
+        positiveChanges: 0,
+        negativeChanges: 0,
+        behaviors: [],
+        bannedUntil: null,
+        banReason: null,
+        lastScoreChange: now
+      };
+      // Add to reputation map
+      this.peerReputation.set(peerAddress, reputationData);
+    }
     
     // Apply score change based on behavior
     let scoreChange = 0;

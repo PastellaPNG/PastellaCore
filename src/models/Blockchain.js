@@ -799,7 +799,22 @@ class Blockchain {
     try {
       if (fs.existsSync(filePath)) {
         const data = JSON.parse(fs.readFileSync(filePath, 'utf8'));
-        this.chain = data.chain || [];
+        
+        // Convert loaded blocks to proper Block instances
+        if (data.chain && Array.isArray(data.chain)) {
+          this.chain = data.chain.map(blockData => {
+            try {
+              const Block = require('./Block');
+              return Block.fromJSON(blockData);
+            } catch (error) {
+              logger.warn('BLOCKCHAIN', `Failed to convert block ${blockData.index || 'unknown'} to Block instance: ${error.message}`);
+              return blockData; // Return original if conversion fails
+            }
+          });
+        } else {
+          this.chain = [];
+        }
+        
         this.difficulty = data.difficulty || 1000;
         this.miningReward = data.miningReward || 50;
         this.blockTime = data.blockTime || 60000;
@@ -847,6 +862,24 @@ class Blockchain {
     });
     
     logger.info('BLOCKCHAIN', `Historical transaction database rebuilt with ${this.historicalTransactions.size} entries`);
+  }
+
+  /**
+   * Clear blockchain (for testing/reset purposes)
+   */
+  clearChain() {
+    this.chain = [];
+    this.difficulty = 1000;
+    this.miningReward = 50;
+    this.blockTime = 60000;
+    this.historicalTransactions.clear();
+    this.historicalTransactionIds.clear();
+    this.utxoManager.clearUTXOs();
+    this.memoryPool.clear();
+    this.spamProtection.reset();
+    
+    logger.info('BLOCKCHAIN', 'Blockchain cleared successfully');
+    return true;
   }
 
   /**

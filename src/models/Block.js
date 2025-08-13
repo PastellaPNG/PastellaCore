@@ -506,10 +506,27 @@ class Block {
    * Create block from JSON data
    */
   static fromJSON(data) {
+    // Convert transactions to Transaction instances if they're plain objects
+    let transactions = data.transactions;
+    if (transactions && Array.isArray(transactions)) {
+      try {
+        const { Transaction } = require('./Transaction');
+        transactions = transactions.map(tx => {
+          if (typeof tx === 'object' && !tx.isValid) {
+            return Transaction.fromJSON(tx);
+          }
+          return tx;
+        });
+      } catch (error) {
+        // If Transaction class can't be loaded, keep original transactions
+        console.warn('BLOCK', `Failed to convert transactions to Transaction instances: ${error.message}`);
+      }
+    }
+    
     const block = new Block(
       data.index,
       data.timestamp,
-      data.transactions,
+      transactions,
       data.previousHash,
       data.nonce,
       data.difficulty

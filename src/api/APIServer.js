@@ -803,10 +803,25 @@ class APIServer {
         }
       }
 
+      // Convert validated transaction to Transaction instance if needed
+      let transactionInstance = validatedTransaction;
+      if (typeof validatedTransaction === 'object' && !validatedTransaction.isValid) {
+        try {
+          const { Transaction } = require('../models/Transaction');
+          transactionInstance = Transaction.fromJSON(validatedTransaction);
+        } catch (error) {
+          logger.error('API', `Failed to convert transaction to Transaction instance: ${error.message}`);
+          return res.status(400).json({ 
+            error: 'Invalid transaction format',
+            details: 'Could not create transaction instance'
+          });
+        }
+      }
+
       // Add transaction to mempool
       let success;
       try {
-        success = this.blockchain.addPendingTransaction(validatedTransaction);
+        success = this.blockchain.addPendingTransaction(transactionInstance);
       } catch (error) {
         logger.error('API', `Error in addPendingTransaction: ${error.message}`);
         return res.status(500).json({ 
@@ -1284,8 +1299,8 @@ class APIServer {
 
   getSpamProtectionStatus(req, res) {
     try {
-      const bannedAddresses = Array.from(this.blockchain.spamProtection.bannedAddresses);
-      const rateLimitData = Array.from(this.blockchain.addressRateLimits.entries()).map(([address, data]) => ({
+      const bannedAddresses = Array.from(this.blockchain.spamProtection.spamProtection.bannedAddresses);
+      const rateLimitData = Array.from(this.blockchain.spamProtection.addressRateLimits.entries()).map(([address, data]) => ({
         address,
         count: data.count,
         firstTx: new Date(data.firstTx).toISOString(),
@@ -1297,9 +1312,9 @@ class APIServer {
         data: {
           bannedAddresses,
           rateLimitData,
-          maxTransactionsPerAddress: this.blockchain.spamProtection.maxTransactionsPerAddress,
-          maxTransactionsPerMinute: this.blockchain.spamProtection.maxTransactionsPerMinute,
-          addressBanDuration: this.blockchain.spamProtection.addressBanDuration
+          maxTransactionsPerAddress: this.blockchain.spamProtection.spamProtection.maxTransactionsPerAddress,
+          maxTransactionsPerMinute: this.blockchain.spamProtection.spamProtection.maxTransactionsPerMinute,
+          addressBanDuration: this.blockchain.spamProtection.spamProtection.addressBanDuration
         },
         timestamp: new Date().toISOString()
       });
@@ -1312,9 +1327,9 @@ class APIServer {
   resetSpamProtection(req, res) {
     try {
       // Reset all spam protection data
-      this.blockchain.spamProtection.bannedAddresses.clear();
-      this.blockchain.addressRateLimits.clear();
-      this.blockchain.spamProtection.lastCleanup = Date.now();
+      this.blockchain.spamProtection.spamProtection.bannedAddresses.clear();
+      this.blockchain.spamProtection.addressRateLimits.clear();
+      this.blockchain.spamProtection.spamProtection.lastCleanup = Date.now();
 
       res.json({
         success: true,
@@ -1337,7 +1352,21 @@ class APIServer {
         });
       }
 
-      const result = this.blockchain.addTransactionBatch(transactions);
+      // Convert plain objects to Transaction instances if needed
+      const processedTransactions = transactions.map(tx => {
+        if (typeof tx === 'object' && !tx.isValid) {
+          try {
+            const { Transaction } = require('../models/Transaction');
+            return Transaction.fromJSON(tx);
+          } catch (error) {
+            logger.warn('API', `Failed to convert transaction ${tx.id || 'unknown'} to Transaction instance: ${error.message}`);
+            return tx; // Return original if conversion fails
+          }
+        }
+        return tx;
+      });
+
+      const result = this.blockchain.addTransactionBatch(processedTransactions);
       
       res.json({
         success: true,

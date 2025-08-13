@@ -173,7 +173,7 @@ class BlockchainValidation {
   /**
    * CRITICAL: Validate block transactions with CPU protection
    */
-  validateBlockTransactions(block) {
+  validateBlockTransactions(block, config = null) {
     const measurement = this.cpuProtection.measureExecution('validateBlockTransactions', block.transactions.length);
     const startTime = measurement.start();
     
@@ -211,19 +211,19 @@ class BlockchainValidation {
       const executionTime = measurement.end();
       logger.debug('BLOCKCHAIN_VALIDATION', `Block transactions validated in ${executionTime}ms`);
       
-      return true;
+      return { valid: true, reason: null };
       
     } catch (error) {
       const executionTime = measurement.end();
       logger.error('BLOCKCHAIN_VALIDATION', `Block transaction validation failed in ${executionTime}ms: ${error.message}`);
-      throw error;
+      return { valid: false, reason: error.message };
     }
   }
 
   /**
    * Check if block is valid
    */
-  isValidBlock(block, config) {
+  isValidBlock(block, config = null) {
     try {
       // Basic block validation
       if (!block || !block.index || !block.timestamp || !block.previousHash || !block.hash) {

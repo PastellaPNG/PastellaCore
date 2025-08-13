@@ -47,7 +47,7 @@ class PastellaDaemon {
 
     // Blockchain specifications
     console.log(chalk.yellow.bold('🔗 BLOCKCHAIN SPECS:'));
-    console.log(chalk.yellow('  • Consensus:      '), chalk.white.bold('Proof of Work (SHA256)'));
+    console.log(chalk.yellow('  • Consensus:      '), chalk.white.bold('Proof of Work (KawPow)'));
     console.log(chalk.yellow('  • Block Time:     '), chalk.white.bold(`${currentConfig.blockchain.blockTime / 1000}s`));
     console.log('');
 
@@ -61,7 +61,6 @@ class PastellaDaemon {
     console.log(chalk.gray.bold('💾 STORAGE:'));
     console.log(chalk.gray('  • Data Directory: '), chalk.white.bold(currentConfig.storage.dataDir));
     console.log(chalk.gray('  • Blockchain File:'), chalk.white.bold(currentConfig.storage.blockchainFile));
-    console.log(chalk.gray('  • Mempool File:   '), chalk.white.bold(currentConfig.storage.mempoolFile));
     console.log('');
   }
 
@@ -83,7 +82,7 @@ class PastellaDaemon {
     // Load or create blockchain
     const blockchainPath = path.join(currentConfig.storage.dataDir, currentConfig.storage.blockchainFile);
     try {
-      if (!(await this.blockchain.loadFromFile(blockchainPath, currentConfig))) {
+      if (!(await this.blockchain.loadFromFile(blockchainPath))) {
         // Check if file exists but validation failed
         if (fs.existsSync(blockchainPath)) {
           logger.error('BLOCKCHAIN', 'Existing blockchain file found but validation failed!');
