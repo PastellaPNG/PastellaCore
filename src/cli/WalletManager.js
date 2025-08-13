@@ -396,7 +396,7 @@ class WalletManager {
 
       // Check if wallet is already fully synced
       if (this.cli.localWallet.isFullySynced(currentHeight)) {
-        console.log(chalk.green(`✅ Wallet already synced to height ${currentHeight}`));
+        //console.log(chalk.green(`✅ Wallet already synced to height ${currentHeight}`));
         return true;
       }
 
@@ -675,33 +675,19 @@ class WalletManager {
 
       console.log(chalk.cyan(`📊 Daemon blockchain: ${daemonStatus.height} blocks, difficulty: ${daemonStatus.difficulty}`));
 
-      // Instead of clearing the chain, load the daemon's blockchain parameters
-      // This ensures compatibility between CLI and daemon
-      try {
-        // Load daemon's blockchain data
-        const daemonResponse = await this.cli.makeApiRequest('/api/blockchain/blocks?limit=1');
-        if (daemonResponse && daemonResponse.blocks && daemonResponse.blocks.length > 0) {
-          const genesisBlock = daemonResponse.blocks[0];
-          console.log(chalk.cyan(`🔗 Daemon genesis block: ${genesisBlock.hash.substring(0, 16)}...`));
-          
-          // Check if our local blockchain is compatible
-          if (this.cli.localBlockchain.chain.length > 0) {
-            const localGenesis = this.cli.localBlockchain.chain[0];
-            if (localGenesis.hash !== genesisBlock.hash) {
-              console.log(chalk.yellow(`⚠️  Local and daemon genesis blocks differ - this is normal for fresh wallets`));
-            }
-          }
-        }
-      } catch (error) {
-        console.log(chalk.yellow(`⚠️  Could not verify daemon blockchain: ${error.message}`));
-      }
-      
-      // Reset wallet sync state and clear transaction history (but keep blockchain)
+      // Clear the local blockchain to start fresh
+      console.log(chalk.cyan('🧹 Clearing local blockchain for fresh sync...'));
+      this.cli.localBlockchain.chain = [];
+      this.cli.localBlockchain.utxos = [];
+      this.cli.localBlockchain.height = 0;
+
+      // Reset wallet sync state and clear transaction history
       this.cli.localWallet.resetSyncState();
       this.cli.localWallet.clearTransactionHistory();
 
-      // Sync wallet with daemon (read-only, don't modify local blockchain)
-      await this.syncWalletWithDaemonReadOnly();
+      // IMPORTANT: Use the FULL sync function that builds blockchain and UTXOs
+      console.log(chalk.cyan('🔗 Syncing local blockchain with daemon (this will build UTXOs)...'));
+      await this.syncWalletWithDaemon();
 
       // Restore pending transactions after sync
       this.cli.localBlockchain.pendingTransactions = pendingTransactions;
@@ -717,6 +703,11 @@ class WalletManager {
           console.log(chalk.red(`❌ Failed to save pending transactions: ${saveError.message}`));
         }
       }
+
+      // Verify UTXO set was built
+      const utxoCount = this.cli.localBlockchain.utxos.length;
+      const blockchainHeight = this.cli.localBlockchain.chain.length;
+      console.log(chalk.green(`✅ Local blockchain synced: ${blockchainHeight} blocks, ${utxoCount} UTXOs`));
 
       console.log(chalk.green('✅ Wallet resync completed'));
 

@@ -47,6 +47,16 @@ class Blockchain {
     this.difficultyBlocks = 60; // Default number of blocks for LWMA calculation
     this.difficultyMinimum = 1; // Minimum difficulty floor
     this.config = null; // Configuration for validation
+    
+    // SPAM PROTECTION SYSTEM (CRITICAL FEATURE)
+    this.addressRateLimits = new Map(); // Track transaction rate per address
+    this.spamProtection = {
+      maxTransactionsPerAddress: 10, // Max transactions per address per minute
+      maxTransactionsPerMinute: 100, // Global max transactions per minute
+      addressBanDuration: 5 * 60 * 1000, // 5 minutes ban for spam
+      bannedAddresses: new Set(), // Currently banned addresses
+      lastCleanup: Date.now()
+    };
   }
 
   /**
@@ -1008,7 +1018,7 @@ class Blockchain {
   }
 
   /**
-   * Add transaction to pending pool with MANDATORY replay attack protection
+   * Add transaction to pending pool with MANDATORY replay attack protection and SPAM PROTECTION
    */
   addPendingTransaction(transaction) {
     // Convert JSON transaction to Transaction instance if needed
@@ -1029,6 +1039,30 @@ class Blockchain {
       logger.error('BLOCKCHAIN', 'ALL transactions must include nonce and expiration fields');
       logger.error('BLOCKCHAIN', 'Use Transaction.createTransaction() to create protected transactions');
       return false;
+    }
+
+    // SPAM PROTECTION: Check global rate limit (CRITICAL FEATURE)
+    if (this.isGlobalRateLimitExceeded()) {
+      logger.warn('BLOCKCHAIN', `Transaction ${transactionInstance.id} REJECTED: Global rate limit exceeded`);
+      return false;
+    }
+
+    // SPAM PROTECTION: Check address-specific rate limit (CRITICAL FEATURE)
+    if (!transactionInstance.isCoinbase) {
+      // Extract sender address from inputs
+      const senderAddresses = transactionInstance.inputs.map(input => {
+        // Find the UTXO to get the address
+        const utxo = this.findUTXO(input.txHash, input.outputIndex);
+        return utxo ? utxo.address : null;
+      }).filter(addr => addr !== null);
+
+      // Check if any sender address is rate limited
+      for (const senderAddress of senderAddresses) {
+        if (!this.isAddressAllowedToSubmit(senderAddress)) {
+          logger.warn('BLOCKCHAIN', `Transaction ${transactionInstance.id} REJECTED: Address ${senderAddress} rate limited for spam`);
+          return false;
+        }
+      }
     }
 
     // Check if transaction already exists
@@ -1064,7 +1098,7 @@ class Blockchain {
 
     if (transactionInstance.isValid()) {
       this.pendingTransactions.push(transactionInstance);
-      logger.info('BLOCKCHAIN', `Transaction ${transactionInstance.id} added to pending pool with mandatory replay protection`);
+      logger.info('BLOCKCHAIN', `Transaction ${transactionInstance.id} added to pending pool with mandatory replay protection and spam protection`);
 
       // Save pending transactions to file so they persist across daemon restarts
       try {
@@ -1109,7 +1143,195 @@ class Blockchain {
       logger.info('BLOCKCHAIN', `Cleaned up ${removedCount} expired transactions from pending pool`);
     }
 
-    return removedCount;
+    return { cleaned: removedCount, remaining: this.pendingTransactions.length };
+  }
+
+  /**
+   * Clean up orphaned UTXOs that are no longer referenced (CRITICAL FEATURE)
+   */
+  cleanupOrphanedUTXOs() {
+    const initialCount = this.utxos.length;
+    let cleanedCount = 0;
+
+    // Find orphaned UTXOs by checking if they're still referenced in the chain
+    this.utxos = this.utxos.filter(utxo => {
+      // Check if this UTXO is still valid by looking for the transaction in the chain
+      const blockIndex = this.findBlockContainingTransaction(utxo.txHash);
+      if (blockIndex === -1) {
+        // UTXO references a transaction that's not in the chain - orphaned
+        logger.debug('BLOCKCHAIN', `Removing orphaned UTXO ${utxo.txHash}:${utxo.outputIndex}`);
+        cleanedCount++;
+        return false;
+      }
+      return true;
+    });
+
+    if (cleanedCount > 0) {
+      logger.info('BLOCKCHAIN', `Cleaned up ${cleanedCount} orphaned UTXOs`);
+    }
+
+    return { cleaned: cleanedCount, remaining: this.utxos.length };
+  }
+
+  /**
+   * Find block index containing a specific transaction
+   */
+  findBlockContainingTransaction(txHash) {
+    for (let i = 0; i < this.chain.length; i++) {
+      const block = this.chain[i];
+      if (block.transactions.some(tx => tx.id === txHash)) {
+        return i;
+      }
+    }
+    return -1; // Transaction not found in any block
+  }
+
+  /**
+   * Manage memory pool with size limits and priority (CRITICAL FEATURE)
+   */
+  manageMemoryPool() {
+    const maxPoolSize = 10000; // Maximum pending transactions
+    const maxMemoryUsage = 100 * 1024 * 1024; // 100MB limit
+    let actions = 0;
+
+    // Check pool size limit
+    if (this.pendingTransactions.length > maxPoolSize) {
+      const excess = this.pendingTransactions.length - maxPoolSize;
+      // Remove lowest priority transactions (lowest fee first)
+      this.pendingTransactions.sort((a, b) => (a.fee || 0) - (b.fee || 0));
+      this.pendingTransactions.splice(0, excess);
+      logger.warn('BLOCKCHAIN', `Memory pool size limit exceeded. Removed ${excess} low-priority transactions`);
+      actions++;
+    }
+
+    // Check memory usage
+    const currentMemoryUsage = this.estimateMemoryUsage();
+    if (currentMemoryUsage > maxMemoryUsage) {
+      // Remove oldest transactions to free memory
+      this.pendingTransactions.sort((a, b) => a.timestamp - b.timestamp);
+      const removedCount = Math.floor(this.pendingTransactions.length * 0.1); // Remove 10%
+      this.pendingTransactions.splice(0, removedCount);
+      logger.warn('BLOCKCHAIN', `Memory usage limit exceeded. Removed ${removedCount} old transactions`);
+      actions++;
+    }
+
+    // Implement transaction priority system (CRITICAL FEATURE)
+    this.pendingTransactions.sort((a, b) => {
+      // Sort by fee (highest first), then by age (oldest first)
+      const feeComparison = (b.fee || 0) - (a.fee || 0);
+      if (feeComparison !== 0) return feeComparison;
+      return a.timestamp - b.timestamp;
+    });
+
+    return { actions, poolSize: this.pendingTransactions.length, memoryUsage: this.estimateMemoryUsage() };
+  }
+
+  /**
+   * Estimate memory usage of pending transactions
+   */
+  estimateMemoryUsage() {
+    let totalSize = 0;
+    for (const tx of this.pendingTransactions) {
+      // Rough estimation: JSON string length + overhead
+      totalSize += JSON.stringify(tx).length + 100; // 100 bytes overhead per transaction
+    }
+    return totalSize;
+  }
+
+  /**
+   * BATCH TRANSACTION VALIDATION: Validate multiple transactions efficiently (CRITICAL FEATURE)
+   */
+  validateTransactionBatch(transactions, maxBatchSize = 100) {
+    const results = {
+      valid: [],
+      invalid: [],
+      errors: []
+    };
+
+    // Process in batches to avoid memory issues
+    for (let i = 0; i < transactions.length; i += maxBatchSize) {
+      const batch = transactions.slice(i, i + maxBatchSize);
+      
+      for (const tx of batch) {
+        try {
+          // Basic validation
+          if (!tx || !tx.id) {
+            results.invalid.push(tx);
+            results.errors.push(`Transaction missing ID: ${JSON.stringify(tx).substring(0, 100)}`);
+            continue;
+          }
+
+          // Check if already in pending pool
+          if (this.pendingTransactions.some(pendingTx => pendingTx.id === tx.id)) {
+            results.invalid.push(tx);
+            results.errors.push(`Transaction ${tx.id} already exists in pending pool`);
+            continue;
+          }
+
+          // Check if already confirmed
+          const isConfirmed = this.chain.some(block => 
+            block.transactions.some(confirmedTx => confirmedTx.id === tx.id)
+          );
+          if (isConfirmed) {
+            results.invalid.push(tx);
+            results.errors.push(`Transaction ${tx.id} already confirmed in blockchain`);
+            continue;
+          }
+
+          // Validate transaction structure
+          if (!tx.isValid || typeof tx.isValid !== 'function') {
+            results.invalid.push(tx);
+            results.errors.push(`Transaction ${tx.id} missing isValid method`);
+            continue;
+          }
+
+          // Check if valid
+          if (tx.isValid()) {
+            results.valid.push(tx);
+          } else {
+            results.invalid.push(tx);
+            results.errors.push(`Transaction ${tx.id} failed validation`);
+          }
+
+        } catch (error) {
+          results.invalid.push(tx);
+          results.errors.push(`Transaction ${tx.id} validation error: ${error.message}`);
+        }
+      }
+    }
+
+    return results;
+  }
+
+  /**
+   * BATCH TRANSACTION ADDITION: Add multiple valid transactions efficiently (CRITICAL FEATURE)
+   */
+  addTransactionBatch(transactions) {
+    const validationResults = this.validateTransactionBatch(transactions);
+    const addedCount = 0;
+
+    // Add all valid transactions
+    for (const tx of validationResults.valid) {
+      if (this.addPendingTransaction(tx)) {
+        addedCount++;
+      }
+    }
+
+    // Log results
+    if (validationResults.valid.length > 0 || validationResults.invalid.length > 0) {
+      logger.info('BLOCKCHAIN', `Batch transaction processing: ${validationResults.valid.length} valid, ${validationResults.invalid.length} invalid`);
+      
+      if (validationResults.errors.length > 0) {
+        logger.warn('BLOCKCHAIN', `Batch validation errors: ${validationResults.errors.slice(0, 5).join(', ')}${validationResults.errors.length > 5 ? '...' : ''}`);
+      }
+    }
+
+    return {
+      added: addedCount,
+      valid: validationResults.valid.length,
+      invalid: validationResults.invalid.length,
+      errors: validationResults.errors
+    };
   }
 
   /**
@@ -1933,6 +2155,93 @@ class Blockchain {
       logger.error('BLOCKCHAIN', `Ultra-fast validation error: ${error.message}`);
       return false;
     }
+  }
+
+  /**
+   * SPAM PROTECTION: Check if address is allowed to submit transactions (CRITICAL FEATURE)
+   */
+  isAddressAllowedToSubmit(fromAddress) {
+    const now = Date.now();
+    
+    // Check if address is banned
+    if (this.spamProtection.bannedAddresses.has(fromAddress)) {
+      const banTime = this.addressRateLimits.get(fromAddress)?.banTime || 0;
+      if (now - banTime < this.spamProtection.addressBanDuration) {
+        logger.warn('BLOCKCHAIN', `Address ${fromAddress} is banned for spam (${Math.ceil((this.spamProtection.addressBanDuration - (now - banTime)) / 1000)}s remaining)`);
+        return false;
+      } else {
+        // Ban expired, remove from banned list
+        this.spamProtection.bannedAddresses.delete(fromAddress);
+        this.addressRateLimits.delete(fromAddress);
+      }
+    }
+
+    // Get current rate limit data for this address
+    const addressData = this.addressRateLimits.get(fromAddress) || { count: 0, firstTx: now, banTime: 0 };
+    
+    // Check if we're in a new time window (1 minute)
+    if (now - addressData.firstTx > 60000) {
+      // Reset for new time window
+      addressData.count = 1;
+      addressData.firstTx = now;
+    } else {
+      // Check if address has exceeded limit
+      if (addressData.count >= this.spamProtection.maxTransactionsPerAddress) {
+        // Ban address for spam
+        addressData.banTime = now;
+        this.spamProtection.bannedAddresses.add(fromAddress);
+        logger.warn('BLOCKCHAIN', `Address ${fromAddress} banned for spam (${addressData.count} transactions in 1 minute)`);
+        return false;
+      }
+      addressData.count++;
+    }
+
+    this.addressRateLimits.set(fromAddress, addressData);
+    return true;
+  }
+
+  /**
+   * SPAM PROTECTION: Check global transaction rate limit (CRITICAL FEATURE)
+   */
+  isGlobalRateLimitExceeded() {
+    const now = Date.now();
+    const oneMinuteAgo = now - 60000;
+    
+    // Count transactions in the last minute
+    const recentTransactions = this.pendingTransactions.filter(tx => tx.timestamp > oneMinuteAgo);
+    
+    if (recentTransactions.length >= this.spamProtection.maxTransactionsPerMinute) {
+      logger.warn('BLOCKCHAIN', `Global rate limit exceeded: ${recentTransactions.length} transactions in 1 minute`);
+      return true;
+    }
+    
+    return false;
+  }
+
+  /**
+   * SPAM PROTECTION: Clean up old rate limit data (CRITICAL FEATURE)
+   */
+  cleanupSpamProtection() {
+    const now = Date.now();
+    const oneMinuteAgo = now - 60000;
+    
+    // Remove old rate limit data
+    for (const [address, data] of this.addressRateLimits.entries()) {
+      if (now - data.firstTx > 60000) {
+        this.addressRateLimits.delete(address);
+      }
+    }
+    
+    // Remove expired bans
+    for (const address of this.spamProtection.bannedAddresses) {
+      const banTime = this.addressRateLimits.get(address)?.banTime || 0;
+      if (now - banTime > this.spamProtection.addressBanDuration) {
+        this.spamProtection.bannedAddresses.delete(address);
+        this.addressRateLimits.delete(address);
+      }
+    }
+    
+    this.spamProtection.lastCleanup = now;
   }
 }
 

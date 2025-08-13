@@ -149,6 +149,12 @@ class APIServer {
     this.app.post('/api/rate-limits/reset/:ip', this.resetRateLimitsForIP.bind(this));                      // Behind Key
     this.app.post('/api/rate-limits/reset-all', this.resetAllRateLimits.bind(this));                        // Behind Key
     
+    // NEW FEATURES: Memory pool and spam protection routes (protected by API key)
+    this.app.get('/api/memory-pool/status', this.getMemoryPoolStatus.bind(this));                           // Behind Key
+    this.app.get('/api/spam-protection/status', this.getSpamProtectionStatus.bind(this));                   // Behind Key
+    this.app.post('/api/spam-protection/reset', this.resetSpamProtection.bind(this));                       // Behind Key
+    this.app.post('/api/transactions/batch', this.addTransactionBatch.bind(this));                          // Behind Key
+    
     // Utility routes (always available)
     this.app.get('/api/health', this.getHealth.bind(this));
     this.app.get('/api/info', this.getInfo.bind(this));
@@ -936,6 +942,95 @@ class APIServer {
       });
     } catch (error) {
       logger.error('API', `Error resetting all rate limits: ${error.message}`);
+      res.status(500).json({ error: 'Internal server error' });
+    }
+  }
+
+  // NEW FEATURES: Memory pool and spam protection management endpoints
+  getMemoryPoolStatus(req, res) {
+    try {
+      const status = this.blockchain.manageMemoryPool();
+      res.json({
+        success: true,
+        data: {
+          poolSize: status.poolSize,
+          memoryUsage: status.memoryUsage,
+          actions: status.actions,
+          maxPoolSize: 10000,
+          maxMemoryUsage: 100 * 1024 * 1024
+        },
+        timestamp: new Date().toISOString()
+      });
+    } catch (error) {
+      logger.error('API', `Error getting memory pool status: ${error.message}`);
+      res.status(500).json({ error: 'Internal server error' });
+    }
+  }
+
+  getSpamProtectionStatus(req, res) {
+    try {
+      const bannedAddresses = Array.from(this.blockchain.spamProtection.bannedAddresses);
+      const rateLimitData = Array.from(this.blockchain.addressRateLimits.entries()).map(([address, data]) => ({
+        address,
+        count: data.count,
+        firstTx: new Date(data.firstTx).toISOString(),
+        banTime: data.banTime ? new Date(data.banTime).toISOString() : null
+      }));
+
+      res.json({
+        success: true,
+        data: {
+          bannedAddresses,
+          rateLimitData,
+          maxTransactionsPerAddress: this.blockchain.spamProtection.maxTransactionsPerAddress,
+          maxTransactionsPerMinute: this.blockchain.spamProtection.maxTransactionsPerMinute,
+          addressBanDuration: this.blockchain.spamProtection.addressBanDuration
+        },
+        timestamp: new Date().toISOString()
+      });
+    } catch (error) {
+      logger.error('API', `Error getting spam protection status: ${error.message}`);
+      res.status(500).json({ error: 'Internal server error' });
+    }
+  }
+
+  resetSpamProtection(req, res) {
+    try {
+      // Reset all spam protection data
+      this.blockchain.spamProtection.bannedAddresses.clear();
+      this.blockchain.addressRateLimits.clear();
+      this.blockchain.spamProtection.lastCleanup = Date.now();
+
+      res.json({
+        success: true,
+        message: 'Spam protection reset successfully',
+        timestamp: new Date().toISOString()
+      });
+    } catch (error) {
+      logger.error('API', `Error resetting spam protection: ${error.message}`);
+      res.status(500).json({ error: 'Internal server error' });
+    }
+  }
+
+  addTransactionBatch(req, res) {
+    try {
+      const { transactions } = req.body;
+      
+      if (!transactions || !Array.isArray(transactions)) {
+        return res.status(400).json({
+          error: 'Invalid request: transactions array required'
+        });
+      }
+
+      const result = this.blockchain.addTransactionBatch(transactions);
+      
+      res.json({
+        success: true,
+        data: result,
+        timestamp: new Date().toISOString()
+      });
+    } catch (error) {
+      logger.error('API', `Error adding transaction batch: ${error.message}`);
       res.status(500).json({ error: 'Internal server error' });
     }
   }

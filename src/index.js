@@ -258,7 +258,42 @@ class PastellaDaemon {
       }
     }, 5 * 60 * 1000);
 
+    // Cleanup expired transactions every 2 minutes (CRITICAL FEATURE)
+    setInterval(() => {
+      if (this.isRunning) {
+        const cleanupResult = this.blockchain.cleanupExpiredTransactions();
+        if (cleanupResult.cleaned > 0) {
+          console.log(chalk.yellow(`🧹 Cleaned up ${cleanupResult.cleaned} expired transactions`));
+        }
+      }
+    }, 2 * 60 * 1000);
 
+    // Cleanup orphaned UTXOs every 10 minutes (CRITICAL FEATURE)
+    setInterval(() => {
+      if (this.isRunning) {
+        const cleanupResult = this.blockchain.cleanupOrphanedUTXOs();
+        if (cleanupResult.cleaned > 0) {
+          console.log(chalk.yellow(`🧹 Cleaned up ${cleanupResult.cleaned} orphaned UTXOs`));
+        }
+      }
+    }, 10 * 60 * 1000);
+
+    // Memory pool management every 5 minutes (CRITICAL FEATURE)
+    setInterval(() => {
+      if (this.isRunning) {
+        const mempoolStatus = this.blockchain.manageMemoryPool();
+        if (mempoolStatus.actions > 0) {
+          console.log(chalk.blue(`💾 Memory pool managed: ${mempoolStatus.actions} actions taken`));
+        }
+      }
+    }, 5 * 60 * 1000);
+
+    // Spam protection cleanup every 3 minutes (CRITICAL FEATURE)
+    setInterval(() => {
+      if (this.isRunning) {
+        this.blockchain.cleanupSpamProtection();
+      }
+    }, 3 * 60 * 1000);
 
     // Note: Difficulty adjustment now happens before each new block is mined
     // in the minePendingTransactions method, so no periodic adjustment needed
