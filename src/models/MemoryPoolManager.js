@@ -353,8 +353,6 @@ class MemoryPoolManager {
         logger.error('MEMORY_POOL', `Periodic cleanup failed: ${error.message}`);
       }
     }, 5 * 60 * 1000); // 5 minutes
-
-    logger.info('MEMORY_POOL', 'Periodic cleanup started (every 5 minutes)');
   }
 
   /**

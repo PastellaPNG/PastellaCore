@@ -18,7 +18,6 @@ class InteractiveMode {
     const connected = await this.cli.checkDaemonConnection();
     if (!connected) {
       console.log(chalk.red('❌ Cannot connect to daemon. Make sure the daemon is running.'));
-      console.log(chalk.yellow('💡 Start the daemon with: node src/index.js'));
       process.exit(1);
     }
     

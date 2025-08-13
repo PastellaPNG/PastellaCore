@@ -86,7 +86,14 @@ class PastellaCLI {
 
   async makeApiRequest(endpoint, method = 'GET', data = null) {
     try {
-      const url = `${this.apiBaseUrl}${endpoint}`;
+      // Force IPv4 by using 127.0.0.1 instead of localhost
+      let url = `${this.apiBaseUrl}${endpoint}`;
+      
+      // If the URL contains localhost, replace it with 127.0.0.1 to force IPv4
+      if (url.includes('localhost')) {
+        url = url.replace('localhost', '127.0.0.1');
+      }
+      
       const options = {
         method: method,
         headers: {
