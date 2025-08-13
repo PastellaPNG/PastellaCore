@@ -129,7 +129,7 @@ class WalletManager {
       console.log(chalk.yellow('💡 Use "wallet load" to load your wallet'));
 
     } catch (error) {
-      console.log(chalk.red(`❌ Error: ${error.message}`));
+      console.log(chalk.red(`❌ Error: ${error}`));
     }
   }
 
@@ -155,7 +155,7 @@ class WalletManager {
       console.log(chalk.green(`Balance: ${balance} PAS`));
 
     } catch (error) {
-      console.log(chalk.red(`❌ Error: ${error.message}`));
+      console.log(chalk.red(`❌ Error: ${error}`));
     }
   }
 
@@ -266,7 +266,7 @@ class WalletManager {
       this.cli.localWallet.updateBalance(this.cli.localBlockchain);
       
     } catch (error) {
-      console.log(chalk.red(`❌ Error: ${error.message}`));
+      console.log(chalk.red(`❌ Error: ${error}`));
     }
   }
 
@@ -302,7 +302,7 @@ class WalletManager {
       console.log(chalk.cyan(`Last Balance: ${syncState.lastBalance} PAS`));
       
     } catch (error) {
-      console.log(chalk.red(`❌ Error: ${error.message}`));
+      console.log(chalk.red(`❌ Error: ${error}`));
     }
   }
 
@@ -353,7 +353,7 @@ class WalletManager {
       console.log(chalk.cyan(`Balance: ${this.cli.localWallet.getBalance()} PAS`));
 
     } catch (error) {
-      console.log(chalk.red(`❌ Error: ${error.message}`));
+      console.log(chalk.red(`❌ Error: ${error}`));
     }
   }
 
@@ -379,7 +379,7 @@ class WalletManager {
       console.log(chalk.green('✅ Wallet unloaded successfully!'));
 
     } catch (error) {
-      console.log(chalk.red(`❌ Error: ${error.message}`));
+      console.log(chalk.red(`❌ Error: ${error}`));
     }
   }
 
@@ -403,6 +403,7 @@ class WalletManager {
       const syncState = this.cli.localWallet.getSyncState();
       const startIndex = syncState.lastSyncedHeight + 1;
       
+      console.log('');
       console.log(chalk.cyan(`🔄 Syncing wallet with blockchain (${startIndex} → ${currentHeight})...`));
       if (syncState.lastSyncedHeight > 0) {
         console.log(chalk.gray(`📊 Previous sync: ${syncState.lastSyncedHeight} blocks, ${syncState.totalTransactions} transactions`));
@@ -463,7 +464,7 @@ class WalletManager {
             
             this.cli.localBlockchain.addBlock(block, true); // Suppress logging
           } catch (error) {
-            console.log(chalk.red(`❌ Failed to process block ${blockData.index}: ${error.message}`));
+            console.log(chalk.red(`❌ Failed to process block ${blockData.index}: ${error}`));
             return false;
           }
         }
@@ -500,13 +501,13 @@ class WalletManager {
         this.cli.localWallet.saveWallet(this.cli.walletPath, this.cli.walletPassword);
         console.log(chalk.cyan('💾 Wallet auto-saved with sync state'));
       } catch (error) {
-        console.log(chalk.yellow(`⚠️  Failed to auto-save wallet: ${error.message}`));
+        console.log(chalk.yellow(`⚠️  Failed to auto-save wallet: ${error}`));
       }
 
       return true;
 
     } catch (error) {
-      console.log(chalk.red(`❌ Failed to sync wallet: ${error.message}`));
+      console.log(chalk.red(`❌ Failed to sync wallet: ${error}`));
       return false;
     }
   }
@@ -583,7 +584,7 @@ class WalletManager {
           // IMPORTANT: DO NOT call addBlock() - this preserves the local blockchain
           
         } catch (error) {
-          console.log(chalk.red(`❌ Failed to process block ${blockData.index}: ${error.message}`));
+          console.log(chalk.red(`❌ Failed to process block ${blockData.index}: ${error}`));
           return false;
         }
       }
@@ -624,13 +625,13 @@ class WalletManager {
         this.cli.localWallet.saveWallet(this.cli.walletPath, this.cli.walletPassword);
         console.log(chalk.cyan('💾 Wallet auto-saved with sync state'));
       } catch (error) {
-        console.log(chalk.yellow(`⚠️  Failed to auto-save wallet: ${error.message}`));
+        console.log(chalk.yellow(`⚠️  Failed to auto-save wallet: ${error}`));
       }
 
       return true;
 
     } catch (error) {
-      console.log(chalk.red(`❌ Failed to sync wallet state: ${error.message}`));
+      console.log(chalk.red(`❌ Failed to sync wallet state: ${error}`));
       return false;
     }
   }
@@ -663,7 +664,8 @@ class WalletManager {
       console.log(chalk.cyan('🔄 Force resyncing wallet from beginning...'));
 
       // Store pending transactions before resync
-      const pendingTransactions = [...this.cli.localBlockchain.pendingTransactions];
+      const pendingTransactions = this.cli.localBlockchain.memoryPool ? 
+        [...this.cli.localBlockchain.memoryPool.getPendingTransactions()] : [];
       console.log(chalk.yellow(`⚠️  Preserving ${pendingTransactions.length} pending transactions during resync`));
 
       // Get daemon blockchain status to ensure compatibility
@@ -700,7 +702,7 @@ class WalletManager {
           this.cli.localBlockchain.saveToFile(blockchainPath);
           console.log(chalk.green(`💾 Saved ${pendingTransactions.length} pending transactions to blockchain.json`));
         } catch (saveError) {
-          console.log(chalk.red(`❌ Failed to save pending transactions: ${saveError.message}`));
+          console.log(chalk.red(`❌ Failed to save pending transactions: ${saveerror}`));
         }
       }
 
@@ -712,7 +714,7 @@ class WalletManager {
       console.log(chalk.green('✅ Wallet resync completed'));
 
     } catch (error) {
-      console.log(chalk.red(`❌ Error: ${error.message}`));
+      console.log(chalk.red(`❌ Error: ${error}`));
     }
   }
 
@@ -727,7 +729,7 @@ class WalletManager {
       console.log(chalk.green('✅ Wallet saved successfully!'));
 
     } catch (error) {
-      console.log(chalk.red(`❌ Error: ${error.message}`));
+      console.log(chalk.red(`❌ Error: ${error}`));
     }
   }
 
@@ -844,7 +846,7 @@ class WalletManager {
       process.stdin.on('keypress', handleKeypress);
 
           } catch (error) {
-        console.log(chalk.red(`❌ Error: ${error.message}`));
+        console.log(chalk.red(`❌ Error: ${error}`));
       }
     }
 
@@ -915,7 +917,7 @@ class WalletManager {
         }
         
       } catch (error) {
-        console.log(chalk.red(`❌ Error: ${error.message}`));
+        console.log(chalk.red(`❌ Error: ${error}`));
       }
     }
 }
