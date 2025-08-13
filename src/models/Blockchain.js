@@ -964,6 +964,26 @@ class Blockchain {
   }
 
   /**
+   * Calculate total supply based on mined blocks and mining rewards
+   */
+  getTotalSupply() {
+    try {
+      // Calculate total supply from mining rewards
+      const totalMiningRewards = this.chain.length * this.miningReward;
+      
+      // Add any additional supply mechanisms (if implemented in the future)
+      // For now, only mining rewards contribute to supply
+      
+      logger.debug('BLOCKCHAIN', `Calculating total supply: ${this.chain.length} blocks × ${this.miningReward} PAS = ${totalMiningRewards} PAS`);
+      
+      return totalMiningRewards;
+    } catch (error) {
+      logger.error('BLOCKCHAIN', `Error calculating total supply: ${error.message}`);
+      return 0;
+    }
+  }
+
+  /**
    * Get security report
    */
   getSecurityReport() {

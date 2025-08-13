@@ -463,7 +463,7 @@ class PastellaDaemon {
     console.log(chalk.cyan('  Status:'), networkStatus.isRunning ? chalk.green('Running') : chalk.red('Stopped'));
     console.log(chalk.cyan('  Port:'), chalk.white(networkStatus.port));
     console.log(chalk.cyan('  Peers:'), chalk.white(`${networkStatus.peerCount}/${networkStatus.maxPeers}`));
-    console.log(chalk.cyan('  Seed Connections:'), chalk.white(`${networkStatus.connectedSeedNodes}/${networkStatus.minSeedConnections} (min required)`));
+    console.log(chalk.cyan('  Seed Connections:'), chalk.white(`${networkStatus.seedNodeConnections.connectedSeedNodes}/${networkStatus.seedNodeConnections.minSeedConnections} (min required)`));
     console.log('');
 
     if (peerList.length > 0) {
@@ -544,7 +544,7 @@ class PastellaDaemon {
     console.log(chalk.cyan('  Difficulty:'), chalk.white(this.blockchain.difficulty));
     console.log(chalk.cyan('  Block Time:'), chalk.white(`${config.blockchain.blockTime / 1000}s`));
     console.log(chalk.cyan('  Total Supply:'), chalk.white(`${totalSupply} PAS`));
-    console.log(chalk.cyan('  Pending TXs:'), chalk.white(this.blockchain.pendingTransactions.length));
+    console.log(chalk.cyan('  Pending TXs:'), chalk.white(this.blockchain.memoryPool.getPendingTransactionCount()));
     console.log('');
 
     if (latestBlock) {
