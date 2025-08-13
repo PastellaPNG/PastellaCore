@@ -158,7 +158,6 @@ data*/
 *.wallet
 blockchain.json
 wallet.json
-mempool.json
 
 # Others
 blocks-test/
