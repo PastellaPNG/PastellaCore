@@ -166,7 +166,7 @@ class PastellaCLI {
   setupCommands() {
     this.program
       .name('pastella')
-      .description('Pastella Cryptocurrency CLI (KawPow GPU Mining Only)\n\nExamples:\n  pastella --host 192.168.1.100 --port 22001 wallet balance\n  pastella --port 22002 chain status\n  pastella --host localhost --port 22003 gpu-mine start')
+      .description('Pastella Cryptocurrency CLI (KawPow GPU Mining Only)\n\nExamples:\n  pastella --host 192.168.1.100 --port 22001 wallet balance\n  pastella --port 22002 chain status\n  pastella --host localhost --port 22003 mine start')
       .version('1.0.0')
       .option('--host <host>', 'API server host (default: localhost)', 'localhost')
       .option('--port <port>', 'API server port (default: 22000)', config.api.port.toString())
@@ -203,7 +203,7 @@ class PastellaCLI {
 
     // KawPow GPU Mining commands (Main mining system)
     this.program
-      .command('gpu-mine')
+      .command('mine')
       .description('KawPow GPU Mining - Memory-hard, ASIC-resistant mining algorithm')
       .argument('[command]', 'GPU mining command to execute')
       .action(async (command) => {
@@ -248,7 +248,7 @@ class PastellaCLI {
         console.log('');
         console.log(chalk.yellow.bold('📖 AVAILABLE COMMANDS:'));
         console.log(chalk.cyan('  wallet <command>                                             - Wallet management'));
-        console.log(chalk.cyan('  gpu-mine <command>                                           - KawPow GPU mining'));
+        console.log(chalk.cyan('  mine <command>                                           - KawPow GPU mining'));
         console.log(chalk.cyan('  chain <command>                                              - Blockchain operations'));
         console.log(chalk.cyan('  network <command>                                            - Network management'));
         console.log(chalk.cyan('  daemon <command>                                             - Daemon control'));
@@ -277,7 +277,7 @@ class PastellaCLI {
         console.log(chalk.cyan('  pastella wallet balance                                      - Check wallet balance'));
         console.log(chalk.cyan('  pastella wallet send <address> <amount>                        - Send coins with replay protection'));
         console.log(chalk.cyan('  pastella wallet transaction-info <tx-id>                       - Show transaction details & protection'));
-        console.log(chalk.cyan('  pastella gpu-mine start                                      - Start GPU mining'));
+        console.log(chalk.cyan('  pastella mine start                                      - Start GPU mining'));
         console.log(chalk.cyan('  pastella chain validate checkpoint                           - Fast validation'));
         console.log(chalk.cyan('  pastella chain checkpoints add 100                           - Add checkpoint at height 100'));
         console.log(chalk.cyan('  pastella --host 192.168.1.100 chain status                   - Remote blockchain status'));

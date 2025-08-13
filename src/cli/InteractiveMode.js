@@ -68,7 +68,7 @@ class InteractiveMode {
         await this.cli.walletManager.handleCommand(args.slice(1));
         break;
       // CPU mining removed - only KawPow GPU mining available
-      case 'gpu-mine':
+      case 'mine':
         await this.cli.gpuMiningManager.handleCommand(args.slice(1));
         break;
       case 'chain':
@@ -469,13 +469,13 @@ class InteractiveMode {
     console.log('');
     
     console.log(chalk.yellow.bold('⛏️  KAW POW GPU MINING COMMANDS:'));
-    console.log(chalk.cyan('  gpu-mine start                     - Start KawPow GPU mining (Memory-hard, ASIC-resistant)'));
-    console.log(chalk.cyan('  gpu-mine stop                      - Stop GPU mining'));
-    console.log(chalk.cyan('  gpu-mine status                    - Show GPU mining status and performance'));
-    console.log(chalk.cyan('  gpu-mine config                    - Configure GPU mining settings'));
-    console.log(chalk.cyan('  gpu-mine detect                    - Detect available GPUs and initialize kernels'));
-    console.log(chalk.cyan('  gpu-mine benchmark                 - Run GPU mining benchmark'));
-    console.log(chalk.cyan('  gpu-mine log                       - Toggle GPU mining logs'));
+    console.log(chalk.cyan('  mine start                         - Start KawPow GPU mining (Memory-hard, ASIC-resistant)'));
+    console.log(chalk.cyan('  mine stop                          - Stop GPU mining'));
+    console.log(chalk.cyan('  mine status                        - Show GPU mining status and performance'));
+    console.log(chalk.cyan('  mine config                        - Configure GPU mining settings'));
+    console.log(chalk.cyan('  mine detect                        - Detect available GPUs and initialize kernels'));
+    console.log(chalk.cyan('  mine benchmark                     - Run GPU mining benchmark'));
+    console.log(chalk.cyan('  mine log                           - Toggle GPU mining logs'));
     console.log('');
     
     console.log(chalk.yellow.bold('🔗 BLOCKCHAIN COMMANDS:'));

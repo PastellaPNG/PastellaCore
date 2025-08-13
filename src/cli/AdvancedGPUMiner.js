@@ -293,7 +293,7 @@ class AdvancedGPUMiner {
 
   async handleCommand(args) {
     if (!args || args.length === 0) {
-      console.log(chalk.red('❌ Missing gpu-mine command'));
+      console.log(chalk.red('❌ Missing mine command'));
       return;
     }
 
@@ -341,7 +341,7 @@ class AdvancedGPUMiner {
         if (args.length >= 3) {
           await this.setGPUSetting(args[1], parseInt(args[2]));
         } else {
-          console.log(chalk.red('❌ Usage: gpu-mine set <setting> <value>'));
+          console.log(chalk.red('❌ Usage: mine set <setting> <value>'));
           console.log(chalk.yellow('Available settings: batchSize, threads, maxAttempts, cacheSize, lanes, rounds'));
         }
         break;
@@ -364,14 +364,14 @@ class AdvancedGPUMiner {
         this.showMiningEarnings();
         break;
       default:
-        console.log(chalk.red(`❌ Unknown gpu-mine command: ${subCmd}`));
+        console.log(chalk.red(`❌ Unknown mine command: ${subCmd}`));
         console.log(chalk.yellow('Available commands: detect, init, start, stop, status, config, benchmark, log, monitor, tune, optimize, recreate, set, cache, debug, selection, performance, fees, earnings'));
-        console.log(chalk.cyan('💡 Use "gpu-mine log" to toggle regular mining logs'));
-        console.log(chalk.cyan('💡 Use "gpu-mine debug" to toggle debug information'));
-        console.log(chalk.cyan('💡 Use "gpu-mine start" to auto-initialize and select GPUs for mining'));
-        console.log(chalk.cyan('💡 Use "gpu-mine selection" to view current GPU selection'));
-        console.log(chalk.cyan('💡 Use "gpu-mine performance" to toggle performance mode (reduces lag)'));
-        console.log(chalk.cyan('💡 Use "gpu-mine fees" to show current pending transaction fees'));
+        console.log(chalk.cyan('💡 Use "mine log" to toggle regular mining logs'));
+        console.log(chalk.cyan('💡 Use "mine debug" to toggle debug information'));
+        console.log(chalk.cyan('💡 Use "mine start" to auto-initialize and select GPUs for mining'));
+        console.log(chalk.cyan('💡 Use "mine selection" to view current GPU selection'));
+        console.log(chalk.cyan('💡 Use "mine performance" to toggle performance mode (reduces lag)'));
+        console.log(chalk.cyan('💡 Use "mine fees" to show current pending transaction fees'));
     }
   }
 
@@ -389,7 +389,7 @@ class AdvancedGPUMiner {
       
       const initSuccess = await this.initializeAdvancedKernels();
       if (!initSuccess) {
-        console.log(chalk.red('❌ Failed to auto-initialize GPU kernels. Please run "gpu-mine init" manually.'));
+        console.log(chalk.red('❌ Failed to auto-initialize GPU kernels. Please run "mine init" manually.'));
         return;
       }
       
@@ -753,7 +753,7 @@ class AdvancedGPUMiner {
         console.log(chalk.white(`💰 Current Block Reward: ${chalk.green(baseReward.toFixed(8))} PAS`));
       }
       
-      console.log(chalk.white(`📊 Pending Transactions: ${chalk.cyan('Check with "gpu-mine fees"')}`));
+      console.log(chalk.white(`📊 Pending Transactions: ${chalk.cyan('Check with "mine fees"')}`));
       console.log(chalk.white(`💡 Total Potential:      ${chalk.green('Base + All Fees')}`));
     }
     
@@ -793,7 +793,7 @@ class AdvancedGPUMiner {
     
     // Footer
     console.log(chalk.blue('\n───────────────────────────────────────────────────────────────────────────────────────────'));
-    console.log(chalk.blue('💡 Use "gpu-mine monitor" for real-time updates | "gpu-mine performance" for lag-free mode'));
+    console.log(chalk.blue('💡 Use "mine monitor" for real-time updates | "mine performance" for lag-free mode'));
     console.log(chalk.blue('───────────────────────────────────────────────────────────────────────────────────────────'));
   }
 
@@ -819,7 +819,7 @@ class AdvancedGPUMiner {
     console.log(chalk.white(`• Cache Size: ${this.gpuConfig.cacheSize} entries`));
     console.log(chalk.white(`• Expected Hash Rate: ~${this.formatHashRate(this.gpuConfig.batchSize * 100)} per batch`));
     
-    console.log(chalk.yellow('\n💡 To modify GPU settings, use: gpu-mine set <setting> <value>'));
+    console.log(chalk.yellow('\n💡 To modify GPU settings, use: mine set <setting> <value>'));
     
     // Show GPU.js capabilities if available
     if (this.gpuKernels.length > 0 && !this.gpuKernels[0].isCPUFallback) {
@@ -875,7 +875,7 @@ class AdvancedGPUMiner {
     
     // Footer
     console.log(chalk.blue('\n────────────────────────────────────────────────────────────────────────────────'));
-    console.log(chalk.blue('💡 Cache is automatically managed during mining | Use "gpu-mine status" for full info'));
+    console.log(chalk.blue('💡 Cache is automatically managed during mining | Use "mine status" for full info'));
     console.log(chalk.blue('────────────────────────────────────────────────────────────────────────────────'));
   }
 
@@ -894,7 +894,7 @@ class AdvancedGPUMiner {
 
   async runBenchmark() {
     if (this.gpuKernels.length === 0) {
-      console.log(chalk.red('❌ No KawPow GPU kernels available. Run "gpu-mine init" first.'));
+      console.log(chalk.red('❌ No KawPow GPU kernels available. Run "mine init" first.'));
       return;
     }
 
@@ -1088,8 +1088,8 @@ class AdvancedGPUMiner {
     }
     
     console.log(chalk.blue('────────────────────────────────────────────────────────────────────────────────'));
-    console.log(chalk.cyan('💡 Use "gpu-mine fees" to see current pending fees'));
-    console.log(chalk.cyan('💡 Use "gpu-mine status" for detailed mining status'));
+    console.log(chalk.cyan('💡 Use "mine fees" to see current pending fees'));
+    console.log(chalk.cyan('💡 Use "mine status" for detailed mining status'));
     console.log(chalk.blue('────────────────────────────────────────────────────────────────────────────────'));
   }
 
@@ -1901,7 +1901,7 @@ class AdvancedGPUMiner {
       this.gpuConfig.batchSize = bestConfig.batchSize;
       
       console.log(chalk.blue(`\n✅ Applied optimal configuration`));
-      console.log(chalk.yellow(`💡 You can now run "gpu-mine start" to begin mining with optimized settings`));
+      console.log(chalk.yellow(`💡 You can now run "mine start" to begin mining with optimized settings`));
       
     } else {
       console.log(chalk.red(`\n❌ No optimal configuration found. Using default settings.`));
@@ -1935,7 +1935,7 @@ class AdvancedGPUMiner {
       console.log(chalk.blue('\n📊 SELECTION STATUS'));
       console.log(chalk.blue('────────────────────────────────────────────────────────────────────────────────'));
       console.log(chalk.yellow('⚠️  No GPUs currently selected for mining'));
-      console.log(chalk.cyan('💡 Run "gpu-mine start" to select GPUs'));
+      console.log(chalk.cyan('💡 Run "mine start" to select GPUs'));
       return;
     }
 
@@ -1980,7 +1980,7 @@ class AdvancedGPUMiner {
     
     // Footer
     console.log(chalk.blue('\n────────────────────────────────────────────────────────────────────────────────'));
-    console.log(chalk.blue('💡 Use "gpu-mine status" for full mining status | "gpu-mine monitor" for real-time updates'));
+    console.log(chalk.blue('💡 Use "mine status" for full mining status | "mine monitor" for real-time updates'));
     console.log(chalk.blue('────────────────────────────────────────────────────────────────────────────────'));
   }
 
@@ -1996,7 +1996,7 @@ class AdvancedGPUMiner {
        this.showMiningLogsDebug = false;
      } else {
        console.log(chalk.yellow('⏸️  Performance mode disabled - Normal logging restored'));
-       console.log(chalk.cyan('💡 You can now use "gpu-mine log" and "gpu-mine debug" normally'));
+       console.log(chalk.cyan('💡 You can now use "mine log" and "mine debug" normally'));
      }
    }
 }
