@@ -63,6 +63,15 @@ class UTXOManager {
   }
 
   /**
+   * Clear all UTXOs (for testing/reset purposes)
+   */
+  clearUTXOs() {
+    this.utxos = [];
+    this.utxoSet.clear();
+    logger.info('UTXO_MANAGER', 'All UTXOs cleared');
+  }
+
+  /**
    * Get balance for an address
    */
   getBalance(address) {
