@@ -170,6 +170,7 @@ class MessageValidator {
               nonce: { type: 'number', minimum: 0, description: 'Mining nonce' },
               difficulty: { type: 'number', minimum: 1, description: 'Block difficulty' },
               merkleRoot: { type: 'string', pattern: '^[a-fA-F0-9]{64}$', description: 'Merkle root hash' },
+              algorithm: { type: 'string', enum: ['kawpow'], description: 'Mining algorithm used' },
             },
           },
         },
@@ -435,7 +436,7 @@ class MessageValidator {
     }
 
     // Validate properties
-    const propertiesValidation = this.validateProperties(message, schema);
+    const propertiesValidation = this.validateProperties(message, schema, message.type);
     if (!propertiesValidation.valid) {
       return propertiesValidation;
     }
@@ -470,8 +471,9 @@ class MessageValidator {
    * Validate properties
    * @param message
    * @param schema
+   * @param messageType
    */
-  validateProperties(message, schema) {
+  validateProperties(message, schema, messageType = 'unknown') {
     if (!schema.properties) {
       return { valid: true };
     }
@@ -482,11 +484,11 @@ class MessageValidator {
         return {
           valid: false,
           error: 'Unknown field',
-          details: `Field '${field}' is not allowed in message type '${message.type}'`,
+          details: `Field '${field}' is not allowed in message type '${messageType}'`,
         };
       }
 
-      const fieldValidation = this.validateField(value, fieldSchema, field);
+      const fieldValidation = this.validateField(value, fieldSchema, field, messageType);
       if (!fieldValidation.valid) {
         return fieldValidation;
       }
@@ -500,8 +502,9 @@ class MessageValidator {
    * @param value
    * @param schema
    * @param fieldName
+   * @param messageType
    */
-  validateField(value, schema, fieldName) {
+  validateField(value, schema, fieldName, messageType = 'unknown') {
     // Type validation
     if (schema.type) {
       let isValidType = false;
@@ -547,7 +550,7 @@ class MessageValidator {
 
     // Object validations
     if (schema.type === 'object') {
-      const objectValidation = this.validateObjectField(value, schema, fieldName);
+      const objectValidation = this.validateObjectField(value, schema, fieldName, messageType);
       if (!objectValidation.valid) {
         return objectValidation;
       }
@@ -698,8 +701,9 @@ class MessageValidator {
    * @param value
    * @param schema
    * @param fieldName
+   * @param messageType
    */
-  validateObjectField(value, schema, fieldName) {
+  validateObjectField(value, schema, fieldName, messageType = 'unknown') {
     if (typeof value !== 'object' || value === null || Array.isArray(value)) {
       return {
         valid: false,
@@ -709,7 +713,7 @@ class MessageValidator {
     }
 
     // Recursively validate object properties
-    const objectValidation = this.validateProperties(value, schema);
+    const objectValidation = this.validateProperties(value, schema, messageType);
     if (!objectValidation.valid) {
       return {
         valid: false,

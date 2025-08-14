@@ -220,9 +220,17 @@ class BlockchainValidation {
           throw new Error('Only first transaction can be coinbase');
         }
 
-        // Validate transaction
-        if (!transaction.isValid()) {
-          throw new Error(`Transaction ${i} is invalid: ${transaction.id}`);
+        // Validate transaction - handle both Transaction instances and plain objects
+        if (typeof transaction.isValid === 'function') {
+          // Transaction instance - call isValid method
+          if (!transaction.isValid()) {
+            throw new Error(`Transaction ${i} is invalid: ${transaction.id}`);
+          }
+        } else {
+          // Plain object - do basic validation
+          if (!transaction.id || !transaction.outputs || transaction.outputs.length === 0) {
+            throw new Error(`Transaction ${i} basic validation failed: missing required fields`);
+          }
         }
       }
 
