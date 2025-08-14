@@ -226,8 +226,55 @@ class PastellaCLI {
       .command('wallet')
       .description('Wallet management commands')
       .argument('[command]', 'Wallet command to execute')
-      .action(async command => {
-        await this.walletManager.handleCommand(command);
+      .action((command, options) => {
+        // Use arrow function to preserve 'this' context
+        const self = this;
+
+        if (!command) {
+          // No subcommand provided, show wallet help
+          console.log(chalk.yellow.bold('🔐 WALLET COMMANDS (Network-Based):'));
+          console.log(chalk.cyan('  wallet create                                                - Create new wallet'));
+          console.log(chalk.cyan('  wallet seed-import                                           - Import from seed phrase'));
+          console.log(chalk.cyan('  wallet key-import                                            - Import from private key'));
+          console.log(chalk.cyan('  wallet load                                                  - Load existing wallet'));
+          console.log(chalk.cyan('  wallet unload                                                - Unload current wallet'));
+          console.log(chalk.cyan('  wallet balance                                               - Check wallet balance'));
+          console.log(chalk.cyan('  wallet send <address> <amount>                               - Send coins with replay protection'));
+          console.log(chalk.cyan('  wallet info                                                  - Show wallet information'));
+          console.log(chalk.cyan('  wallet sync                                                  - Sync wallet with network'));
+          console.log(chalk.cyan('  wallet resync                                                - Resync wallet'));
+          console.log(chalk.cyan('  wallet save                                                  - Save wallet'));
+          console.log(chalk.cyan('  wallet transactions                                          - Show transaction history'));
+          console.log(chalk.cyan('  wallet transaction-info <transaction-id>                     - Show transaction details & protection'));
+          console.log(chalk.cyan('  wallet connect <host> <port> [protocol]                      - Connect to a node'));
+          console.log('');
+          console.log(chalk.yellow('💡 Examples:'));
+          console.log(chalk.cyan('  wallet create                                                - Create a new wallet'));
+          console.log(chalk.cyan('  wallet load mywallet mypassword                              - Load existing wallet'));
+          console.log(chalk.cyan('  wallet connect 127.0.0.1 22000                              - Connect to local node'));
+          console.log(chalk.cyan('  wallet balance                                               - Check current balance'));
+          return;
+        }
+
+        // Parse command and arguments - handle both space-separated and array formats
+        let args;
+        if (typeof command === 'string') {
+          args = command.split(' ').filter(arg => arg.trim() !== '');
+        } else if (Array.isArray(command)) {
+          args = command;
+        } else {
+          args = [command];
+        }
+
+        try {
+          self.networkWalletManager.handleCommand(args);
+        } catch (error) {
+          console.log(chalk.red(`❌ Wallet command error: ${error.message}`));
+          if (error.stack) {
+            console.log(chalk.gray('Stack trace:'));
+            console.log(chalk.gray(error.stack));
+          }
+        }
       });
 
     // CPU mining removed - only KawPow GPU mining available
@@ -268,6 +315,21 @@ class PastellaCLI {
         await this.networkManager.handleDaemonCommand(command);
       });
 
+    // Connection info command
+    this.program
+      .command('connection')
+      .description('Show connection information')
+      .action(() => {
+        const options = this.program.opts();
+        console.log(chalk.cyan('🔗 Connection Information:'));
+        console.log(chalk.white(`  Host: ${options.host}`));
+        console.log(chalk.white(`  Port: ${options.port}`));
+        if (options.dataDir) {
+          console.log(chalk.white(`  Data Directory: ${options.dataDir}`));
+        }
+        console.log(chalk.white(`  API URL: http://${options.host}:${options.port}`));
+      });
+
     // Help command
     this.program
       .command('help')
@@ -289,6 +351,22 @@ class PastellaCLI {
           chalk.cyan('  connection                                                   - Show connection info')
         );
         console.log(chalk.cyan('  help                                                         - Show this help'));
+        console.log('');
+        console.log(chalk.yellow.bold('🔐 WALLET COMMANDS (Network-Based):'));
+        console.log(chalk.cyan('  wallet create                                                - Create new wallet'));
+        console.log(chalk.cyan('  wallet seed-import                                           - Import from seed phrase'));
+        console.log(chalk.cyan('  wallet key-import                                            - Import from private key'));
+        console.log(chalk.cyan('  wallet load                                                  - Load existing wallet'));
+        console.log(chalk.cyan('  wallet unload                                                - Unload current wallet'));
+        console.log(chalk.cyan('  wallet balance                                               - Check wallet balance'));
+        console.log(chalk.cyan('  wallet send <address> <amount>                               - Send coins with replay protection'));
+        console.log(chalk.cyan('  wallet info                                                  - Show wallet information'));
+        console.log(chalk.cyan('  wallet sync                                                  - Sync wallet with network'));
+        console.log(chalk.cyan('  wallet resync                                                - Resync wallet'));
+        console.log(chalk.cyan('  wallet save                                                  - Save wallet'));
+        console.log(chalk.cyan('  wallet transactions                                          - Show transaction history'));
+        console.log(chalk.cyan('  wallet transaction-info <transaction-id>                     - Show transaction details & protection'));
+        console.log(chalk.cyan('  wallet connect <host> <port> [protocol]                      - Connect to a node'));
         console.log('');
         console.log(chalk.yellow.bold('💡 CHECKPOINT SYSTEM:'));
         console.log(
@@ -364,21 +442,6 @@ class PastellaCLI {
         console.log(chalk.cyan('  Type "help" in interactive mode for detailed commands'));
         console.log(chalk.cyan('  Check CHECKPOINTS_README.md for checkpoint system details'));
         console.log('');
-      });
-
-    // Connection info command
-    this.program
-      .command('connection')
-      .description('Show connection information')
-      .action(() => {
-        const options = this.program.opts();
-        console.log(chalk.cyan('🔗 Connection Information:'));
-        console.log(chalk.white(`  Host: ${options.host}`));
-        console.log(chalk.white(`  Port: ${options.port}`));
-        if (options.dataDir) {
-          console.log(chalk.white(`  Data Directory: ${options.dataDir}`));
-        }
-        console.log(chalk.white(`  API URL: http://${options.host}:${options.port}`));
       });
   }
 
