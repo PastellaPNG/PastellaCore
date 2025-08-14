@@ -1748,7 +1748,7 @@ class AdvancedGPUMiner {
     try {
       if (this.showMiningLogs) {
         console.log(chalk.blue('╔══════════════════════════════════════════════════════════════════════════════╗'));
-        console.log(chalk.blue('║                        📤 BLOCK SUBMISSION                               ║'));
+        console.log(chalk.blue('║                           📤 BLOCK SUBMISSION                               ║'));
         console.log(chalk.blue('╚══════════════════════════════════════════════════════════════════════════════╝'));
         console.log(chalk.white(`📦 Submitting KawPow block #${chalk.cyan(block.index)} to daemon...`));
         console.log(chalk.white(`🔑 Hash: ${chalk.cyan(block.hash.substring(0, 16))}...`));
