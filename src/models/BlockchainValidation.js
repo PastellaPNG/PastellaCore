@@ -6,13 +6,15 @@ const logger = require('../utils/logger');
 class CPUProtection {
   /**
    *
+   * @param config
    */
-  constructor() {
-    this.maxExecutionTime = 5000; // 5 seconds max execution time
-    this.maxValidationComplexity = 1000; // Maximum validation complexity score
-    this.maxTransactionsPerBatch = 100; // Maximum transactions to validate per batch
-    this.cpuThreshold = 0.8; // 80% CPU usage threshold
-    this.rateLimitPerSecond = 100; // Maximum validations per second
+  constructor(config = null) {
+    // Use config values or fallback to defaults
+    this.maxExecutionTime = config?.memory?.cpuProtection?.maxExecutionTime || 5000; // 5 seconds max execution time
+    this.maxValidationComplexity = config?.memory?.cpuProtection?.maxValidationComplexity || 1000; // Maximum validation complexity score
+    this.maxTransactionsPerBatch = config?.batchProcessing?.maxTransactionsPerBatch || 100; // Maximum transactions to validate per batch
+    this.cpuThreshold = config?.memory?.cpuProtection?.cpuThreshold || 0.8; // 80% CPU usage threshold
+    this.rateLimitPerSecond = config?.memory?.cpuProtection?.validationRateLimit || 100; // Configurable validation rate limit
 
     // CPU monitoring
     this.currentCPUUsage = 0;
@@ -178,10 +180,15 @@ class CPUProtection {
 class BlockchainValidation {
   /**
    *
+   * @param config
    */
-  constructor() {
-    // CRITICAL: Initialize CPU protection
-    this.cpuProtection = new CPUProtection();
+  constructor(config = null) {
+    // Initialize CPU protection with config
+    this.cpuProtection = new CPUProtection(config);
+
+    logger.debug('BLOCKCHAIN_VALIDATION', `Initialized with config: ${config ? 'present' : 'null'}`);
+    logger.debug('BLOCKCHAIN_VALIDATION', `CPU Protection maxTransactionsPerBatch: ${this.cpuProtection.maxTransactionsPerBatch}`);
+    logger.debug('BLOCKCHAIN_VALIDATION', `CPU Protection validationRateLimit: ${this.cpuProtection.rateLimitPerSecond}`);
   }
 
   /**
@@ -246,6 +253,22 @@ class BlockchainValidation {
       );
       return { valid: false, reason: error.message };
     }
+  }
+
+  /**
+   * Get current configuration status
+   */
+  getConfigStatus() {
+    return {
+      cpuProtection: {
+        maxExecutionTime: this.cpuProtection.maxExecutionTime,
+        maxValidationComplexity: this.cpuProtection.maxValidationComplexity,
+        maxTransactionsPerBatch: this.cpuProtection.maxTransactionsPerBatch,
+        cpuThreshold: this.cpuProtection.cpuThreshold,
+        rateLimitPerSecond: this.cpuProtection.rateLimitPerSecond
+      },
+      configReceived: this.config !== null
+    };
   }
 
   /**

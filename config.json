@@ -9,9 +9,9 @@
     "maxPeers": 80000,
     "minSeedConnections": 2,
     "seedNodes": [
-      "ws://localhost:23000",
-      "ws://localhost:23001",
-      "ws://localhost:23002"
+      "ws://127.0.0.1:23000",
+      "ws://127.0.0.1:23001",
+      "ws://127.0.0.1:23002"
     ]
   },
   "blockchain": {
@@ -63,7 +63,11 @@
       "enabled": true,
       "maxCpuUsage": 80,
       "cleanupInterval": 60000,
-      "monitoringInterval": 10000
+      "monitoringInterval": 10000,
+      "maxExecutionTime": 5000,
+      "maxValidationComplexity": 1000,
+      "cpuThreshold": 0.8,
+      "validationRateLimit": 100000
     }
   },
   "batchProcessing": {

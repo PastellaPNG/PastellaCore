@@ -53,7 +53,7 @@ class Blockchain {
     this.spamProtection = new SpamProtection();
     this.memoryPool = new MemoryPoolManager(config); // Pass config for memory limits
     this.transactionManager = new TransactionManager(this.utxoManager, this.spamProtection, this.memoryPool);
-    this.blockchainValidation = new BlockchainValidation();
+    this.blockchainValidation = new BlockchainValidation(config); // Pass config for validation limits
 
     // CRITICAL: Initialize checkpoint manager for blockchain validation
     this.checkpointManager = new CheckpointManager(dataDir);

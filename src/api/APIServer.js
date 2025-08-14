@@ -1,4 +1,3 @@
-const path = require('path');
 const cors = require('cors');
 const express = require('express');
 
@@ -80,9 +79,6 @@ class APIServer {
     this.app.use('/api/cpu-protection/settings', this.auth.validateApiKey.bind(this.auth));
 
     this.app.use('/api/batch-processing/config', this.auth.validateApiKey.bind(this.auth));
-
-    this.app.use('/api/mempool/sync', this.auth.validateApiKey.bind(this.auth));
-    this.app.use('/api/mempool/sync/status', this.auth.validateApiKey.bind(this.auth));
 
     // Add error handling middleware
     this.app.use((error, req, res, _next) => {
@@ -206,10 +202,6 @@ class APIServer {
 
     // Batch Processing configuration route (protected by API key)
     this.app.get('/api/batch-processing/config', this.getBatchProcessingConfig.bind(this)); // Behind Key
-
-    // Mempool synchronization routes (protected by API key)
-    this.app.post('/api/mempool/sync', this.syncMempoolWithPeers.bind(this)); // Behind Key
-    this.app.get('/api/mempool/sync/status', this.getMempoolSyncStatus.bind(this)); // Behind Key
 
     // Checkpoint endpoints
     this.app.get('/api/blockchain/checkpoints', this.getCheckpoints.bind(this));
@@ -2038,77 +2030,6 @@ class APIServer {
       res.status(500).json({
         success: false,
         error: error.message,
-      });
-    }
-  }
-
-  /**
-   *
-   * @param req
-   * @param res
-   */
-  syncMempoolWithPeers(req, res) {
-    try {
-      if (!this.p2pNetwork) {
-        return res.status(503).json({
-          error: 'P2P network not available',
-        });
-      }
-
-      logger.info('API', `Manual mempool sync initiated by API request`);
-      const syncResult = this.p2pNetwork.syncMempoolWithPeers();
-
-      if (syncResult.success) {
-        res.json({
-          success: true,
-          message: `Mempool sync initiated. Peers notified: ${syncResult.peersNotified}`,
-          timestamp: new Date().toISOString(),
-        });
-      } else {
-        res.status(500).json({
-          success: false,
-          error: 'Failed to initiate mempool sync',
-          details: syncResult.message,
-          timestamp: new Date().toISOString(),
-        });
-      }
-    } catch (error) {
-      logger.error('API', `Error initiating mempool sync: ${error.message}`);
-      res.status(500).json({
-        success: false,
-        error: 'Internal server error during mempool sync',
-        details: error.message,
-        timestamp: new Date().toISOString(),
-      });
-    }
-  }
-
-  /**
-   *
-   * @param req
-   * @param res
-   */
-  getMempoolSyncStatus(req, res) {
-    try {
-      if (!this.p2pNetwork) {
-        return res.status(503).json({
-          error: 'P2P network not available',
-        });
-      }
-
-      const syncStatus = this.p2pNetwork.getMempoolSyncStatus();
-      res.json({
-        success: true,
-        data: syncStatus,
-        timestamp: new Date().toISOString(),
-      });
-    } catch (error) {
-      logger.error('API', `Error getting mempool sync status: ${error.message}`);
-      res.status(500).json({
-        success: false,
-        error: 'Internal server error',
-        details: error.message,
-        timestamp: new Date().toISOString(),
       });
     }
   }
