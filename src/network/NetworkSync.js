@@ -137,8 +137,8 @@ class NetworkSync {
             type: 'MEMPOOL_SYNC_REQUEST',
             data: {
               timestamp: Date.now(),
-              networkId: this.blockchain.config?.networkId || 'unknown'
-            }
+              networkId: this.blockchain.config?.networkId || 'unknown',
+            },
           };
 
           if (this.sendMessage(peer, message)) {

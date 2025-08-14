@@ -128,7 +128,16 @@ class Transaction {
    * @param fee
    * @param tag
    */
-  constructor(inputs = [], outputs = [], fee = 0, tag = TRANSACTION_TAGS.TRANSACTION, timestamp = null, nonce = null, atomicSequence = null, isGenesisBlock = false) {
+  constructor(
+    inputs = [],
+    outputs = [],
+    fee = 0,
+    tag = TRANSACTION_TAGS.TRANSACTION,
+    timestamp = null,
+    nonce = null,
+    atomicSequence = null,
+    isGenesisBlock = false
+  ) {
     this.id = null; // Transaction hash
     this.inputs = inputs; // Array of TransactionInput
     this.outputs = outputs; // Array of TransactionOutput
@@ -674,8 +683,24 @@ class Transaction {
    * @param atomicSequence
    * @param isGenesisBlock
    */
-  static createCoinbase(address, amount, timestamp = null, nonce = null, atomicSequence = null, isGenesisBlock = false) {
-    const transaction = new Transaction([], [new TransactionOutput(address, amount)], 0, TRANSACTION_TAGS.COINBASE, timestamp, nonce, atomicSequence, isGenesisBlock);
+  static createCoinbase(
+    address,
+    amount,
+    timestamp = null,
+    nonce = null,
+    atomicSequence = null,
+    isGenesisBlock = false
+  ) {
+    const transaction = new Transaction(
+      [],
+      [new TransactionOutput(address, amount)],
+      0,
+      TRANSACTION_TAGS.COINBASE,
+      timestamp,
+      nonce,
+      atomicSequence,
+      isGenesisBlock
+    );
     transaction.isCoinbase = true;
     transaction.calculateId();
     return transaction;
@@ -691,7 +716,15 @@ class Transaction {
    * @param atomicSequence
    */
   static createTransaction(inputs, outputs, fee = 0, timestamp = null, nonce = null, atomicSequence = null) {
-    const transaction = new Transaction(inputs, outputs, fee, TRANSACTION_TAGS.TRANSACTION, timestamp, nonce, atomicSequence);
+    const transaction = new Transaction(
+      inputs,
+      outputs,
+      fee,
+      TRANSACTION_TAGS.TRANSACTION,
+      timestamp,
+      nonce,
+      atomicSequence
+    );
     transaction.calculateId();
     return transaction;
   }

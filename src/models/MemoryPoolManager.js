@@ -419,17 +419,14 @@ class MemoryPoolManager {
     const cleanupInterval = this.config?.batchProcessing?.cleanupInterval || 5 * 60 * 1000;
 
     // Clean up expired transactions at configurable interval
-    setInterval(
-      () => {
-        try {
-          this.cleanupExpiredTransactions();
-          this.manageMemoryPool();
-        } catch (error) {
-          logger.error('MEMORY_POOL', `Periodic cleanup failed: ${error.message}`);
-        }
-      },
-      cleanupInterval
-    );
+    setInterval(() => {
+      try {
+        this.cleanupExpiredTransactions();
+        this.manageMemoryPool();
+      } catch (error) {
+        logger.error('MEMORY_POOL', `Periodic cleanup failed: ${error.message}`);
+      }
+    }, cleanupInterval);
   }
 
   /**

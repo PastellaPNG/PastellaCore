@@ -122,7 +122,8 @@ class Block {
       timeDifference,
       timeDifferenceSeconds: Math.floor(timeDifference / 1000),
       // Genesis blocks (index 0) are always valid regardless of timestamp age
-      isValid: this.index === 0 ? this.timestamp > 0 : (this.timestamp > 0 && this.timestamp <= currentTime + 2 * 60 * 1000),
+      isValid:
+        this.index === 0 ? this.timestamp > 0 : this.timestamp > 0 && this.timestamp <= currentTime + 2 * 60 * 1000,
       warnings: this.getTimestampWarnings(),
     };
   }
@@ -212,7 +213,13 @@ class Block {
 
       // If it's a plain object, try to create a transaction from it
       if (tx.inputs && tx.outputs) {
-        const transaction = new Transaction(tx.inputs, tx.outputs, tx.fee, tx.tag || TRANSACTION_TAGS.TRANSACTION, tx.timestamp);
+        const transaction = new Transaction(
+          tx.inputs,
+          tx.outputs,
+          tx.fee,
+          tx.tag || TRANSACTION_TAGS.TRANSACTION,
+          tx.timestamp
+        );
         transaction.isCoinbase = tx.isCoinbase;
         transaction.timestamp = tx.timestamp;
         return transaction.calculateId();
@@ -540,7 +547,14 @@ class Block {
     let genesisTransactions = [];
     if (genesisConfig && genesisConfig.premineAmount && genesisConfig.premineAddress) {
       // Use config settings for premine
-      const premineTransaction = Transaction.createCoinbase(genesisConfig.premineAddress, genesisConfig.premineAmount, genesisConfig.timestamp, genesisConfig.coinbaseNonce, genesisConfig.coinbaseAtomicSequence, true);
+      const premineTransaction = Transaction.createCoinbase(
+        genesisConfig.premineAddress,
+        genesisConfig.premineAmount,
+        genesisConfig.timestamp,
+        genesisConfig.coinbaseNonce,
+        genesisConfig.coinbaseAtomicSequence,
+        true
+      );
       // Don't override the timestamp - keep the config timestamp for determinism
       premineTransaction.calculateId();
       genesisTransactions = [premineTransaction];

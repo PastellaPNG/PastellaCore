@@ -154,18 +154,23 @@ class P2PNetwork {
    */
   updatePeerManagerSeedNodes() {
     if (this.config?.network?.seedNodes) {
-      const seedNodeAddresses = this.config.network.seedNodes.map(seedNode => {
-        try {
-          const url = new URL(seedNode);
-          return `${url.hostname}:${url.port}`;
-        } catch (error) {
-          logger.warn('P2P_NETWORK', `Invalid seed node URL: ${seedNode}`);
-          return null;
-        }
-      }).filter(Boolean);
+      const seedNodeAddresses = this.config.network.seedNodes
+        .map(seedNode => {
+          try {
+            const url = new URL(seedNode);
+            return `${url.hostname}:${url.port}`;
+          } catch (error) {
+            logger.warn('P2P_NETWORK', `Invalid seed node URL: ${seedNode}`);
+            return null;
+          }
+        })
+        .filter(Boolean);
 
       this.peerManager.setSeedNodeAddresses(seedNodeAddresses);
-      logger.info('P2P_NETWORK', `Seed node detection enabled for ${seedNodeAddresses.length} addresses: ${seedNodeAddresses.join(', ')}`);
+      logger.info(
+        'P2P_NETWORK',
+        `Seed node detection enabled for ${seedNodeAddresses.length} addresses: ${seedNodeAddresses.join(', ')}`
+      );
     }
   }
 
@@ -386,7 +391,7 @@ class P2PNetwork {
     const peerAddress = this.extractPeerAddress(ws);
     logger.debug('P2P_NETWORK', `Peer address extracted: ${peerAddress}`);
 
-        // Track connection state
+    // Track connection state
     this.connectionStates = this.connectionStates || new Map();
     this.connectionStates.set(peerAddress, 'connecting');
     logger.debug('P2P_NETWORK', `Connection state set to 'connecting' for ${peerAddress}`);
@@ -736,7 +741,7 @@ class P2PNetwork {
       return {
         success: true,
         peersNotified: peerCount,
-        message: `Mempool sync initiated with ${peerCount} peers`
+        message: `Mempool sync initiated with ${peerCount} peers`,
       };
     } catch (error) {
       logger.error('P2P_NETWORK', `Failed to sync mempool with peers: ${error.message}`);
@@ -762,12 +767,12 @@ class P2PNetwork {
           poolSize: mempoolStatus.poolSize,
           memoryUsage: mempoolStatus.memoryUsage,
           lastCleanup: mempoolStatus.lastCleanup,
-          batchProcessing: this.blockchain.memoryPool.getBatchProcessingConfig()
+          batchProcessing: this.blockchain.memoryPool.getBatchProcessingConfig(),
         },
         lastSync: networkStatus.lastSync,
         isSyncing: networkStatus.isSyncing,
         peerCount: this.peerManager.getPeerCount(),
-        timestamp: Date.now()
+        timestamp: Date.now(),
       };
     } catch (error) {
       logger.error('P2P_NETWORK', `Failed to get mempool sync status: ${error.message}`);

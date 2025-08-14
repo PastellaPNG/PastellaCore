@@ -928,7 +928,14 @@ async function main() {
         console.log('');
 
         // Create premine transaction
-        const premineTransaction = Transaction.createCoinbase(premineAddress, premineAmount, genesisConfig.timestamp, genesisConfig.coinbaseNonce, genesisConfig.coinbaseAtomicSequence, true);
+        const premineTransaction = Transaction.createCoinbase(
+          premineAddress,
+          premineAmount,
+          genesisConfig.timestamp,
+          genesisConfig.coinbaseNonce,
+          genesisConfig.coinbaseAtomicSequence,
+          true
+        );
         premineTransaction.tag = TRANSACTION_TAGS.PREMINE;
         // Don't override the timestamp - keep the config timestamp for determinism
         premineTransaction.calculateId();

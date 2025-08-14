@@ -196,9 +196,15 @@ class MessageHandler {
       // Debug: Log authentication state
       if (this.p2pNetwork?.authenticatedPeers) {
         const authInfo = this.p2pNetwork.authenticatedPeers.get(peerAddress);
-        logger.debug('MESSAGE_HANDLER', `[AUTH_DEBUG] Peer ${peerAddress} auth state: ${authInfo ? 'authenticated' : 'not authenticated'}`);
+        logger.debug(
+          'MESSAGE_HANDLER',
+          `[AUTH_DEBUG] Peer ${peerAddress} auth state: ${authInfo ? 'authenticated' : 'not authenticated'}`
+        );
         if (authInfo) {
-          logger.debug('MESSAGE_HANDLER', `[AUTH_DEBUG] Auth details: nodeId=${authInfo.nodeId}, networkId=${authInfo.networkId}, at=${new Date(authInfo.authenticatedAt).toISOString()}`);
+          logger.debug(
+            'MESSAGE_HANDLER',
+            `[AUTH_DEBUG] Auth details: nodeId=${authInfo.nodeId}, networkId=${authInfo.networkId}, at=${new Date(authInfo.authenticatedAt).toISOString()}`
+          );
         }
       }
 
@@ -444,19 +450,23 @@ class MessageHandler {
       const pendingTransactions = this.blockchain.memoryPool.getPendingTransactions();
 
       // Find transactions in mempool that are now in the block
-      const transactionsToRemove = pendingTransactions.filter(tx =>
-        blockTransactionHashes.includes(tx.hash)
-      );
+      const transactionsToRemove = pendingTransactions.filter(tx => blockTransactionHashes.includes(tx.hash));
 
       if (transactionsToRemove.length > 0) {
-        logger.info('MESSAGE_HANDLER', `Removing ${transactionsToRemove.length} transactions from mempool (now in block ${block.index})`);
+        logger.info(
+          'MESSAGE_HANDLER',
+          `Removing ${transactionsToRemove.length} transactions from mempool (now in block ${block.index})`
+        );
 
         // Remove transactions from mempool
         this.blockchain.memoryPool.removeTransactions(transactionsToRemove);
 
         // Log the cleanup
         transactionsToRemove.forEach(tx => {
-          logger.debug('MESSAGE_HANDLER', `Removed transaction ${tx.hash} from mempool (included in block ${block.index})`);
+          logger.debug(
+            'MESSAGE_HANDLER',
+            `Removed transaction ${tx.hash} from mempool (included in block ${block.index})`
+          );
         });
       }
     } catch (error) {
@@ -508,8 +518,8 @@ class MessageHandler {
         data: {
           transactionHashes: mempoolHashes,
           count: mempoolHashes.length,
-          timestamp: Date.now()
-        }
+          timestamp: Date.now(),
+        },
       });
 
       logger.debug('MESSAGE_HANDLER', `Sent mempool inventory to ${peerAddress}: ${mempoolHashes.length} transactions`);
@@ -535,15 +545,18 @@ class MessageHandler {
       const missingTransactions = peerTransactionHashes.filter(hash => !localTransactionHashes.includes(hash));
 
       if (missingTransactions.length > 0) {
-        logger.debug('MESSAGE_HANDLER', `Requesting ${missingTransactions.length} missing transactions from ${peerAddress}`);
+        logger.debug(
+          'MESSAGE_HANDLER',
+          `Requesting ${missingTransactions.length} missing transactions from ${peerAddress}`
+        );
 
         // Request missing transactions
         this.sendMessage(ws, {
           type: 'MEMPOOL_GETDATA',
           data: {
             transactionHashes: missingTransactions,
-            count: missingTransactions.length
-          }
+            count: missingTransactions.length,
+          },
         });
       } else {
         logger.debug('MESSAGE_HANDLER', `Mempool already synchronized with ${peerAddress}`);
@@ -575,8 +588,8 @@ class MessageHandler {
             type: 'MEMPOOL_TX',
             data: {
               transaction: transaction,
-              hash: hash
-            }
+              hash: hash,
+            },
           });
         } else {
           // Transaction not found in our mempool
@@ -584,13 +597,16 @@ class MessageHandler {
             type: 'MEMPOOL_NOTFOUND',
             data: {
               hash: hash,
-              reason: 'Transaction not in mempool'
-            }
+              reason: 'Transaction not in mempool',
+            },
           });
         }
       }
 
-      logger.debug('MESSAGE_HANDLER', `Processed getdata request from ${peerAddress}: ${requestedHashes.length} transactions`);
+      logger.debug(
+        'MESSAGE_HANDLER',
+        `Processed getdata request from ${peerAddress}: ${requestedHashes.length} transactions`
+      );
     } catch (error) {
       logger.error('MESSAGE_HANDLER', `Failed to process getdata request from ${peerAddress}: ${error.message}`);
     }
@@ -620,8 +636,8 @@ class MessageHandler {
           data: {
             hash: transactionHash,
             reason: 'Transaction hash mismatch',
-            code: 0x01
-          }
+            code: 0x01,
+          },
         });
         return;
       }
@@ -658,7 +674,10 @@ class MessageHandler {
    * @param peerAddress
    */
   handleMempoolReject(ws, message, peerAddress) {
-    logger.warn('MESSAGE_HANDLER', `Mempool reject from ${peerAddress}: ${message.data.reason} (hash: ${message.data.hash})`);
+    logger.warn(
+      'MESSAGE_HANDLER',
+      `Mempool reject from ${peerAddress}: ${message.data.reason} (hash: ${message.data.hash})`
+    );
     // Transaction was rejected by peer - log for debugging
   }
 
@@ -791,7 +810,10 @@ class MessageHandler {
 
         // Check if peer is a seed node by their listening port
         isSeedNode = this.p2pNetwork?.peerManager?.isSeedNodeByListeningPort(peerAddress, peerListeningPort);
-        logger.debug('MESSAGE_HANDLER', `Peer ${peerAddress} listening on port ${peerListeningPort}, seed node: ${isSeedNode}`);
+        logger.debug(
+          'MESSAGE_HANDLER',
+          `Peer ${peerAddress} listening on port ${peerListeningPort}, seed node: ${isSeedNode}`
+        );
       } else {
         // Fallback to direct address check
         isSeedNode = this.p2pNetwork?.peerManager?.isSeedNodeAddress(peerAddress);
@@ -799,7 +821,10 @@ class MessageHandler {
 
       // Check if this is a seed node and log it
       if (isSeedNode) {
-        logger.info('MESSAGE_HANDLER', `Seed node handshake completed successfully with ${peerAddress} (listening on port ${peerListeningPort})`);
+        logger.info(
+          'MESSAGE_HANDLER',
+          `Seed node handshake completed successfully with ${peerAddress} (listening on port ${peerListeningPort})`
+        );
       } else {
         logger.info('MESSAGE_HANDLER', `Peer handshake completed successfully with ${peerAddress}`);
       }

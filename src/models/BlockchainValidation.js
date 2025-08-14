@@ -187,8 +187,14 @@ class BlockchainValidation {
     this.cpuProtection = new CPUProtection(config);
 
     logger.debug('BLOCKCHAIN_VALIDATION', `Initialized with config: ${config ? 'present' : 'null'}`);
-    logger.debug('BLOCKCHAIN_VALIDATION', `CPU Protection maxTransactionsPerBatch: ${this.cpuProtection.maxTransactionsPerBatch}`);
-    logger.debug('BLOCKCHAIN_VALIDATION', `CPU Protection validationRateLimit: ${this.cpuProtection.rateLimitPerSecond}`);
+    logger.debug(
+      'BLOCKCHAIN_VALIDATION',
+      `CPU Protection maxTransactionsPerBatch: ${this.cpuProtection.maxTransactionsPerBatch}`
+    );
+    logger.debug(
+      'BLOCKCHAIN_VALIDATION',
+      `CPU Protection validationRateLimit: ${this.cpuProtection.rateLimitPerSecond}`
+    );
   }
 
   /**
@@ -265,9 +271,9 @@ class BlockchainValidation {
         maxValidationComplexity: this.cpuProtection.maxValidationComplexity,
         maxTransactionsPerBatch: this.cpuProtection.maxTransactionsPerBatch,
         cpuThreshold: this.cpuProtection.cpuThreshold,
-        rateLimitPerSecond: this.cpuProtection.rateLimitPerSecond
+        rateLimitPerSecond: this.cpuProtection.rateLimitPerSecond,
       },
-      configReceived: this.config !== null
+      configReceived: this.config !== null,
     };
   }
 

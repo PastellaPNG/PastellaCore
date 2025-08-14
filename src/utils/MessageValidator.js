@@ -24,7 +24,12 @@ class MessageValidator {
               nodeVersion: { type: 'string', pattern: '^\\d+\\.\\d+\\.\\d+$', description: 'Semantic version' },
               timestamp: { type: 'number', minimum: 0, description: 'Unix timestamp' },
               nodeId: { type: 'string', minLength: 1, description: 'Node identifier' },
-              listeningPort: { type: 'number', minimum: 1, maximum: 65535, description: 'Port the node is listening on for incoming connections' },
+              listeningPort: {
+                type: 'number',
+                minimum: 1,
+                maximum: 65535,
+                description: 'Port the node is listening on for incoming connections',
+              },
             },
           },
         },
@@ -333,8 +338,8 @@ class MessageValidator {
         optional: ['networkId'],
         types: {
           timestamp: 'number',
-          networkId: 'string'
-        }
+          networkId: 'string',
+        },
       },
       MEMPOOL_SYNC_RESPONSE: {
         required: ['timestamp'],
@@ -342,8 +347,8 @@ class MessageValidator {
         types: {
           timestamp: 'number',
           status: 'string',
-          message: 'string'
-        }
+          message: 'string',
+        },
       },
       MEMPOOL_INV: {
         required: ['transactionHashes', 'count', 'timestamp'],
@@ -351,32 +356,32 @@ class MessageValidator {
         types: {
           transactionHashes: 'array',
           count: 'number',
-          timestamp: 'number'
-        }
+          timestamp: 'number',
+        },
       },
       MEMPOOL_GETDATA: {
         required: ['transactionHashes', 'count'],
         optional: [],
         types: {
           transactionHashes: 'array',
-          count: 'number'
-        }
+          count: 'number',
+        },
       },
       MEMPOOL_TX: {
         required: ['transaction', 'hash'],
         optional: [],
         types: {
           transaction: 'object',
-          hash: 'string'
-        }
+          hash: 'string',
+        },
       },
       MEMPOOL_NOTFOUND: {
         required: ['hash', 'reason'],
         optional: [],
         types: {
           hash: 'string',
-          reason: 'string'
-        }
+          reason: 'string',
+        },
       },
       MEMPOOL_REJECT: {
         required: ['hash', 'reason', 'code'],
@@ -384,8 +389,8 @@ class MessageValidator {
         types: {
           hash: 'string',
           reason: 'string',
-          code: 'number'
-        }
+          code: 'number',
+        },
       },
     };
 

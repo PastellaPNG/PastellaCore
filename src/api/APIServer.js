@@ -405,7 +405,7 @@ class APIServer {
 
       const testOutputs = [new TransactionOutput('test-address', 10)];
 
-              const testTransaction = new Transaction(testInputs, testOutputs, 0.001, TRANSACTION_TAGS.TRANSACTION, Date.now());
+      const testTransaction = new Transaction(testInputs, testOutputs, 0.001, TRANSACTION_TAGS.TRANSACTION, Date.now());
       testTransaction.calculateId();
 
       // Test the replay protection

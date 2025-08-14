@@ -126,7 +126,14 @@ class Blockchain {
         const { premineAmount } = genesisConfig;
         const { premineAddress } = genesisConfig;
 
-        const premineTransaction = Transaction.createCoinbase(premineAddress, premineAmount, genesisTimestamp, this.config?.blockchain?.genesis?.coinbaseNonce, this.config?.blockchain?.genesis?.coinbaseAtomicSequence, true);
+        const premineTransaction = Transaction.createCoinbase(
+          premineAddress,
+          premineAmount,
+          genesisTimestamp,
+          this.config?.blockchain?.genesis?.coinbaseNonce,
+          this.config?.blockchain?.genesis?.coinbaseAtomicSequence,
+          true
+        );
         premineTransaction.tag = TRANSACTION_TAGS.PREMINE;
         // Don't override the timestamp - keep the config timestamp for determinism
         premineTransaction.calculateId();
@@ -144,7 +151,13 @@ class Blockchain {
       } else {
         // Use config timestamp if available, otherwise create without timestamp
         const configTimestamp = this.config?.blockchain?.genesis?.timestamp;
-        genesisBlock = Block.createGenesisBlock(address, configTimestamp, [], this.difficulty, this.config?.blockchain?.genesis);
+        genesisBlock = Block.createGenesisBlock(
+          address,
+          configTimestamp,
+          [],
+          this.difficulty,
+          this.config?.blockchain?.genesis
+        );
         if (!suppressLogging) {
           logger.info('BLOCKCHAIN', 'Genesis block created with default settings');
         }
