@@ -6,13 +6,24 @@ const logger = require('../utils/logger');
 class MemoryProtection {
   /**
    *
+   * @param config
    */
-  constructor() {
-    this.maxMemoryUsage = 100 * 1024 * 1024; // 100MB default limit
-    this.maxTransactionSize = 1024 * 1024; // 1MB per transaction
-    this.maxPoolSize = 10000; // Maximum transactions in pool
-    this.memoryThreshold = 0.8; // 80% memory usage threshold
-    this.cleanupInterval = 60000; // 1 minute cleanup interval
+  constructor(config = null) {
+    // Get memory limits from config or use defaults
+    const configMemoryMB = config?.memory?.maxMemoryUsage || 2048;
+    this.maxMemoryUsage = configMemoryMB * 1024 * 1024; // Convert MB to bytes
+
+    const configTransactionSizeKB = config?.memory?.maxTransactionSize || 1024;
+    this.maxTransactionSize = configTransactionSizeKB * 1024; // Convert KB to bytes
+
+    this.maxPoolSize = config?.memory?.maxPoolSize || 10000; // Maximum transactions in pool
+    this.memoryThreshold = config?.memory?.memoryThreshold || 0.8; // Memory usage threshold
+
+    // CPU protection configuration
+    this.cpuProtectionEnabled = config?.memory?.cpuProtection?.enabled !== false; // Default to true
+    this.maxCpuUsage = config?.memory?.cpuProtection?.maxCpuUsage || 80; // Default 80%
+    this.cleanupInterval = config?.memory?.cpuProtection?.cleanupInterval || 60000; // Default 1 minute
+    this.monitoringInterval = config?.memory?.cpuProtection?.monitoringInterval || 10000; // Default 10 seconds
     this.lastCleanup = Date.now();
 
     // Memory monitoring
@@ -20,8 +31,12 @@ class MemoryProtection {
     this.transactionSizes = new Map(); // Track transaction memory usage
     this.memoryWarnings = [];
 
-    // Start memory monitoring
-    this.startMemoryMonitoring();
+    // Start monitoring (only if enabled)
+    if (this.cpuProtectionEnabled) {
+      this.startMemoryMonitoring();
+    } else {
+      logger.info('MEMORY_PROTECTION', 'CPU protection disabled via config');
+    }
   }
 
   /**
@@ -30,7 +45,7 @@ class MemoryProtection {
   startMemoryMonitoring() {
     setInterval(() => {
       this.checkMemoryUsage();
-    }, 10000); // Check every 10 seconds
+    }, this.monitoringInterval); // Use configurable interval
   }
 
   /**
@@ -143,6 +158,12 @@ class MemoryProtection {
       maxTransactionSize: this.maxTransactionSize,
       maxPoolSize: this.maxPoolSize,
       memoryThreshold: this.memoryThreshold,
+      cpuProtection: {
+        enabled: this.cpuProtectionEnabled,
+        maxCpuUsage: this.maxCpuUsage,
+        monitoringInterval: this.monitoringInterval,
+        cleanupInterval: this.cleanupInterval,
+      },
       warnings: this.memoryWarnings.length,
       lastCleanup: this.lastCleanup,
     };
@@ -167,6 +188,40 @@ class MemoryProtection {
     }
 
     logger.info('MEMORY_PROTECTION', 'Memory protection limits updated');
+  }
+
+  /**
+   * Enable or disable CPU protection
+   * @param enabled
+   */
+  setCpuProtection(enabled) {
+    this.cpuProtectionEnabled = enabled;
+
+    if (enabled && !this.monitoringInterval) {
+      // Restart monitoring if it was stopped
+      this.startMemoryMonitoring();
+      logger.info('MEMORY_PROTECTION', 'CPU protection enabled and monitoring started');
+    } else if (!enabled) {
+      logger.info('MEMORY_PROTECTION', 'CPU protection disabled');
+    }
+  }
+
+  /**
+   * Update CPU protection settings
+   * @param settings
+   */
+  updateCpuProtection(settings) {
+    if (settings.maxCpuUsage !== undefined) {
+      this.maxCpuUsage = settings.maxCpuUsage;
+    }
+    if (settings.monitoringInterval !== undefined) {
+      this.monitoringInterval = settings.monitoringInterval;
+    }
+    if (settings.cleanupInterval !== undefined) {
+      this.cleanupInterval = settings.cleanupInterval;
+    }
+
+    logger.info('MEMORY_PROTECTION', 'CPU protection settings updated');
   }
 }
 
@@ -216,7 +271,7 @@ class MemoryPoolManager {
    */
   manageMemoryPool() {
     const maxPoolSize = 10000; // Maximum pending transactions
-    const maxMemoryUsage = 100 * 1024 * 1024; // 100MB limit
+    const maxMemoryUsage = this.maxMemoryUsage; // Use configured memory limit
     let actions = 0;
 
     // Check pool size limit

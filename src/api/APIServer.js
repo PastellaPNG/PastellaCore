@@ -75,6 +75,10 @@ class APIServer {
     this.app.use('/api/spam-protection/reset', this.auth.validateApiKey.bind(this.auth));
     this.app.use('/api/transactions/batch', this.auth.validateApiKey.bind(this.auth));
 
+    this.app.use('/api/cpu-protection/enable', this.auth.validateApiKey.bind(this.auth));
+    this.app.use('/api/cpu-protection/disable', this.auth.validateApiKey.bind(this.auth));
+    this.app.use('/api/cpu-protection/settings', this.auth.validateApiKey.bind(this.auth));
+
     // Add error handling middleware
     this.app.use((error, req, res, _next) => {
       console.error(`❌ API Error: ${error.message}`);
@@ -189,6 +193,11 @@ class APIServer {
     this.app.get('/api/spam-protection/status', this.getSpamProtectionStatus.bind(this)); // Behind Key
     this.app.post('/api/spam-protection/reset', this.resetSpamProtection.bind(this)); // Behind Key
     this.app.post('/api/transactions/batch', this.addTransactionBatch.bind(this)); // Behind Key
+
+    // CPU Protection management routes (protected by API key)
+    this.app.post('/api/cpu-protection/enable', this.setCpuProtection.bind(this)); // Behind Key
+    this.app.post('/api/cpu-protection/disable', this.setCpuProtection.bind(this)); // Behind Key
+    this.app.post('/api/cpu-protection/settings', this.updateCpuProtection.bind(this)); // Behind Key
 
     // Checkpoint endpoints
     this.app.get('/api/blockchain/checkpoints', this.getCheckpoints.bind(this));
@@ -1593,13 +1602,96 @@ class APIServer {
           poolSize: status.poolSize,
           memoryUsage: status.memoryUsage,
           actions: status.actions,
-          maxPoolSize: 10000,
-          maxMemoryUsage: 100 * 1024 * 1024,
+          maxPoolSize: this.config?.memory?.maxPoolSize || 10000,
+          maxMemoryUsage: (this.config?.memory?.maxMemoryUsage || 2048) * 1024 * 1024, // Convert MB to bytes
+          cpuProtection: status.cpuProtection,
         },
         timestamp: new Date().toISOString(),
       });
     } catch (error) {
       logger.error('API', `Error getting memory pool status: ${error.message}`);
+      res.status(500).json({ error: 'Internal server error' });
+    }
+  }
+
+  /**
+   * Enable or disable CPU protection
+   * @param req
+   * @param res
+   */
+  setCpuProtection(req, res) {
+    try {
+      const { enabled } = req.body;
+
+      if (typeof enabled !== 'boolean') {
+        return res.status(400).json({
+          error: 'Invalid request: enabled must be a boolean',
+        });
+      }
+
+      this.blockchain.memoryPool.memoryProtection.setCpuProtection(enabled);
+
+      res.json({
+        success: true,
+        message: `CPU protection ${enabled ? 'enabled' : 'disabled'} successfully`,
+        data: {
+          cpuProtectionEnabled: enabled,
+        },
+        timestamp: new Date().toISOString(),
+      });
+    } catch (error) {
+      logger.error('API', `Error setting CPU protection: ${error.message}`);
+      res.status(500).json({ error: 'Internal server error' });
+    }
+  }
+
+  /**
+   * Update CPU protection settings
+   * @param req
+   * @param res
+   */
+  updateCpuProtection(req, res) {
+    try {
+      const { maxCpuUsage, monitoringInterval, cleanupInterval } = req.body;
+
+      const settings = {};
+      if (maxCpuUsage !== undefined) {
+        if (typeof maxCpuUsage !== 'number' || maxCpuUsage < 1 || maxCpuUsage > 100) {
+          return res.status(400).json({
+            error: 'Invalid maxCpuUsage: must be a number between 1 and 100',
+          });
+        }
+        settings.maxCpuUsage = maxCpuUsage;
+      }
+
+      if (monitoringInterval !== undefined) {
+        if (typeof monitoringInterval !== 'number' || monitoringInterval < 1000) {
+          return res.status(400).json({
+            error: 'Invalid monitoringInterval: must be a number >= 1000ms',
+          });
+        }
+        settings.monitoringInterval = monitoringInterval;
+      }
+
+      if (cleanupInterval !== undefined) {
+        if (typeof cleanupInterval !== 'number' || cleanupInterval < 1000) {
+          return res.status(400).json({
+            error: 'Invalid cleanupInterval: must be a number >= 1000ms',
+          });
+        }
+        settings.cleanupInterval = cleanupInterval;
+      }
+
+      this.blockchain.memoryPool.memoryProtection.updateCpuProtection(settings);
+
+      res.json({
+        success: true,
+        message: 'CPU protection settings updated successfully',
+        data: settings,
+        timestamp: new Date().toISOString(),
+      });
+    } catch (error) {
+      logger.error('API', `Error updating CPU protection: ${error.message}`);
       res.status(500).json({ error: 'Internal server error' });
     }
   }

@@ -35,8 +35,9 @@ class Blockchain {
   /**
    *
    * @param dataDir
+   * @param config
    */
-  constructor(dataDir = './data') {
+  constructor(dataDir = './data', config = null) {
     this.chain = [];
     this.difficulty = 1000; // Default difficulty (will be overridden by config)
     this.miningReward = 50;
@@ -45,12 +46,12 @@ class Blockchain {
     this.difficultyAlgorithm = 'lwma3'; // Default to LWMA-3 algorithm
     this.difficultyBlocks = 60; // Default number of blocks for LWMA calculation
     this.difficultyMinimum = 1; // Minimum difficulty floor
-    this.config = null; // Configuration for validation
+    this.config = config; // Configuration for validation
 
     // Initialize modular components
     this.utxoManager = new UTXOManager();
     this.spamProtection = new SpamProtection();
-    this.memoryPool = new MemoryPoolManager();
+    this.memoryPool = new MemoryPoolManager(config); // Pass config for memory limits
     this.transactionManager = new TransactionManager(this.utxoManager, this.spamProtection, this.memoryPool);
     this.blockchainValidation = new BlockchainValidation();
 

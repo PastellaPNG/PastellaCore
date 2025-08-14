@@ -6,8 +6,9 @@ const logger = require('./logger');
 class MessageValidator {
   /**
    *
+   * @param config
    */
-  constructor() {
+  constructor(config = null) {
     // Define comprehensive message schemas
     this.messageSchemas = {
       // Authentication messages
@@ -329,10 +330,10 @@ class MessageValidator {
 
     // Define validation rules
     this.validationRules = {
-      maxMessageSize: 1024 * 1024, // 1MB max message size
+      maxMessageSize: (config?.memory?.maxMessageSize || 1024) * 1024, // Use config or default 1MB
       maxTimestampDrift: 5 * 60 * 1000, // 5 minutes timestamp drift
-      maxBlockSize: 1024 * 1024, // 1MB max block size
-      maxTransactionSize: 100 * 1024, // 100KB max transaction size
+      maxBlockSize: (config?.memory?.maxBlockSize || 1024) * 1024, // Use config or default 1MB
+      maxTransactionSize: (config?.memory?.maxTransactionSize || 100) * 1024, // Use config or default 100KB
       maxTransactionsPerBlock: 10000, // Max transactions per block
       maxInputsPerTransaction: 1000, // Max inputs per transaction
       maxOutputsPerTransaction: 1000, // Max outputs per transaction

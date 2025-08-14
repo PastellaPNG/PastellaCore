@@ -25,7 +25,7 @@ class PastellaDaemon {
    *
    */
   constructor() {
-    this.blockchain = new Blockchain();
+    this.blockchain = new Blockchain('./data', config); // Pass config for memory limits
     this.p2pNetwork = null;
     this.apiServer = null;
     this.isRunning = false;

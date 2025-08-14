@@ -36,7 +36,7 @@ class MessageHandler {
     this.config = config;
     this.p2pNetwork = null; // Will be set by P2PNetwork after initialization
     this.messageHandlers = new Map();
-    this.messageValidator = new MessageValidator();
+    this.messageValidator = new MessageValidator(config);
     this.messageValidationStats = {
       totalMessages: 0,
       validMessages: 0,

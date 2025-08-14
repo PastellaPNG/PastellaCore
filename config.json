@@ -52,6 +52,20 @@
     "dataDir": "./data",
     "blockchainFile": "blockchain.json"
   },
+  "memory": {
+    "maxMemoryUsage": 2048,
+    "maxTransactionSize": 1024,
+    "maxPoolSize": 10000,
+    "memoryThreshold": 0.8,
+    "maxMessageSize": 1024,
+    "maxBlockSize": 1024,
+    "cpuProtection": {
+      "enabled": true,
+      "maxCpuUsage": 80,
+      "cleanupInterval": 60000,
+      "monitoringInterval": 10000
+    }
+  },
   "seedNode": {
     "enabled": false,
     "port": 23000,
