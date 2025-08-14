@@ -181,6 +181,16 @@ class MessageHandler {
         'MESSAGE_HANDLER',
         `[AUTH] Unauthenticated peer ${peerAddress} attempted sensitive operation: ${message.type}`
       );
+
+      // Debug: Log authentication state
+      if (this.p2pNetwork?.authenticatedPeers) {
+        const authInfo = this.p2pNetwork.authenticatedPeers.get(peerAddress);
+        logger.debug('MESSAGE_HANDLER', `[AUTH_DEBUG] Peer ${peerAddress} auth state: ${authInfo ? 'authenticated' : 'not authenticated'}`);
+        if (authInfo) {
+          logger.debug('MESSAGE_HANDLER', `[AUTH_DEBUG] Auth details: nodeId=${authInfo.nodeId}, networkId=${authInfo.networkId}, at=${new Date(authInfo.authenticatedAt).toISOString()}`);
+        }
+      }
+
       this.peerReputation.updatePeerReputation(peerAddress, 'bad_behavior', { reason: 'unauthorized_operation' });
       return false;
     }
@@ -450,7 +460,7 @@ class MessageHandler {
    * @param peerAddress
    */
   handleHandshake(ws, message, peerAddress) {
-    logger.debug('MESSAGE_HANDLER', `Handshake received from ${peerAddress}`);
+    logger.info('MESSAGE_HANDLER', `🎯 HANDSHAKE RECEIVED from ${peerAddress} - Processing handshake request`);
     logger.debug('MESSAGE_HANDLER', `Handshake message data: ${JSON.stringify(message.data)}`);
 
     try {
@@ -505,6 +515,7 @@ class MessageHandler {
       logger.info('MESSAGE_HANDLER', `Network ID match with ${peerAddress}: ${peerNetworkId}`);
 
       // Send successful handshake response
+      logger.info('MESSAGE_HANDLER', `✅ Sending HANDSHAKE_ACCEPTED to ${peerAddress}`);
       this.sendMessage(ws, {
         type: 'HANDSHAKE_ACCEPTED',
         data: {
@@ -514,6 +525,16 @@ class MessageHandler {
           message: 'Network ID verified successfully',
         },
       });
+
+      // CRITICAL FIX: Mark the peer as authenticated immediately after sending handshake response
+      if (this.p2pNetwork) {
+        this.p2pNetwork.authenticatedPeers.set(peerAddress, {
+          nodeId: message.data.nodeId || 'unknown',
+          networkId: peerNetworkId,
+          authenticatedAt: Date.now(),
+        });
+        logger.info('MESSAGE_HANDLER', `Peer ${peerAddress} marked as authenticated after successful handshake`);
+      }
 
       // Update peer reputation for successful handshake
       this.peerReputation.updatePeerReputation(peerAddress, 'good_behavior', {

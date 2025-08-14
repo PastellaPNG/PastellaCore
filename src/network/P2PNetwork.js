@@ -318,7 +318,65 @@ class P2PNetwork {
   }
 
   /**
-   * Handle new WebSocket connection
+   * Handle outgoing WebSocket connection (we initiated the connection)
+   * @param ws
+   * @param peerAddress
+   */
+  handleOutgoingConnection(ws, peerAddress) {
+    logger.debug('P2P_NETWORK', `Handling outgoing connection to ${peerAddress}...`);
+
+    // Extract peer address from WebSocket connection
+    const extractedAddress = this.extractPeerAddress(ws);
+    logger.debug('P2P_NETWORK', `Peer address extracted: ${extractedAddress}`);
+
+    // Track connection state
+    this.connectionStates = this.connectionStates || new Map();
+    this.connectionStates.set(extractedAddress, 'connecting');
+    logger.debug('P2P_NETWORK', `Connection state set to 'connecting' for ${extractedAddress}`);
+
+    // Check if this is a seed node connection
+    const isSeedNode = this.peerManager.isSeedNodeAddress(extractedAddress);
+    if (isSeedNode) {
+      logger.debug('P2P_NETWORK', `Outgoing connection to seed node: ${extractedAddress}`);
+    }
+
+    // Check if peer is banned
+    logger.debug('P2P_NETWORK', `Checking if peer ${extractedAddress} is banned...`);
+    if (this.peerReputation.isPeerBanned(extractedAddress)) {
+      logger.warn('P2P', `[REPUTATION] Rejecting banned peer: ${extractedAddress}`);
+      logger.debug('P2P_NETWORK', `Closing connection to banned peer ${extractedAddress}`);
+      ws.close();
+      return;
+    }
+    logger.debug('P2P_NETWORK', `Peer ${extractedAddress} is not banned, proceeding with connection`);
+
+    // Check if we can accept more peers
+    if (!this.peerManager.canAcceptPeers()) {
+      logger.warn('P2P', `Max peers reached (${this.peerManager.maxPeers}), rejecting connection`);
+      this.peerReputation.updatePeerReputation(extractedAddress, 'bad_behavior', { reason: 'max_peers_reached' });
+      ws.close();
+      return;
+    }
+
+    // Update reputation for successful connection
+    this.peerReputation.updatePeerReputation(extractedAddress, 'connect');
+
+    // Add peer to manager
+    if (!this.peerManager.addPeer(ws, extractedAddress)) {
+      ws.close();
+      return;
+    }
+
+    // CRITICAL: For outgoing connections, WE initiate the handshake
+    logger.debug('P2P_NETWORK', `Outgoing connection established with ${extractedAddress}, initiating handshake`);
+    this.initiateHandshake(ws, extractedAddress);
+
+    // Set up message handlers
+    this.setupMessageHandlers(ws, extractedAddress);
+  }
+
+  /**
+   * Handle incoming WebSocket connection (peer connected to us)
    * @param ws
    */
   handleConnection(ws) {
@@ -366,9 +424,21 @@ class P2PNetwork {
       return;
     }
 
-    // Initiate handshake with network ID validation
-    this.initiateHandshake(ws, peerAddress);
+    // CRITICAL FIX: Don't initiate handshake from receiving node
+    // The connecting node (initiator) will send the handshake
+    // We just wait for it to arrive
+    logger.debug('P2P_NETWORK', `Connection established with ${peerAddress}, waiting for handshake from peer`);
 
+    // Set up message handlers
+    this.setupMessageHandlers(ws, peerAddress);
+  }
+
+  /**
+   * Set up message handlers for a WebSocket connection
+   * @param ws
+   * @param peerAddress
+   */
+  setupMessageHandlers(ws, peerAddress) {
     ws.on('message', data => {
       try {
         const message = JSON.parse(data);
@@ -520,11 +590,9 @@ class P2PNetwork {
         ws.on('open', () => {
           clearTimeout(timeout);
 
-          // Add a small random delay to prevent simultaneous connection conflicts
-          const connectionDelay = Math.random() * 2000; // 0-2 seconds
-          setTimeout(() => {
-            this.handleConnection(ws);
-          }, connectionDelay);
+          // CRITICAL FIX: For outgoing connections, we need to handle them differently
+          // than incoming connections. Outgoing connections should send handshakes.
+          this.handleOutgoingConnection(ws, peerAddress);
 
           resolve(true);
         });
