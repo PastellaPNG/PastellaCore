@@ -4,6 +4,12 @@ const logger = require('../utils/logger');
  * Network Synchronization - Handles network synchronization and peer discovery
  */
 class NetworkSync {
+  /**
+   *
+   * @param blockchain
+   * @param peerManager
+   * @param seedNodeManager
+   */
   constructor(blockchain, peerManager, seedNodeManager) {
     this.blockchain = blockchain;
     this.peerManager = peerManager;
@@ -66,6 +72,7 @@ class NetworkSync {
 
   /**
    * Start periodic network synchronization
+   * @param intervalMs
    */
   startPeriodicSync(intervalMs = 30000) {
     // 30 seconds default
@@ -95,6 +102,7 @@ class NetworkSync {
 
   /**
    * Connect to seed nodes with minimum connection requirement
+   * @param connectToPeerFunction
    */
   async connectToSeedNodes(connectToPeerFunction) {
     if (this.seedNodeManager.minSeedConnections === 0) {
@@ -122,14 +130,14 @@ class NetworkSync {
         if (connected) {
           this.seedNodeManager.markSeedNodeConnected(seedNode);
           return true;
-        } else if (connected === null) {
+        }
+        if (connected === null) {
           // Already connected, mark as connected
           this.seedNodeManager.markSeedNodeConnected(seedNode);
           return true;
-        } else {
-          this.seedNodeManager.markSeedNodeAttempt(seedNode, false);
-          return false;
         }
+        this.seedNodeManager.markSeedNodeAttempt(seedNode, false);
+        return false;
       } catch (error) {
         this.seedNodeManager.markSeedNodeAttempt(seedNode, false);
         return false; // Fail silently
@@ -153,6 +161,7 @@ class NetworkSync {
 
   /**
    * Broadcast new block to all peers
+   * @param block
    */
   broadcastNewBlock(block) {
     const peers = this.peerManager.getAllPeers();
@@ -183,6 +192,7 @@ class NetworkSync {
 
   /**
    * Broadcast new transaction to all peers
+   * @param transaction
    */
   broadcastNewTransaction(transaction) {
     const peers = this.peerManager.getAllPeers();
@@ -213,6 +223,8 @@ class NetworkSync {
 
   /**
    * Send message to peer
+   * @param peer
+   * @param message
    */
   sendMessage(peer, message) {
     try {

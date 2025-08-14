@@ -1,12 +1,17 @@
 const fs = require('fs');
 const path = require('path');
-const logger = require('../utils/logger');
+
+const logger = require('../utils/logger.js');
 
 /**
  * Checkpoint Manager - Handles blockchain checkpoint validation
  * CRITICAL: Stops daemon if invalid checkpoints are detected
  */
 class CheckpointManager {
+  /**
+   *
+   * @param dataDir
+   */
   constructor(dataDir = './data') {
     this.dataDir = dataDir;
     this.checkpointsPath = path.join(dataDir, 'checkpoints.json');
@@ -109,6 +114,7 @@ class CheckpointManager {
   /**
    * Validate checkpoints against blockchain
    * CRITICAL: This method will stop the daemon if invalid checkpoints are found
+   * @param blockchain
    */
   validateCheckpoints(blockchain) {
     logger.debug('CHECKPOINT_MANAGER', `Validating checkpoints against blockchain...`);
@@ -181,6 +187,10 @@ class CheckpointManager {
   /**
    * CRITICAL: Handle invalid checkpoint detection
    * This method will stop the daemon and provide clear instructions
+   * @param error
+   * @param details
+   * @param checkpoint
+   * @param actualBlock
    */
   handleInvalidCheckpoint(error, details, checkpoint, actualBlock) {
     logger.error('CHECKPOINT_MANAGER', `🚨 CRITICAL: INVALID CHECKPOINT DETECTED!`);
@@ -214,6 +224,9 @@ class CheckpointManager {
 
   /**
    * Add validation error
+   * @param type
+   * @param message
+   * @param details
    */
   addValidationError(type, message, details = null) {
     const error = {
@@ -234,6 +247,7 @@ class CheckpointManager {
 
   /**
    * Get checkpoint at specific height
+   * @param height
    */
   getCheckpoint(height) {
     return this.checkpoints.find(cp => cp.height === height);
@@ -260,6 +274,9 @@ class CheckpointManager {
 
   /**
    * Add new checkpoint
+   * @param height
+   * @param hash
+   * @param description
    */
   addCheckpoint(height, hash, description = '') {
     logger.debug('CHECKPOINT_MANAGER', `Adding checkpoint: height=${height}, hash=${hash.substring(0, 16)}...`);
@@ -272,8 +289,8 @@ class CheckpointManager {
 
     const checkpoint = {
       height: parseInt(height),
-      hash: hash,
-      description: description,
+      hash,
+      description,
     };
 
     this.checkpoints.push(checkpoint);
@@ -285,6 +302,9 @@ class CheckpointManager {
 
   /**
    * Update checkpoint
+   * @param height
+   * @param hash
+   * @param description
    */
   updateCheckpoint(height, hash, description = '') {
     logger.debug('CHECKPOINT_MANAGER', `Updating checkpoint at height ${height}`);
@@ -297,7 +317,7 @@ class CheckpointManager {
 
     this.checkpoints[index] = {
       height: parseInt(height),
-      hash: hash,
+      hash,
       description: description || this.checkpoints[index].description,
     };
 
@@ -309,6 +329,7 @@ class CheckpointManager {
 
   /**
    * Remove checkpoint
+   * @param height
    */
   removeCheckpoint(height) {
     logger.debug('CHECKPOINT_MANAGER', `Removing checkpoint at height ${height}`);

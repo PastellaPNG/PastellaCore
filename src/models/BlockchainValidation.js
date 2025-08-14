@@ -4,6 +4,9 @@ const logger = require('../utils/logger');
  * CRITICAL: CPU exhaustion protection system
  */
 class CPUProtection {
+  /**
+   *
+   */
   constructor() {
     this.maxExecutionTime = 5000; // 5 seconds max execution time
     this.maxValidationComplexity = 1000; // Maximum validation complexity score
@@ -81,6 +84,8 @@ class CPUProtection {
 
   /**
    * CRITICAL: Measure execution time and complexity
+   * @param operation
+   * @param complexity
    */
   measureExecution(operation, complexity = 1) {
     const startTime = Date.now();
@@ -147,6 +152,7 @@ class CPUProtection {
 
   /**
    * CRITICAL: Update CPU protection limits
+   * @param newLimits
    */
   updateCPULimits(newLimits) {
     if (newLimits.maxExecutionTime) {
@@ -170,6 +176,9 @@ class CPUProtection {
  * Blockchain Validation - Handles all blockchain validation methods
  */
 class BlockchainValidation {
+  /**
+   *
+   */
   constructor() {
     // CRITICAL: Initialize CPU protection
     this.cpuProtection = new CPUProtection();
@@ -177,6 +186,8 @@ class BlockchainValidation {
 
   /**
    * CRITICAL: Validate block transactions with CPU protection
+   * @param block
+   * @param config
    */
   validateBlockTransactions(block, config = null) {
     const measurement = this.cpuProtection.measureExecution('validateBlockTransactions', block.transactions.length);
@@ -231,6 +242,8 @@ class BlockchainValidation {
 
   /**
    * Check if block is valid
+   * @param block
+   * @param config
    */
   isValidBlock(block, config = null) {
     logger.debug(
@@ -320,6 +333,8 @@ class BlockchainValidation {
 
   /**
    * Validate entire blockchain
+   * @param chain
+   * @param config
    */
   isValidChain(chain, config) {
     try {
@@ -381,6 +396,7 @@ class BlockchainValidation {
 
   /**
    * Fast validation that skips expensive operations
+   * @param chain
    */
   isValidChainFast(chain) {
     try {
@@ -447,6 +463,7 @@ class BlockchainValidation {
 
   /**
    * Ultra-fast validation for very large chains
+   * @param chain
    */
   isValidChainUltraFast(chain) {
     try {

@@ -1,10 +1,15 @@
 const WebSocket = require('ws');
+
 const logger = require('../utils/logger');
 
 /**
  * Peer Manager - Handles all peer connection management
  */
 class PeerManager {
+  /**
+   *
+   * @param maxPeers
+   */
   constructor(maxPeers = 10) {
     logger.debug('PEER_MANAGER', `Initializing PeerManager: maxPeers=${maxPeers}`);
 
@@ -21,6 +26,8 @@ class PeerManager {
 
   /**
    * Add a new peer connection
+   * @param ws
+   * @param peerAddress
    */
   addPeer(ws, peerAddress) {
     logger.debug(
@@ -46,6 +53,7 @@ class PeerManager {
 
   /**
    * Remove a peer connection
+   * @param ws
    */
   removePeer(ws) {
     const peerAddress = this.peerAddresses.get(ws);
@@ -61,6 +69,7 @@ class PeerManager {
 
   /**
    * Get peer address from WebSocket
+   * @param ws
    */
   getPeerAddress(ws) {
     return this.peerAddresses.get(ws) || 'unknown';
@@ -68,6 +77,7 @@ class PeerManager {
 
   /**
    * Check if peer exists
+   * @param ws
    */
   hasPeer(ws) {
     return this.peers.has(ws);
@@ -93,7 +103,7 @@ class PeerManager {
   getPeerList() {
     return Array.from(this.peerAddresses.values()).map(address => ({
       url: `ws://${address}`,
-      address: address,
+      address,
     }));
   }
 
@@ -122,6 +132,7 @@ class PeerManager {
 
   /**
    * Set maximum peer limit
+   * @param maxPeers
    */
   setMaxPeers(maxPeers) {
     this.maxPeers = maxPeers;

@@ -1,16 +1,28 @@
-const inquirer = require('inquirer');
-const chalk = require('chalk');
-const path = require('path');
 const fs = require('fs');
+const path = require('path');
+
+const chalk = require('chalk');
+const inquirer = require('inquirer');
 
 const Block = require('../models/Block');
 const { Transaction } = require('../models/Transaction');
 
+/**
+ *
+ */
 class WalletManager {
+  /**
+   *
+   * @param cli
+   */
   constructor(cli) {
     this.cli = cli;
   }
 
+  /**
+   *
+   * @param args
+   */
   async handleCommand(args) {
     if (!args || args.length === 0) {
       console.log(chalk.red('❌ Missing wallet command'));
@@ -73,6 +85,9 @@ class WalletManager {
     }
   }
 
+  /**
+   *
+   */
   async createWallet() {
     try {
       const answers = await inquirer.prompt([
@@ -113,7 +128,7 @@ class WalletManager {
       ]);
 
       // Check if wallet file already exists
-      const walletName = answers.walletName.endsWith('.wallet') ? answers.walletName : answers.walletName + '.wallet';
+      const walletName = answers.walletName.endsWith('.wallet') ? answers.walletName : `${answers.walletName}.wallet`;
       const dataDir = this.cli.localBlockchain.dataDir || './data';
       const walletPath = path.join(process.cwd(), dataDir, walletName);
 
@@ -136,6 +151,9 @@ class WalletManager {
     }
   }
 
+  /**
+   *
+   */
   async checkBalance() {
     try {
       if (!this.cli.walletLoaded) {
@@ -161,6 +179,12 @@ class WalletManager {
     }
   }
 
+  /**
+   *
+   * @param address
+   * @param amount
+   * @param fee
+   */
   async sendTransaction(address, amount, fee) {
     try {
       if (!this.cli.walletLoaded) {
@@ -264,7 +288,7 @@ class WalletManager {
         txHash: transaction.id,
         timestamp: Date.now(),
         isCoinbase: false,
-        address: address,
+        address,
       };
       this.cli.localWallet.addTransactionToHistory(sentTransactionData);
 
@@ -275,6 +299,9 @@ class WalletManager {
     }
   }
 
+  /**
+   *
+   */
   async showWalletInfo() {
     try {
       if (!this.cli.walletLoaded) {
@@ -303,7 +330,7 @@ class WalletManager {
       console.log(chalk.cyan(`Last Synced Height: ${syncState.lastSyncedHeight}`));
       console.log(
         chalk.cyan(
-          `Last Synced Hash: ${syncState.lastSyncedHash ? syncState.lastSyncedHash.substring(0, 16) + '...' : 'None'}`
+          `Last Synced Hash: ${syncState.lastSyncedHash ? `${syncState.lastSyncedHash.substring(0, 16)}...` : 'None'}`
         )
       );
       console.log(
@@ -318,6 +345,9 @@ class WalletManager {
     }
   }
 
+  /**
+   *
+   */
   async loadWallet() {
     try {
       const answers = await inquirer.prompt([
@@ -334,7 +364,7 @@ class WalletManager {
         },
       ]);
 
-      const walletName = answers.walletName.endsWith('.wallet') ? answers.walletName : answers.walletName + '.wallet';
+      const walletName = answers.walletName.endsWith('.wallet') ? answers.walletName : `${answers.walletName}.wallet`;
       const dataDir = this.cli.localBlockchain.dataDir || './data';
       const walletPath = path.join(process.cwd(), dataDir, walletName);
 
@@ -368,6 +398,9 @@ class WalletManager {
     }
   }
 
+  /**
+   *
+   */
   async unloadWallet() {
     try {
       if (!this.cli.walletLoaded) {
@@ -393,6 +426,9 @@ class WalletManager {
     }
   }
 
+  /**
+   *
+   */
   async syncWalletWithDaemon() {
     try {
       if (!this.cli.walletLoaded) {
@@ -406,7 +442,7 @@ class WalletManager {
 
       // Check if wallet is already fully synced
       if (this.cli.localWallet.isFullySynced(currentHeight)) {
-        //console.log(chalk.green(`✅ Wallet already synced to height ${currentHeight}`));
+        // console.log(chalk.green(`✅ Wallet already synced to height ${currentHeight}`));
         return true;
       }
 
@@ -425,7 +461,7 @@ class WalletManager {
 
       // Get blocks from daemon
       const response = await this.cli.makeApiRequest(`/api/blockchain/blocks?limit=${currentHeight}`);
-      const blocks = response.blocks;
+      const { blocks } = response;
 
       // Track transactions for the wallet during sync
       const walletTransactions = [];
@@ -441,10 +477,11 @@ class WalletManager {
               const walletAddress = this.cli.localWallet.getAddress();
               const isInvolved =
                 tx.outputs.some(output => output.address === walletAddress) ||
-                tx.inputs.some(input => {
-                  // For inputs, we need to check if the previous output was to our address
-                  return false; // We'll focus on outputs for now
-                });
+                tx.inputs.some(
+                  input =>
+                    // For inputs, we need to check if the previous output was to our address
+                    false // We'll focus on outputs for now
+                );
 
               if (isInvolved) {
                 const receivedAmount = tx.outputs
@@ -545,7 +582,7 @@ class WalletManager {
 
       // Get blocks from daemon (read-only, don't add to local blockchain)
       const response = await this.cli.makeApiRequest(`/api/blockchain/blocks?limit=${currentHeight}`);
-      const blocks = response.blocks;
+      const { blocks } = response;
 
       // Track transactions for the wallet during sync
       const walletTransactions = [];
@@ -560,10 +597,11 @@ class WalletManager {
             const walletAddress = this.cli.localWallet.getAddress();
             const isInvolved =
               tx.outputs.some(output => output.address === walletAddress) ||
-              tx.inputs.some(input => {
-                // For inputs, we need to check if the previous output was to our address
-                return false; // We'll focus on outputs for now
-              });
+              tx.inputs.some(
+                input =>
+                  // For inputs, we need to check if the previous output was to our address
+                  false // We'll focus on outputs for now
+              );
 
             if (isInvolved) {
               const receivedAmount = tx.outputs
@@ -649,6 +687,9 @@ class WalletManager {
     }
   }
 
+  /**
+   *
+   */
   startWalletSync() {
     // Start periodic sync every 30 seconds
     this.cli.syncInterval = setInterval(async () => {
@@ -658,6 +699,9 @@ class WalletManager {
     }, 30000);
   }
 
+  /**
+   *
+   */
   stopWalletSync() {
     if (this.cli.syncInterval) {
       clearInterval(this.cli.syncInterval);
@@ -665,6 +709,9 @@ class WalletManager {
     }
   }
 
+  /**
+   *
+   */
   async resyncWallet() {
     try {
       if (!this.cli.walletLoaded) {
@@ -735,6 +782,9 @@ class WalletManager {
     }
   }
 
+  /**
+   *
+   */
   async saveWallet() {
     try {
       if (!this.cli.walletLoaded) {
@@ -749,6 +799,9 @@ class WalletManager {
     }
   }
 
+  /**
+   *
+   */
   async showTransactionHistory() {
     try {
       if (!this.cli.walletLoaded) {
@@ -800,7 +853,9 @@ class WalletManager {
             const amount = tx.amount || 0;
 
             // Determine transaction type and color
-            let type, color, direction;
+            let type;
+            let color;
+            let direction;
             if (tx.type === 'sent') {
               type = 'SENT';
               color = chalk.red;
@@ -817,7 +872,7 @@ class WalletManager {
 
             // Compact 2-line format
             const line1 = `${chalk.cyan(`${globalIndex.toString().padStart(2)}.`)} ${color(type.padEnd(8))} ${color(`${amount} PAS`.padEnd(12))} ${direction.padEnd(20)} ${chalk.gray(`Block ${tx.blockHeight || 'Pending'}`)}`;
-            const line2 = `    ${chalk.gray(`Hash: ${tx.txHash ? tx.txHash.substring(0, 12) + '...' : 'Unknown'}`)} ${tx.fee ? chalk.yellow(`Fee: ${tx.fee} PAS`) : ''} ${chalk.gray(timestamp)}`;
+            const line2 = `    ${chalk.gray(`Hash: ${tx.txHash ? `${tx.txHash.substring(0, 12)}...` : 'Unknown'}`)} ${tx.fee ? chalk.yellow(`Fee: ${tx.fee} PAS`) : ''} ${chalk.gray(timestamp)}`;
 
             console.log(line1);
             console.log(line2);
@@ -859,7 +914,6 @@ class WalletManager {
             process.stdin.setRawMode(false);
             process.stdin.removeListener('keypress', handleKeypress);
             console.log(chalk.green('✅ Exited transaction history'));
-            return;
         }
       };
 
@@ -869,6 +923,10 @@ class WalletManager {
     }
   }
 
+  /**
+   *
+   * @param txId
+   */
   async showTransactionInfo(txId) {
     try {
       if (!this.cli.walletLoaded) {
@@ -914,7 +972,7 @@ class WalletManager {
               console.log(chalk.cyan(`  Expires: ${new Date(response.expiresAt).toLocaleString()}`));
 
               const now = Date.now();
-              const expiresAt = response.expiresAt;
+              const { expiresAt } = response;
               if (now > expiresAt) {
                 console.log(chalk.red('  Status: EXPIRED'));
               } else {

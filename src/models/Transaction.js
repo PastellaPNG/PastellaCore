@@ -1,7 +1,18 @@
-const { CryptoUtils, SafeMath } = require('../utils/crypto');
-const { TRANSACTION_TAGS } = require('../utils/constants');
+const { TRANSACTION_TAGS } = require('../utils/constants.js');
+const { CryptoUtils, SafeMath } = require('../utils/crypto.js');
+const logger = require('../utils/logger.js');
 
+/**
+ *
+ */
 class TransactionInput {
+  /**
+   *
+   * @param txId
+   * @param outputIndex
+   * @param signature
+   * @param publicKey
+   */
   constructor(txId, outputIndex, signature, publicKey) {
     this.txId = txId; // Hash of the transaction containing the UTXO
     this.outputIndex = outputIndex; // Index of the output in the previous transaction
@@ -9,6 +20,9 @@ class TransactionInput {
     this.publicKey = publicKey; // Public key of the owner
   }
 
+  /**
+   *
+   */
   toJSON() {
     return {
       txId: this.txId,
@@ -18,6 +32,10 @@ class TransactionInput {
     };
   }
 
+  /**
+   *
+   * @param data
+   */
   static fromJSON(data) {
     try {
       if (!data || typeof data !== 'object') {
@@ -47,13 +65,25 @@ class TransactionInput {
   }
 }
 
+/**
+ *
+ */
 class TransactionOutput {
+  /**
+   *
+   * @param address
+   * @param amount
+   * @param scriptPubKey
+   */
   constructor(address, amount, scriptPubKey = '') {
     this.address = address; // Recipient address
     this.amount = amount; // Amount in PAS
     this.scriptPubKey = scriptPubKey || `OP_DUP OP_HASH160 ${address} OP_EQUALVERIFY OP_CHECKSIG`;
   }
 
+  /**
+   *
+   */
   toJSON() {
     return {
       address: this.address,
@@ -62,6 +92,10 @@ class TransactionOutput {
     };
   }
 
+  /**
+   *
+   * @param data
+   */
   static fromJSON(data) {
     try {
       if (!data || typeof data !== 'object') {
@@ -83,7 +117,17 @@ class TransactionOutput {
   }
 }
 
+/**
+ *
+ */
 class Transaction {
+  /**
+   *
+   * @param inputs
+   * @param outputs
+   * @param fee
+   * @param tag
+   */
   constructor(inputs = [], outputs = [], fee = 0, tag = TRANSACTION_TAGS.TRANSACTION) {
     this.id = null; // Transaction hash
     this.inputs = inputs; // Array of TransactionInput
@@ -129,6 +173,8 @@ class Transaction {
 
   /**
    * CRITICAL: Acquire transaction lock to prevent race attacks
+   * @param lockId
+   * @param timeout
    */
   acquireLock(lockId, timeout = 30000) {
     if (this._isLocked) {
@@ -150,6 +196,7 @@ class Transaction {
 
   /**
    * CRITICAL: Release transaction lock
+   * @param lockId
    */
   releaseLock(lockId) {
     if (this._lockId === lockId) {
@@ -216,9 +263,7 @@ class Transaction {
       SafeMath.validateAmount(this.fee);
 
       // Validate total output amount
-      const totalOutput = this.outputs.reduce((sum, output) => {
-        return SafeMath.safeAdd(sum, output.amount);
-      }, 0);
+      const totalOutput = this.outputs.reduce((sum, output) => SafeMath.safeAdd(sum, output.amount), 0);
 
       // Validate total input amount (if not coinbase)
       if (!this.isCoinbase && this.inputs.length > 0) {
@@ -237,6 +282,8 @@ class Transaction {
 
   /**
    * CRITICAL: Safe fee calculation using SafeMath
+   * @param inputAmount
+   * @param outputAmount
    */
   calculateSafeFee(inputAmount, outputAmount) {
     try {
@@ -321,6 +368,7 @@ class Transaction {
 
   /**
    * CRITICAL: Protected setter for fee (prevents malleability)
+   * @param newFee
    */
   setFee(newFee) {
     this._preventModification();
@@ -329,6 +377,7 @@ class Transaction {
 
   /**
    * CRITICAL: Protected setter for outputs (prevents malleability)
+   * @param newOutputs
    */
   setOutputs(newOutputs) {
     this._preventModification();
@@ -337,6 +386,7 @@ class Transaction {
 
   /**
    * CRITICAL: Protected setter for inputs (prevents malleability)
+   * @param newInputs
    */
   setInputs(newInputs) {
     this._preventModification();
@@ -368,6 +418,7 @@ class Transaction {
 
   /**
    * Sign transaction inputs
+   * @param privateKey
    */
   sign(privateKey) {
     const dataToSign = this.getDataToSign();
@@ -489,6 +540,7 @@ class Transaction {
 
   /**
    * Check if transaction is valid with MANDATORY replay attack protection
+   * @param config
    */
   isValid(config = null) {
     logger.debug(
@@ -602,6 +654,8 @@ class Transaction {
 
   /**
    * Create coinbase transaction
+   * @param address
+   * @param amount
    */
   static createCoinbase(address, amount) {
     const transaction = new Transaction([], [new TransactionOutput(address, amount)], 0, TRANSACTION_TAGS.COINBASE);
@@ -612,6 +666,9 @@ class Transaction {
 
   /**
    * Create regular transaction
+   * @param inputs
+   * @param outputs
+   * @param fee
    */
   static createTransaction(inputs, outputs, fee = 0) {
     const transaction = new Transaction(inputs, outputs, fee);
@@ -619,6 +676,9 @@ class Transaction {
     return transaction;
   }
 
+  /**
+   *
+   */
   toJSON() {
     return {
       id: this.id,
@@ -634,6 +694,10 @@ class Transaction {
     };
   }
 
+  /**
+   *
+   * @param data
+   */
   static fromJSON(data) {
     try {
       if (!data || typeof data !== 'object') {

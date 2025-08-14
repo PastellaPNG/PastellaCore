@@ -1,8 +1,22 @@
 const { CryptoUtils } = require('../utils/crypto');
-const { Transaction } = require('./Transaction');
 const logger = require('../utils/logger');
 
+const { Transaction } = require('./Transaction');
+
+/**
+ *
+ */
 class Block {
+  /**
+   *
+   * @param index
+   * @param timestamp
+   * @param transactions
+   * @param previousHash
+   * @param nonce
+   * @param difficulty
+   * @param config
+   */
   constructor(index, timestamp, transactions, previousHash, nonce = 0, difficulty = 4, config = null) {
     this.index = index;
     this.timestamp = timestamp;
@@ -62,6 +76,7 @@ class Block {
 
   /**
    * CRITICAL: Validate timestamp against previous block
+   * @param previousBlock
    */
   validateTimestampAgainstPrevious(previousBlock) {
     if (!previousBlock) {
@@ -103,8 +118,8 @@ class Block {
 
     return {
       timestamp: this.timestamp,
-      currentTime: currentTime,
-      timeDifference: timeDifference,
+      currentTime,
+      timeDifference,
       timeDifferenceSeconds: Math.floor(timeDifference / 1000),
       isValid: this.timestamp > 0 && this.timestamp <= currentTime + 2 * 60 * 1000,
       warnings: this.getTimestampWarnings(),
@@ -221,7 +236,7 @@ class Block {
     if (this.index === 0) {
       // Use the actual difficulty, but cap it to prevent impossible mining
       const genesisDifficulty = Math.min(this.difficulty, 1000); // Cap at 1000
-      const targetHex = BigInt('0x' + maxTarget) / BigInt(Math.max(1, genesisDifficulty));
+      const targetHex = BigInt(`0x${maxTarget}`) / BigInt(Math.max(1, genesisDifficulty));
       const result = targetHex.toString(16).padStart(64, '0');
 
       return result;
@@ -229,7 +244,7 @@ class Block {
 
     // For other blocks, use the actual difficulty
     // Standard formula: Target = MaxTarget / Difficulty
-    const targetHex = BigInt('0x' + maxTarget) / BigInt(Math.max(1, this.difficulty));
+    const targetHex = BigInt(`0x${maxTarget}`) / BigInt(Math.max(1, this.difficulty));
     const result = targetHex.toString(16).padStart(64, '0');
 
     return result;
@@ -258,8 +273,8 @@ class Block {
       this.calculateId(); // Use SHA256 for CPU mining
 
       // Compare hash as hex number with target
-      const hashNum = BigInt('0x' + this.hash);
-      const targetNum = BigInt('0x' + target);
+      const hashNum = BigInt(`0x${this.hash}`);
+      const targetNum = BigInt(`0x${target}`);
 
       if (hashNum <= targetNum) {
         return true;
@@ -286,8 +301,8 @@ class Block {
       this.calculateKawPowId(); // Use KawPow for GPU mining
 
       // Compare hash as hex number with target
-      const hashNum = BigInt('0x' + this.hash);
-      const targetNum = BigInt('0x' + target);
+      const hashNum = BigInt(`0x${this.hash}`);
+      const targetNum = BigInt(`0x${target}`);
 
       if (hashNum <= targetNum) {
         return true;
@@ -310,8 +325,8 @@ class Block {
     }
 
     try {
-      const hashNum = BigInt('0x' + this.hash);
-      const targetNum = BigInt('0x' + target);
+      const hashNum = BigInt(`0x${this.hash}`);
+      const targetNum = BigInt(`0x${target}`);
       const isValid = hashNum <= targetNum;
 
       return isValid;
@@ -323,6 +338,7 @@ class Block {
 
   /**
    * Verify block hash meets difficulty requirement for specific algorithm
+   * @param algorithm
    */
   hasValidHashForAlgorithm(algorithm = 'kawpow') {
     if (algorithm === 'kawpow') {
@@ -354,6 +370,7 @@ class Block {
 
   /**
    * Verify block transactions are valid
+   * @param config
    */
   hasValidTransactions(config = null) {
     logger.debug(
@@ -496,6 +513,11 @@ class Block {
 
   /**
    * Create genesis block
+   * @param address
+   * @param timestamp
+   * @param transactions
+   * @param difficulty
+   * @param genesisConfig
    */
   static createGenesisBlock(address, timestamp = null, transactions = null, difficulty = 4, genesisConfig = null) {
     const genesisTimestamp = timestamp || Date.now();
@@ -538,6 +560,11 @@ class Block {
 
   /**
    * Create a new block
+   * @param index
+   * @param transactions
+   * @param previousHash
+   * @param difficulty
+   * @param config
    */
   static createBlock(index, transactions, previousHash, difficulty = 4, config = null) {
     const block = new Block(index, Date.now(), transactions, previousHash, 0, difficulty, config);
@@ -570,6 +597,7 @@ class Block {
 
   /**
    * Create block from JSON data
+   * @param data
    */
   static fromJSON(data) {
     logger.debug(
@@ -578,7 +606,7 @@ class Block {
     );
 
     // Convert transactions to Transaction instances if they're plain objects
-    let transactions = data.transactions;
+    let { transactions } = data;
     if (transactions && Array.isArray(transactions)) {
       logger.debug('BLOCK', `Processing ${transactions.length} transactions for conversion`);
       try {

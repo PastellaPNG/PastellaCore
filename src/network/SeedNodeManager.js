@@ -4,6 +4,11 @@ const logger = require('../utils/logger');
  * Seed Node Manager - Handles seed node connections and reconnection
  */
 class SeedNodeManager {
+  /**
+   *
+   * @param config
+   * @param port
+   */
   constructor(config = null, port = 3001) {
     this.seedNodes = [];
     this.isSeedNode = false;
@@ -22,6 +27,7 @@ class SeedNodeManager {
 
   /**
    * Load seed nodes from config
+   * @param config
    */
   loadSeedNodes(config) {
     if (config && config.network && config.network.seedNodes) {
@@ -32,6 +38,7 @@ class SeedNodeManager {
 
   /**
    * Setup seed node configuration
+   * @param seedConfig
    */
   setupSeedNode(seedConfig) {
     this.isSeedNode = true;
@@ -78,6 +85,7 @@ class SeedNodeManager {
 
   /**
    * Mark seed node as connected
+   * @param seedNode
    */
   markSeedNodeConnected(seedNode) {
     this.connectedSeedNodes++;
@@ -87,6 +95,7 @@ class SeedNodeManager {
 
   /**
    * Mark seed node as disconnected
+   * @param seedNode
    */
   markSeedNodeDisconnected(seedNode) {
     if (this.seedNodeConnections.get(seedNode)?.connected) {
@@ -98,6 +107,8 @@ class SeedNodeManager {
 
   /**
    * Mark seed node connection attempt
+   * @param seedNode
+   * @param success
    */
   markSeedNodeAttempt(seedNode, success = false) {
     const now = Date.now();
@@ -194,6 +205,7 @@ class SeedNodeManager {
 
   /**
    * Mark a seed node as disconnected based on peer address
+   * @param peerAddress
    */
   markSeedNodeAsDisconnected(peerAddress) {
     // Convert IPv6 localhost to IPv4 for comparison

@@ -1,14 +1,27 @@
-const express = require('express');
 const cors = require('cors');
-const path = require('path');
-const AuthMiddleware = require('../utils/auth');
-const InputValidator = require('../utils/validation');
-const { TRANSACTION_TAGS } = require('../utils/constants');
-const RateLimiter = require('../utils/rateLimiter');
+const express = require('express');
 
-const logger = require('../utils/logger');
+const Block = require('../models/Block.js');
+const { Transaction, TransactionInput, TransactionOutput } = require('../models/Transaction.js');
+const AuthMiddleware = require('../utils/auth.js');
+const { TRANSACTION_TAGS } = require('../utils/constants.js');
+const logger = require('../utils/logger.js');
+const RateLimiter = require('../utils/rateLimiter.js');
+const InputValidator = require('../utils/validation.js');
 
+/**
+ *
+ */
 class APIServer {
+  /**
+   *
+   * @param blockchain
+   * @param wallet
+   * @param miner
+   * @param p2pNetwork
+   * @param port
+   * @param config
+   */
   constructor(blockchain, wallet, miner, p2pNetwork, port = 3002, config = {}) {
     this.blockchain = blockchain;
     this.wallet = wallet;
@@ -62,7 +75,7 @@ class APIServer {
     this.app.use('/api/transactions/batch', this.auth.validateApiKey.bind(this.auth));
 
     // Add error handling middleware
-    this.app.use((error, req, res, next) => {
+    this.app.use((error, req, res) => {
       console.error(`❌ API Error: ${error.message}`);
       res.status(500).json({ error: error.message });
     });
@@ -70,6 +83,9 @@ class APIServer {
 
   /**
    * Rate limiting middleware for DoS protection
+   * @param req
+   * @param res
+   * @param next
    */
   rateLimitMiddleware(req, res, next) {
     const clientIP = req.ip || req.connection.remoteAddress || req.headers['x-forwarded-for'] || 'unknown';
@@ -265,6 +281,11 @@ class APIServer {
   }
 
   // Blockchain endpoints
+  /**
+   *
+   * @param req
+   * @param res
+   */
   getBlockchainStatus(req, res) {
     try {
       const status = this.blockchain.getStatus();
@@ -280,6 +301,11 @@ class APIServer {
     }
   }
 
+  /**
+   *
+   * @param req
+   * @param res
+   */
   getSecurityReport(req, res) {
     try {
       const securityReport = this.blockchain.getSecurityReport();
@@ -291,6 +317,11 @@ class APIServer {
     }
   }
 
+  /**
+   *
+   * @param req
+   * @param res
+   */
   getReplayProtectionStats(req, res) {
     try {
       const replayProtectionStats = this.blockchain.getReplayProtectionStats();
@@ -302,6 +333,11 @@ class APIServer {
     }
   }
 
+  /**
+   *
+   * @param req
+   * @param res
+   */
   getMempoolStatus(req, res) {
     try {
       const mempoolStatus = {
@@ -326,6 +362,11 @@ class APIServer {
     }
   }
 
+  /**
+   *
+   * @param req
+   * @param res
+   */
   getReplayProtectionAnalysis(req, res) {
     try {
       const analysis = this.blockchain.getReplayProtectionAnalysis();
@@ -337,11 +378,13 @@ class APIServer {
     }
   }
 
+  /**
+   *
+   * @param req
+   * @param res
+   */
   testReplayProtection(req, res) {
     try {
-      // Create a test transaction to validate replay protection
-      const { Transaction, TransactionInput, TransactionOutput } = require('../models/Transaction');
-
       // Create a test transaction with replay protection
       const testInputs = [new TransactionInput('test-tx-hash', 0, 'test-signature', 'test-public-key')];
 
@@ -361,7 +404,7 @@ class APIServer {
           expiresAt: testTransaction.expiresAt,
           isExpired: testTransaction.isExpired(),
         },
-        testResults: testResults,
+        testResults,
       });
     } catch (error) {
       res.status(500).json({
@@ -370,6 +413,11 @@ class APIServer {
     }
   }
 
+  /**
+   *
+   * @param req
+   * @param res
+   */
   getConsensusStatus(req, res) {
     try {
       const consensusStatus = this.blockchain.getConsensusStatus();
@@ -381,6 +429,11 @@ class APIServer {
     }
   }
 
+  /**
+   *
+   * @param req
+   * @param res
+   */
   getSecurityAnalysis(req, res) {
     try {
       const securityAnalysis = {
@@ -404,6 +457,11 @@ class APIServer {
     }
   }
 
+  /**
+   *
+   * @param req
+   * @param res
+   */
   addValidatorSignature(req, res) {
     try {
       const { blockHash, validatorAddress, stakeAmount } = req.body;
@@ -416,7 +474,6 @@ class APIServer {
       }
 
       // Validate inputs
-      const InputValidator = require('../utils/validation');
       const validatedHash = InputValidator.validateHash(blockHash);
       const validatedAddress = InputValidator.validateCryptocurrencyAddress(validatorAddress);
       const validatedStake = InputValidator.validateAmount(stakeAmount, { min: 0 });
@@ -559,6 +616,11 @@ class APIServer {
     return recommendations;
   }
 
+  /**
+   *
+   * @param req
+   * @param res
+   */
   resetBlockchain(req, res) {
     try {
       // Clear the blockchain and create new genesis block
@@ -587,6 +649,11 @@ class APIServer {
     }
   }
 
+  /**
+   *
+   * @param req
+   * @param res
+   */
   getBlocks(req, res) {
     try {
       // Input validation for limit parameter
@@ -601,16 +668,14 @@ class APIServer {
         // Check if block has toJSON method, if not, convert to proper Block object
         if (typeof block.toJSON === 'function') {
           return block.toJSON();
-        } else {
-          // Convert plain object to Block instance and then to JSON
-          const Block = require('../models/Block');
-          const blockInstance = Block.fromJSON(block);
-          return blockInstance.toJSON();
         }
+        // Convert plain object to Block instance and then to JSON
+        const blockInstance = Block.fromJSON(block);
+        return blockInstance.toJSON();
       });
 
       res.json({
-        blocks: blocks,
+        blocks,
       });
     } catch (error) {
       res.status(500).json({
@@ -619,6 +684,11 @@ class APIServer {
     }
   }
 
+  /**
+   *
+   * @param req
+   * @param res
+   */
   getBlock(req, res) {
     try {
       // Input validation for block index
@@ -647,7 +717,6 @@ class APIServer {
         res.json(block.toJSON());
       } else {
         // Convert plain object to Block instance and then to JSON
-        const Block = require('../models/Block');
         const blockInstance = Block.fromJSON(block);
         res.json(blockInstance.toJSON());
       }
@@ -658,6 +727,11 @@ class APIServer {
     }
   }
 
+  /**
+   *
+   * @param req
+   * @param res
+   */
   getLatestBlock(req, res) {
     try {
       const latestBlock = this.blockchain.getLatestBlock();
@@ -667,7 +741,6 @@ class APIServer {
         res.json(latestBlock.toJSON());
       } else {
         // Convert plain object to Block instance and then to JSON
-        const Block = require('../models/Block');
         const blockInstance = Block.fromJSON(latestBlock);
         res.json(blockInstance.toJSON());
       }
@@ -678,11 +751,16 @@ class APIServer {
     }
   }
 
+  /**
+   *
+   * @param req
+   * @param res
+   */
   getPendingTransactions(req, res) {
     try {
       const transactions = this.blockchain.memoryPool.getPendingTransactions().map(tx => tx.toJSON());
       res.json({
-        transactions: transactions,
+        transactions,
       });
     } catch (error) {
       res.status(500).json({
@@ -691,6 +769,11 @@ class APIServer {
     }
   }
 
+  /**
+   *
+   * @param req
+   * @param res
+   */
   getTransaction(req, res) {
     try {
       // Input validation for transaction ID
@@ -711,10 +794,9 @@ class APIServer {
 
       // Search in blockchain
       if (!transaction) {
-        for (const block of this.blockchain.chain) {
-          transaction = block.transactions.find(tx => tx.id === validatedTxId);
-          if (transaction) break;
-        }
+        transaction = this.blockchain.chain
+          .find(block => block.transactions.find(tx => tx.id === validatedTxId))
+          ?.transactions.find(tx => tx.id === validatedTxId);
       }
 
       if (!transaction) {
@@ -731,6 +813,11 @@ class APIServer {
     }
   }
 
+  /**
+   *
+   * @param req
+   * @param res
+   */
   submitTransaction(req, res) {
     try {
       const { transaction } = req.body;
@@ -742,44 +829,29 @@ class APIServer {
 
       // Validate transaction structure with InputValidator
       const transactionSchema = {
-        id: value => {
-          return InputValidator.validateString(value, { required: true, minLength: 1, maxLength: 100 });
-        },
-        inputs: value => {
-          return InputValidator.validateArray(
+        id: value => InputValidator.validateString(value, { required: true, minLength: 1, maxLength: 100 }),
+        inputs: value =>
+          InputValidator.validateArray(
             value,
             input => {
               const result = InputValidator.validateObject(input, {
-                txId: v => {
-                  return InputValidator.validateHash(v, { required: true });
-                },
-                outputIndex: v => {
-                  return InputValidator.validateNumber(v, { required: true, integer: true, min: 0 });
-                },
-                signature: v => {
-                  return InputValidator.validateString(v, { required: true, minLength: 1 });
-                },
-                publicKey: v => {
-                  return InputValidator.validateString(v, { required: true, minLength: 1 });
-                },
+                txId: v => InputValidator.validateHash(v, { required: true }),
+                outputIndex: v => InputValidator.validateNumber(v, { required: true, integer: true, min: 0 }),
+                signature: v => InputValidator.validateString(v, { required: true, minLength: 1 }),
+                publicKey: v => InputValidator.validateString(v, { required: true, minLength: 1 }),
               });
               return result;
             },
             { required: true, minLength: 1 }
-          );
-        },
-        outputs: value => {
-          return InputValidator.validateArray(
+          ),
+        outputs: value =>
+          InputValidator.validateArray(
             value,
             output => {
               // First validate the required fields (address, amount)
               const baseValidation = InputValidator.validateObject(output, {
-                address: v => {
-                  return InputValidator.validateAddress(v, { required: true });
-                },
-                amount: v => {
-                  return InputValidator.validateAmount(v, { required: true, min: 0 }, this.config.decimals || 8);
-                },
+                address: v => InputValidator.validateAddress(v, { required: true }),
+                amount: v => InputValidator.validateAmount(v, { required: true, min: 0 }, this.config.decimals || 8),
               });
 
               if (!baseValidation) {
@@ -795,34 +867,24 @@ class APIServer {
               return result;
             },
             { required: true, minLength: 1 }
-          );
-        },
-        fee: value => {
-          return InputValidator.validateNumber(value, { required: true, min: 0 });
-        },
-        timestamp: value => {
-          return InputValidator.validateNumber(value, { required: true, min: 0 });
-        },
-        isCoinbase: value => {
+          ),
+        fee: value => InputValidator.validateNumber(value, { required: true, min: 0 }),
+        timestamp: value => InputValidator.validateNumber(value, { required: true, min: 0 }),
+        isCoinbase: value =>
           // Boolean validation - just return the value as is
-          return value;
-        },
-        tag: value => {
+          value,
+        tag: value =>
           // Tag validation - just return the value as is
-          return value;
-        },
-        nonce: value => {
+          value,
+        nonce: value =>
           // Nonce validation for replay protection
-          return InputValidator.validateString(value, { required: false, minLength: 1, maxLength: 100 });
-        },
-        expiresAt: value => {
+          InputValidator.validateString(value, { required: false, minLength: 1, maxLength: 100 }),
+        expiresAt: value =>
           // Expiration validation for replay protection
-          return InputValidator.validateNumber(value, { required: false, min: 0 });
-        },
-        sequence: value => {
+          InputValidator.validateNumber(value, { required: false, min: 0 }),
+        sequence: value =>
           // Sequence validation for replay protection
-          return InputValidator.validateNumber(value, { required: false, integer: true, min: 0 });
-        },
+          InputValidator.validateNumber(value, { required: false, integer: true, min: 0 }),
       };
 
       const validatedTransaction = InputValidator.validateObject(transaction, transactionSchema);
@@ -850,7 +912,6 @@ class APIServer {
       let transactionInstance = validatedTransaction;
       if (typeof validatedTransaction === 'object' && !validatedTransaction.isValid) {
         try {
-          const { Transaction } = require('../models/Transaction');
           transactionInstance = Transaction.fromJSON(validatedTransaction);
         } catch (error) {
           logger.error('API', `Failed to convert transaction to Transaction instance: ${error.message}`);
@@ -889,6 +950,11 @@ class APIServer {
   }
 
   // Network endpoints
+  /**
+   *
+   * @param req
+   * @param res
+   */
   getNetworkStatus(req, res) {
     try {
       const status = this.p2pNetwork.getNetworkStatus();
@@ -900,11 +966,16 @@ class APIServer {
     }
   }
 
+  /**
+   *
+   * @param req
+   * @param res
+   */
   getPeers(req, res) {
     try {
       const peers = this.p2pNetwork.getPeerList();
       res.json({
-        peers: peers,
+        peers,
       });
     } catch (error) {
       res.status(500).json({
@@ -913,6 +984,11 @@ class APIServer {
     }
   }
 
+  /**
+   *
+   * @param req
+   * @param res
+   */
   connectToPeer(req, res) {
     try {
       const { host, port } = req.body;
@@ -946,6 +1022,11 @@ class APIServer {
   }
 
   // Daemon endpoints
+  /**
+   *
+   * @param req
+   * @param res
+   */
   getDaemonStatus(req, res) {
     logger.debug('API', `Daemon status request received`);
     logger.debug('API', `Request headers: ${JSON.stringify(req.headers)}`);
@@ -966,13 +1047,13 @@ class APIServer {
       logger.debug('API', `Network status: ${JSON.stringify(networkStatus)}`);
 
       const blockchainHeight = this.blockchain.chain.length;
-      const difficulty = this.blockchain.difficulty;
+      const { difficulty } = this.blockchain;
       const pendingTransactions = this.blockchain.memoryPool.getPendingTransactionCount();
 
       const blockchainStatus = {
         height: blockchainHeight,
-        difficulty: difficulty,
-        pendingTransactions: pendingTransactions,
+        difficulty,
+        pendingTransactions,
       };
       logger.debug(
         'API',
@@ -1004,6 +1085,11 @@ class APIServer {
   }
 
   // Utility endpoints
+  /**
+   *
+   * @param req
+   * @param res
+   */
   getHealth(req, res) {
     res.json({
       status: 'healthy',
@@ -1012,6 +1098,11 @@ class APIServer {
     });
   }
 
+  /**
+   *
+   * @param req
+   * @param res
+   */
   getInfo(req, res) {
     res.json({
       name: this.config.name,
@@ -1033,6 +1124,11 @@ class APIServer {
   }
 
   // Block submission endpoints
+  /**
+   *
+   * @param req
+   * @param res
+   */
   submitBlock(req, res) {
     logger.debug('API', `Block submission request received`);
     logger.debug('API', `Request body: ${JSON.stringify(req.body)}`);
@@ -1059,9 +1155,7 @@ class APIServer {
       );
 
       // Import Block class
-      logger.debug('API', `Importing Block class`);
-      const Block = require('../models/Block');
-      logger.debug('API', `Block class imported successfully`);
+      logger.debug('API', `Block class available`);
 
       // Create block object from JSON
       logger.debug('API', `Creating Block instance from JSON data`);
@@ -1162,6 +1256,11 @@ class APIServer {
     }
   }
 
+  /**
+   *
+   * @param req
+   * @param res
+   */
   getPendingBlocks(req, res) {
     try {
       const pendingTransactions = this.blockchain.memoryPool.getPendingTransactions();
@@ -1171,7 +1270,7 @@ class APIServer {
       let currentGroup = [];
       let currentSize = 0;
 
-      for (const tx of pendingTransactions) {
+      pendingTransactions.forEach(tx => {
         if (currentSize + tx.size > this.config.blockchain.blockSize) {
           blockGroups.push(currentGroup);
           currentGroup = [];
@@ -1179,7 +1278,7 @@ class APIServer {
         }
         currentGroup.push(tx);
         currentSize += tx.size;
-      }
+      });
       if (currentGroup.length > 0) {
         blockGroups.push(currentGroup);
       }
@@ -1198,6 +1297,11 @@ class APIServer {
     }
   }
 
+  /**
+   *
+   * @param req
+   * @param res
+   */
   validateBlock(req, res) {
     try {
       const { block } = req.body;
@@ -1207,9 +1311,6 @@ class APIServer {
           error: 'Block data is required',
         });
       }
-
-      // Import Block class
-      const Block = require('../models/Block');
 
       // Create block object from JSON
       const blockObj = Block.fromJSON(block);
@@ -1235,6 +1336,11 @@ class APIServer {
   }
 
   // Reputation endpoints
+  /**
+   *
+   * @param req
+   * @param res
+   */
   getReputationStats(req, res) {
     try {
       if (!this.p2pNetwork) {
@@ -1255,6 +1361,11 @@ class APIServer {
     }
   }
 
+  /**
+   *
+   * @param req
+   * @param res
+   */
   getPeerReputation(req, res) {
     try {
       if (!this.p2pNetwork) {
@@ -1279,7 +1390,7 @@ class APIServer {
       const reputation = this.p2pNetwork.getPeerReputation(validatedPeerAddress);
       res.json({
         peerAddress: validatedPeerAddress,
-        reputation: reputation,
+        reputation,
         timestamp: new Date().toISOString(),
       });
     } catch (error) {
@@ -1290,6 +1401,11 @@ class APIServer {
   }
 
   // Message validation endpoints
+  /**
+   *
+   * @param req
+   * @param res
+   */
   getMessageValidationStats(req, res) {
     try {
       if (!this.p2pNetwork) {
@@ -1309,6 +1425,11 @@ class APIServer {
     }
   }
 
+  /**
+   *
+   * @param req
+   * @param res
+   */
   resetMessageValidationStats(req, res) {
     try {
       if (!this.p2pNetwork) {
@@ -1328,6 +1449,11 @@ class APIServer {
     }
   }
 
+  /**
+   *
+   * @param req
+   * @param res
+   */
   getPartitionStats(req, res) {
     try {
       if (!this.p2pNetwork) {
@@ -1348,6 +1474,11 @@ class APIServer {
     }
   }
 
+  /**
+   *
+   * @param req
+   * @param res
+   */
   resetPartitionStats(req, res) {
     try {
       if (!this.p2pNetwork) {
@@ -1369,6 +1500,11 @@ class APIServer {
   }
 
   // Rate limiting management endpoints
+  /**
+   *
+   * @param req
+   * @param res
+   */
   getRateLimitStats(req, res) {
     try {
       const stats = this.rateLimiter.getStats();
@@ -1383,6 +1519,11 @@ class APIServer {
     }
   }
 
+  /**
+   *
+   * @param req
+   * @param res
+   */
   resetRateLimitsForIP(req, res) {
     try {
       const { ip } = req.params;
@@ -1405,6 +1546,11 @@ class APIServer {
     }
   }
 
+  /**
+   *
+   * @param req
+   * @param res
+   */
   resetAllRateLimits(req, res) {
     try {
       const resetCount = this.rateLimiter.resetAll();
@@ -1421,6 +1567,11 @@ class APIServer {
   }
 
   // NEW FEATURES: Memory pool and spam protection management endpoints
+  /**
+   *
+   * @param req
+   * @param res
+   */
   getMemoryPoolStatus(req, res) {
     try {
       const status = this.blockchain.manageMemoryPool();
@@ -1441,6 +1592,11 @@ class APIServer {
     }
   }
 
+  /**
+   *
+   * @param req
+   * @param res
+   */
   getSpamProtectionStatus(req, res) {
     try {
       const bannedAddresses = Array.from(this.blockchain.spamProtection.spamProtection.bannedAddresses);
@@ -1470,6 +1626,11 @@ class APIServer {
     }
   }
 
+  /**
+   *
+   * @param req
+   * @param res
+   */
   resetSpamProtection(req, res) {
     try {
       // Reset all spam protection data
@@ -1488,6 +1649,11 @@ class APIServer {
     }
   }
 
+  /**
+   *
+   * @param req
+   * @param res
+   */
   addTransactionBatch(req, res) {
     try {
       const { transactions } = req.body;
@@ -1502,7 +1668,6 @@ class APIServer {
       const processedTransactions = transactions.map(tx => {
         if (typeof tx === 'object' && !tx.isValid) {
           try {
-            const { Transaction } = require('../models/Transaction');
             return Transaction.fromJSON(tx);
           } catch (error) {
             logger.warn(
@@ -1528,6 +1693,11 @@ class APIServer {
     }
   }
 
+  /**
+   *
+   * @param req
+   * @param res
+   */
   getMemoryProtectionStatus(req, res) {
     try {
       const status = this.blockchain.getMemoryProtectionStatus();
@@ -1542,6 +1712,11 @@ class APIServer {
     }
   }
 
+  /**
+   *
+   * @param req
+   * @param res
+   */
   getCPUProtectionStatus(req, res) {
     try {
       const status = this.blockchain.getCPUProtectionStatus();
@@ -1556,6 +1731,11 @@ class APIServer {
     }
   }
 
+  /**
+   *
+   * @param req
+   * @param res
+   */
   getReputationStatus(req, res) {
     try {
       if (!this.p2pNetwork) {
@@ -1576,6 +1756,11 @@ class APIServer {
   }
 
   // Checkpoint endpoints
+  /**
+   *
+   * @param req
+   * @param res
+   */
   getCheckpoints(req, res) {
     try {
       const checkpoints = this.blockchain.checkpointManager.getAllCheckpoints();
@@ -1583,8 +1768,8 @@ class APIServer {
 
       res.json({
         success: true,
-        checkpoints: checkpoints,
-        stats: stats,
+        checkpoints,
+        stats,
       });
     } catch (error) {
       logger.error('API', `Error getting checkpoints: ${error.message}`);
@@ -1595,6 +1780,11 @@ class APIServer {
     }
   }
 
+  /**
+   *
+   * @param req
+   * @param res
+   */
   addCheckpoint(req, res) {
     try {
       const { height, hash, description } = req.body;
@@ -1628,6 +1818,11 @@ class APIServer {
     }
   }
 
+  /**
+   *
+   * @param req
+   * @param res
+   */
   updateCheckpoints(req, res) {
     try {
       // This would typically update checkpoints from a trusted source
@@ -1646,6 +1841,11 @@ class APIServer {
     }
   }
 
+  /**
+   *
+   * @param req
+   * @param res
+   */
   clearCheckpoints(req, res) {
     try {
       const success = this.blockchain.checkpointManager.clearCheckpoints();
@@ -1670,6 +1870,11 @@ class APIServer {
     }
   }
 
+  /**
+   *
+   * @param req
+   * @param res
+   */
   validateCheckpoints(req, res) {
     try {
       logger.debug('API', `Checkpoint validation request received`);
@@ -1683,7 +1888,7 @@ class APIServer {
           success: true,
           message: 'Checkpoint validation completed successfully',
           checkpointsUsed: stats.total,
-          stats: stats,
+          stats,
         });
       } else {
         // This should never happen as validateCheckpoints will exit the process

@@ -1,17 +1,19 @@
-const Block = require('./Block');
-const { Transaction } = require('./Transaction');
 const fs = require('fs');
 const path = require('path');
-const logger = require('../utils/logger');
+
 const { TRANSACTION_TAGS } = require('../utils/constants');
+const logger = require('../utils/logger');
+
+const Block = require('./Block');
 
 // Import modular components
-const UTXOManager = require('./UTXOManager');
-const SpamProtection = require('./SpamProtection');
-const MemoryPoolManager = require('./MemoryPoolManager');
-const TransactionManager = require('./TransactionManager');
 const BlockchainValidation = require('./BlockchainValidation');
 const CheckpointManager = require('./CheckpointManager');
+const MemoryPoolManager = require('./MemoryPoolManager');
+const SpamProtection = require('./SpamProtection');
+const { Transaction } = require('./Transaction');
+const TransactionManager = require('./TransactionManager');
+const UTXOManager = require('./UTXOManager');
 
 /**
  * MODULAR & SECURE BLOCKCHAIN CLASS
@@ -30,6 +32,10 @@ const CheckpointManager = require('./CheckpointManager');
  * - Reduced file size and complexity
  */
 class Blockchain {
+  /**
+   *
+   * @param dataDir
+   */
   constructor(dataDir = './data') {
     this.chain = [];
     this.difficulty = 1000; // Default difficulty (will be overridden by config)
@@ -87,6 +93,9 @@ class Blockchain {
 
   /**
    * Initialize blockchain with genesis block
+   * @param address
+   * @param config
+   * @param suppressLogging
    */
   initialize(address, config = null, suppressLogging = false) {
     // Store config for validation
@@ -113,8 +122,8 @@ class Blockchain {
       if (config && config.blockchain && config.blockchain.genesis) {
         const genesisConfig = config.blockchain.genesis;
         const genesisTimestamp = genesisConfig.timestamp;
-        const premineAmount = genesisConfig.premineAmount;
-        const premineAddress = genesisConfig.premineAddress;
+        const { premineAmount } = genesisConfig;
+        const { premineAddress } = genesisConfig;
 
         const premineTransaction = Transaction.createCoinbase(premineAddress, premineAmount);
         premineTransaction.tag = TRANSACTION_TAGS.PREMINE;
@@ -186,6 +195,8 @@ class Blockchain {
 
   /**
    * Add new block to the chain
+   * @param block
+   * @param skipValidation
    */
   addBlock(block, skipValidation = false) {
     logger.debug(
@@ -278,6 +289,7 @@ class Blockchain {
 
   /**
    * CRITICAL: Add transactions to historical database for replay attack protection
+   * @param block
    */
   addTransactionsToHistoricalDatabase(block) {
     block.transactions.forEach(transaction => {
@@ -293,7 +305,7 @@ class Blockchain {
             blockHeight: block.index,
             timestamp: transaction.timestamp,
             nonce: transaction.nonce,
-            senderAddress: senderAddress,
+            senderAddress,
           });
 
           // Also track by transaction ID for duplicate detection
@@ -310,6 +322,7 @@ class Blockchain {
 
   /**
    * CRITICAL: Get sender address from transaction inputs
+   * @param transaction
    */
   getTransactionSenderAddress(transaction) {
     if (!transaction.inputs || transaction.inputs.length === 0) {
@@ -330,6 +343,7 @@ class Blockchain {
 
   /**
    * CRITICAL: Check if transaction is a replay attack against historical blockchain
+   * @param transaction
    */
   isReplayAttack(transaction) {
     if (transaction.isCoinbase) {
@@ -384,6 +398,9 @@ class Blockchain {
 
   /**
    * CRITICAL: 51% Attack Protection - Validate consensus
+   * @param block
+   * @param minerAddress
+   * @param hashRate
    */
   validateConsensus(block, minerAddress, hashRate) {
     try {
@@ -453,6 +470,9 @@ class Blockchain {
 
   /**
    * CRITICAL: Add validator signature for hybrid consensus
+   * @param blockHash
+   * @param validatorAddress
+   * @param stakeAmount
    */
   addValidatorSignature(blockHash, validatorAddress, stakeAmount) {
     if (stakeAmount >= this.consensusManager.minStakeForValidation) {
@@ -578,7 +598,7 @@ class Blockchain {
     // Check for potential threats (transactions with same nonce from different senders)
     const nonceGroups = new Map();
     this.historicalTransactions.forEach((value, key) => {
-      const nonce = value.nonce;
+      const { nonce } = value;
       if (!nonceGroups.has(nonce)) {
         nonceGroups.set(nonce, []);
       }
@@ -591,8 +611,8 @@ class Blockchain {
         if (senders.length > 1) {
           analysis.threats.push({
             type: 'Nonce collision detected',
-            nonce: nonce,
-            senders: senders,
+            nonce,
+            senders,
             severity: 'low',
             description: 'Multiple senders using same nonce (this is normal if nonces are truly random)',
           });
@@ -606,6 +626,7 @@ class Blockchain {
   /**
    * CRITICAL: Test replay protection by attempting to add a duplicate transaction
    * This is useful for security testing and validation
+   * @param transaction
    */
   testReplayProtection(transaction) {
     const testResults = {
@@ -751,6 +772,7 @@ class Blockchain {
 
   /**
    * Add transaction to pending pool
+   * @param transaction
    */
   addPendingTransaction(transaction) {
     // CRITICAL: Check for replay attacks against historical blockchain BEFORE adding to pool
@@ -767,6 +789,7 @@ class Blockchain {
 
   /**
    * Add multiple transactions in batch
+   * @param transactions
    */
   addTransactionBatch(transactions) {
     return this.transactionManager.addTransactionBatch(transactions);
@@ -823,6 +846,7 @@ class Blockchain {
 
   /**
    * Get balance for an address
+   * @param address
    */
   getBalance(address) {
     return this.utxoManager.getBalance(address);
@@ -830,6 +854,7 @@ class Blockchain {
 
   /**
    * Get UTXOs for an address
+   * @param address
    */
   getUTXOsForAddress(address) {
     return this.utxoManager.getUTXOsForAddress(address);
@@ -837,6 +862,11 @@ class Blockchain {
 
   /**
    * Create transaction
+   * @param fromAddress
+   * @param toAddress
+   * @param amount
+   * @param fee
+   * @param tag
    */
   createTransaction(fromAddress, toAddress, amount, fee = 0.001, tag = TRANSACTION_TAGS.TRANSACTION) {
     return this.transactionManager.createTransaction(fromAddress, toAddress, amount, fee, tag);
@@ -844,6 +874,7 @@ class Blockchain {
 
   /**
    * Save blockchain to file
+   * @param filePath
    */
   saveToFile(filePath) {
     try {
@@ -872,6 +903,7 @@ class Blockchain {
 
   /**
    * Load blockchain from file
+   * @param filePath
    */
   loadFromFile(filePath) {
     logger.debug('BLOCKCHAIN', `Loading blockchain from file: ${filePath}`);
@@ -984,10 +1016,9 @@ class Blockchain {
           `Final blockchain state: chain.length=${this.chain.length}, difficulty=${this.difficulty}, miningReward=${this.miningReward}`
         );
         return true;
-      } else {
-        logger.debug('BLOCKCHAIN', `File does not exist: ${filePath}`);
-        return false;
       }
+      logger.debug('BLOCKCHAIN', `File does not exist: ${filePath}`);
+      return false;
     } catch (error) {
       logger.error('BLOCKCHAIN', `Failed to load blockchain: ${error.message}`);
       logger.error('BLOCKCHAIN', `Error stack: ${error.stack}`);

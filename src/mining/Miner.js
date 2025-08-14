@@ -1,7 +1,15 @@
 const Block = require('../models/Block');
 const { Transaction } = require('../models/Transaction');
 
+/**
+ *
+ */
 class Miner {
+  /**
+   *
+   * @param blockchain
+   * @param wallet
+   */
   constructor(blockchain, wallet) {
     this.blockchain = blockchain;
     this.wallet = wallet;
@@ -19,6 +27,7 @@ class Miner {
 
   /**
    * Set custom mining address
+   * @param address
    */
   setMiningAddress(address) {
     this.miningAddress = address;
@@ -42,6 +51,7 @@ class Miner {
 
   /**
    * Set debug mode
+   * @param enabled
    */
   setDebugMode(enabled) {
     this.debugMode = enabled;
@@ -50,6 +60,7 @@ class Miner {
 
   /**
    * Verify block validity
+   * @param block
    */
   verifyBlock(block) {
     try {
@@ -86,8 +97,8 @@ class Miner {
 
       // Verify difficulty
       const target = block.calculateTarget();
-      const hashNum = BigInt('0x' + block.hash);
-      const targetNum = BigInt('0x' + target);
+      const hashNum = BigInt(`0x${block.hash}`);
+      const targetNum = BigInt(`0x${target}`);
       if (hashNum > targetNum) {
         console.log('Block does not meet difficulty requirement');
         return false;
@@ -215,7 +226,7 @@ class Miner {
     if (!this.isMining || !this.currentBlock) return;
 
     const target = this.currentBlock.calculateTarget();
-    let attempts = 0;
+    const attempts = 0;
     const batchSize = 1000; // Process in batches for better performance
 
     const mineBatch = () => {
@@ -227,8 +238,8 @@ class Miner {
         this.totalHashes++;
 
         // Compare hash as hex number with target
-        const hashNum = BigInt('0x' + this.currentBlock.hash);
-        const targetNum = BigInt('0x' + target);
+        const hashNum = BigInt(`0x${this.currentBlock.hash}`);
+        const targetNum = BigInt(`0x${target}`);
 
         if (hashNum <= targetNum) {
           // Block found!
@@ -311,7 +322,7 @@ class Miner {
             hash: this.currentBlock.hash,
           }
         : null,
-      hashrate: hashrate,
+      hashrate,
       totalHashes: this.totalHashes,
       elapsed: Math.round(elapsed),
       difficulty: this.blockchain.difficulty,
@@ -325,6 +336,7 @@ class Miner {
 
   /**
    * Set mining difficulty
+   * @param difficulty
    */
   setDifficulty(difficulty) {
     this.difficulty = Math.max(1, difficulty);
@@ -346,11 +358,11 @@ class Miner {
 
     if (estimatedSeconds < 60) {
       return `${Math.round(estimatedSeconds)} seconds`;
-    } else if (estimatedSeconds < 3600) {
-      return `${Math.round(estimatedSeconds / 60)} minutes`;
-    } else {
-      return `${Math.round(estimatedSeconds / 3600)} hours`;
     }
+    if (estimatedSeconds < 3600) {
+      return `${Math.round(estimatedSeconds / 60)} minutes`;
+    }
+    return `${Math.round(estimatedSeconds / 3600)} hours`;
   }
 
   /**
@@ -368,10 +380,10 @@ class Miner {
     const dailyReward = blocksPerDay * blockReward;
 
     return {
-      hashrate: hashrate,
-      estimatedBlockTime: estimatedBlockTime,
-      dailyReward: dailyReward,
-      blockReward: blockReward,
+      hashrate,
+      estimatedBlockTime,
+      dailyReward,
+      blockReward,
     };
   }
 

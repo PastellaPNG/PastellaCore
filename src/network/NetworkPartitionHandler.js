@@ -1,7 +1,15 @@
-const logger = require('../utils/logger');
 const WebSocket = require('ws');
 
+const logger = require('../utils/logger');
+
+/**
+ *
+ */
 class NetworkPartitionHandler {
+  /**
+   *
+   * @param p2pNetwork
+   */
   constructor(p2pNetwork) {
     this.p2pNetwork = p2pNetwork;
     this.partitionDetectionEnabled = true;
@@ -125,6 +133,8 @@ class NetworkPartitionHandler {
 
   /**
    * Detect network partition
+   * @param connectedPeers
+   * @param totalPeers
    */
   detectPartition(connectedPeers, totalPeers) {
     if (this.partitionState.isPartitioned) {
@@ -208,6 +218,7 @@ class NetworkPartitionHandler {
 
   /**
    * Execute a specific recovery strategy
+   * @param strategy
    */
   async executeRecoveryStrategy(strategy) {
     try {
@@ -382,6 +393,7 @@ class NetworkPartitionHandler {
 
   /**
    * Handle peer disconnection
+   * @param peerAddress
    */
   handlePeerDisconnection(peerAddress) {
     if (this.partitionState.isPartitioned) {
@@ -392,6 +404,7 @@ class NetworkPartitionHandler {
 
   /**
    * Handle peer reconnection
+   * @param peerAddress
    */
   handlePeerReconnection(peerAddress) {
     if (this.partitionState.disconnectedPeers.has(peerAddress)) {
@@ -450,6 +463,7 @@ class NetworkPartitionHandler {
 
   /**
    * Update configuration
+   * @param newConfig
    */
   updateConfig(newConfig) {
     this.config = { ...this.config, ...newConfig };

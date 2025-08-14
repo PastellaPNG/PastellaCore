@@ -1,4 +1,5 @@
 const crypto = require('crypto');
+
 const secp256k1 = require('secp256k1');
 
 /**
@@ -6,10 +7,13 @@ const secp256k1 = require('secp256k1');
  */
 class SafeMath {
   static MAX_SAFE_INTEGER = Number.MAX_SAFE_INTEGER;
+
   static MIN_SAFE_INTEGER = Number.MIN_SAFE_INTEGER;
 
   /**
    * CRITICAL: Safe addition with overflow protection
+   * @param a
+   * @param b
    */
   static safeAdd(a, b) {
     const result = BigInt(a) + BigInt(b);
@@ -28,6 +32,8 @@ class SafeMath {
 
   /**
    * CRITICAL: Safe subtraction with underflow protection
+   * @param a
+   * @param b
    */
   static safeSub(a, b) {
     const result = BigInt(a) - BigInt(b);
@@ -46,6 +52,8 @@ class SafeMath {
 
   /**
    * CRITICAL: Safe multiplication with overflow protection
+   * @param a
+   * @param b
    */
   static safeMul(a, b) {
     const result = BigInt(a) * BigInt(b);
@@ -64,6 +72,8 @@ class SafeMath {
 
   /**
    * CRITICAL: Safe division with division by zero protection
+   * @param a
+   * @param b
    */
   static safeDiv(a, b) {
     if (b === 0) {
@@ -86,6 +96,8 @@ class SafeMath {
 
   /**
    * CRITICAL: Safe modulo with division by zero protection
+   * @param a
+   * @param b
    */
   static safeMod(a, b) {
     if (b === 0) {
@@ -108,6 +120,7 @@ class SafeMath {
 
   /**
    * CRITICAL: Validate amount is within safe bounds
+   * @param amount
    */
   static validateAmount(amount) {
     if (typeof amount !== 'number' || isNaN(amount)) {
@@ -131,6 +144,7 @@ class SafeMath {
 
   /**
    * CRITICAL: Safe balance calculation
+   * @param balances
    */
   static safeBalanceCalculation(balances) {
     if (!Array.isArray(balances)) {
@@ -160,19 +174,38 @@ class SafeMath {
   }
 }
 
+/**
+ *
+ */
 class CryptoUtils {
+  /**
+   *
+   * @param data
+   */
   static hash(data) {
     return crypto.createHash('sha256').update(data).digest('hex');
   }
 
+  /**
+   *
+   * @param data
+   */
   static doubleHash(data) {
     return this.hash(this.hash(data));
   }
 
+  /**
+   *
+   * @param data
+   */
   static ripemd160(data) {
     return crypto.createHash('ripemd160').update(data).digest('hex');
   }
 
+  /**
+   *
+   * @param transactionHashes
+   */
   static calculateMerkleRoot(transactionHashes) {
     if (transactionHashes.length === 0) return this.hash('empty');
     if (transactionHashes.length === 1) return this.hash(transactionHashes[0]);
@@ -192,6 +225,9 @@ class CryptoUtils {
     return leaves[0];
   }
 
+  /**
+   *
+   */
   static generateSeed() {
     const words = [
       'abandon',
@@ -2268,10 +2304,17 @@ class CryptoUtils {
     return selectedWords.join(' ');
   }
 
+  /**
+   *
+   * @param seed
+   */
   static seedToPrivateKey(seed) {
     return this.hash(seed);
   }
 
+  /**
+   *
+   */
   static generateKeyPair() {
     // Generate a random private key
     const privateKey = crypto.randomBytes(32);
@@ -2285,11 +2328,15 @@ class CryptoUtils {
 
     return {
       privateKey: privateKeyHex,
-      publicKey: publicKey,
-      seed: seed,
+      publicKey,
+      seed,
     };
   }
 
+  /**
+   *
+   * @param privateKeyHex
+   */
   static privateKeyToPublicKey(privateKeyHex) {
     const privateKeyBuffer = Buffer.from(privateKeyHex, 'hex');
 
@@ -2300,12 +2347,16 @@ class CryptoUtils {
     let hexString = '';
     for (let i = 0; i < publicKey.length; i++) {
       const hex = publicKey[i].toString(16);
-      hexString += hex.length === 1 ? '0' + hex : hex;
+      hexString += hex.length === 1 ? `0${hex}` : hex;
     }
 
     return hexString;
   }
 
+  /**
+   *
+   * @param privateKeyHex
+   */
   static importPrivateKey(privateKeyHex) {
     // Validate private key format
     if (!/^[0-9a-fA-F]{64}$/.test(privateKeyHex)) {
@@ -2317,20 +2368,32 @@ class CryptoUtils {
 
     return {
       privateKey: privateKeyHex,
-      publicKey: publicKey,
+      publicKey,
     };
   }
 
+  /**
+   *
+   * @param seed
+   */
   static importFromSeed(seed) {
     // In a real implementation, this would derive keys from the seed
     // For now, we'll generate a new key pair
     return this.generateKeyPair();
   }
 
+  /**
+   *
+   * @param seed
+   */
   static generateKeyPairFromSeed(seed) {
     return this.importFromSeed(seed);
   }
 
+  /**
+   *
+   * @param publicKey
+   */
   static publicKeyToAddress(publicKey) {
     // Convert public key to Buffer
     const publicKeyBuffer = Buffer.from(publicKey, 'hex');
@@ -2358,25 +2421,34 @@ class CryptoUtils {
     return this.base58Encode(binaryAddr);
   }
 
+  /**
+   *
+   * @param buffer
+   */
   static base58Encode(buffer) {
     const alphabet = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz';
-    let num = BigInt('0x' + buffer.toString('hex'));
+    let num = BigInt(`0x${buffer.toString('hex')}`);
     let str = '';
 
     while (num > 0) {
       const remainder = Number(num % BigInt(58));
       str = alphabet[remainder] + str;
-      num = num / BigInt(58);
+      num /= BigInt(58);
     }
 
     // Handle leading zeros
     for (let i = 0; i < buffer.length && buffer[i] === 0; i++) {
-      str = '1' + str;
+      str = `1${str}`;
     }
 
     return str;
   }
 
+  /**
+   *
+   * @param data
+   * @param privateKeyHex
+   */
   static sign(data, privateKeyHex) {
     const privateKeyBuffer = Buffer.from(privateKeyHex, 'hex');
     const dataHash = crypto.createHash('sha256').update(data).digest();
@@ -2388,11 +2460,17 @@ class CryptoUtils {
     let hexString = '';
     for (let i = 0; i < signature.signature.length; i++) {
       const hex = signature.signature[i].toString(16);
-      hexString += hex.length === 1 ? '0' + hex : hex;
+      hexString += hex.length === 1 ? `0${hex}` : hex;
     }
     return hexString;
   }
 
+  /**
+   *
+   * @param data
+   * @param signature
+   * @param publicKeyHex
+   */
   static verify(data, signature, publicKeyHex) {
     const dataHash = crypto.createHash('sha256').update(data).digest();
 
@@ -2416,6 +2494,11 @@ class CryptoUtils {
     return secp256k1.ecdsaVerify(signatureBuffer, dataHash, publicKeyBuffer);
   }
 
+  /**
+   *
+   * @param privateKeyHex
+   * @param publicKeyHex
+   */
   static verifyKeyPair(privateKeyHex, publicKeyHex) {
     try {
       const derivedPublicKey = this.privateKeyToPublicKey(privateKeyHex);

@@ -5,6 +5,9 @@ const logger = require('./logger');
  * Prevents DoS attacks by limiting requests per IP address and endpoint
  */
 class RateLimiter {
+  /**
+   *
+   */
   constructor() {
     // Store request counts per IP and endpoint
     this.requestCounts = new Map();
@@ -79,7 +82,7 @@ class RateLimiter {
   /**
    * Get rate limit configuration for a specific endpoint
    * @param {string} endpoint - API endpoint
-   * @returns {Object} - Rate limit configuration
+   * @returns {object} - Rate limit configuration
    */
   getLimitForEndpoint(endpoint) {
     // Check for specific endpoint limits
@@ -111,7 +114,7 @@ class RateLimiter {
    * Get current rate limit status for an IP and endpoint
    * @param {string} ip - Client IP address
    * @param {string} endpoint - API endpoint
-   * @returns {Object} - Rate limit status information
+   * @returns {object} - Rate limit status information
    */
   getStatus(ip, endpoint) {
     const key = `${ip}:${endpoint}`;
@@ -161,7 +164,7 @@ class RateLimiter {
 
   /**
    * Get rate limiter statistics
-   * @returns {Object} - Statistics about current rate limiting
+   * @returns {object} - Statistics about current rate limiting
    */
   getStats() {
     const stats = {
@@ -199,7 +202,7 @@ class RateLimiter {
     let resetCount = 0;
 
     for (const [key] of this.requestCounts.entries()) {
-      if (key.startsWith(ip + ':')) {
+      if (key.startsWith(`${ip}:`)) {
         this.requestCounts.delete(key);
         resetCount++;
       }

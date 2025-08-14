@@ -1,4 +1,4 @@
-const logger = require('./logger');
+const logger = require('./logger.js');
 
 /**
  * Input validation and sanitization utilities
@@ -7,7 +7,7 @@ class InputValidator {
   /**
    * Validate and sanitize a string input
    * @param {string} input - The input string
-   * @param {Object} options - Validation options
+   * @param {object} options - Validation options
    * @returns {string|null} - Sanitized string or null if invalid
    */
   static validateString(input, options = {}) {
@@ -60,7 +60,7 @@ class InputValidator {
   /**
    * Validate and sanitize a number input
    * @param {any} input - The input value
-   * @param {Object} options - Validation options
+   * @param {object} options - Validation options
    * @returns {number|null} - Validated number or null if invalid
    */
   static validateNumber(input, options = {}) {
@@ -109,7 +109,7 @@ class InputValidator {
   /**
    * Validate and sanitize a cryptocurrency amount with decimal precision
    * @param {any} input - The amount input
-   * @param {Object} options - Validation options
+   * @param {object} options - Validation options
    * @param {number} decimals - Number of decimal places allowed (default: 8)
    * @returns {number|null} - Validated amount or null if invalid
    */
@@ -142,7 +142,8 @@ class InputValidator {
     const str = num.toString();
     if (str.indexOf('.') !== -1 && str.indexOf('e-') === -1) {
       return str.split('.')[1].length;
-    } else if (str.indexOf('e-') !== -1) {
+    }
+    if (str.indexOf('e-') !== -1) {
       const match = str.match(/e-(\d+)/);
       return match ? parseInt(match[1]) : 0;
     }
@@ -152,7 +153,7 @@ class InputValidator {
   /**
    * Validate and sanitize an email address
    * @param {string} input - The email input
-   * @param {Object} options - Validation options
+   * @param {object} options - Validation options
    * @returns {string|null} - Sanitized email or null if invalid
    */
   static validateEmail(input, options = {}) {
@@ -168,7 +169,7 @@ class InputValidator {
   /**
    * Validate and sanitize a URL
    * @param {string} input - The URL input
-   * @param {Object} options - Validation options
+   * @param {object} options - Validation options
    * @returns {string|null} - Sanitized URL or null if invalid
    */
   static validateUrl(input, options = {}) {
@@ -184,7 +185,7 @@ class InputValidator {
   /**
    * Validate and sanitize a wallet address
    * @param {string} input - The address input
-   * @param {Object} options - Validation options
+   * @param {object} options - Validation options
    * @returns {string|null} - Sanitized address or null if invalid
    */
   static validateAddress(input, options = {}) {
@@ -201,7 +202,7 @@ class InputValidator {
   /**
    * Validate and sanitize a transaction hash
    * @param {string} input - The hash input
-   * @param {Object} options - Validation options
+   * @param {object} options - Validation options
    * @returns {string|null} - Sanitized hash or null if invalid
    */
   static validateHash(input, options = {}) {
@@ -218,7 +219,7 @@ class InputValidator {
   /**
    * Validate and sanitize a port number
    * @param {any} input - The port input
-   * @param {Object} options - Validation options
+   * @param {object} options - Validation options
    * @returns {number|null} - Validated port or null if invalid
    */
   static validatePort(input, options = {}) {
@@ -232,9 +233,9 @@ class InputValidator {
 
   /**
    * Validate and sanitize an object with schema
-   * @param {Object} input - The input object
-   * @param {Object} schema - Validation schema
-   * @returns {Object|null} - Validated object or null if invalid
+   * @param {object} input - The input object
+   * @param {object} schema - Validation schema
+   * @returns {object | null} - Validated object or null if invalid
    */
   static validateObject(input, schema) {
     if (!input || typeof input !== 'object') {
@@ -263,7 +264,7 @@ class InputValidator {
    * Validate and sanitize an array
    * @param {Array} input - The input array
    * @param {Function} itemValidator - Validator function for each item
-   * @param {Object} options - Validation options
+   * @param {object} options - Validation options
    * @returns {Array|null} - Validated array or null if invalid
    */
   static validateArray(input, itemValidator, options = {}) {
@@ -365,7 +366,7 @@ class InputValidator {
   /**
    * CRITICAL: Validate cryptocurrency address with enhanced security
    * @param {string} input - The address input
-   * @param {Object} options - Validation options
+   * @param {object} options - Validation options
    * @returns {string|null} - Sanitized address or null if invalid
    */
   static validateCryptocurrencyAddress(input, options = {}) {
@@ -406,8 +407,8 @@ class InputValidator {
 
   /**
    * CRITICAL: Validate transaction data with comprehensive security checks
-   * @param {Object} transaction - The transaction object
-   * @returns {Object|null} - Validated transaction or null if invalid
+   * @param {object} transaction - The transaction object
+   * @returns {object | null} - Validated transaction or null if invalid
    */
   static validateTransaction(transaction) {
     if (!transaction || typeof transaction !== 'object') {
@@ -482,8 +483,8 @@ class InputValidator {
 
   /**
    * CRITICAL: Validate block data with security checks
-   * @param {Object} block - The block object
-   * @returns {Object|null} - Validated block or null if invalid
+   * @param {object} block - The block object
+   * @returns {object | null} - Validated block or null if invalid
    */
   static validateBlock(block) {
     if (!block || typeof block !== 'object') {

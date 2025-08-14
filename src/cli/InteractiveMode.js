@@ -1,12 +1,23 @@
-const inquirer = require('inquirer');
 const chalk = require('chalk');
-const { generatePrompt } = require('./utils');
+const inquirer = require('inquirer');
 
+const { generatePrompt } = require('./utils.js');
+
+/**
+ *
+ */
 class InteractiveMode {
+  /**
+   *
+   * @param cli
+   */
   constructor(cli) {
     this.cli = cli;
   }
 
+  /**
+   *
+   */
   async start() {
     console.log(chalk.blue.bold('╔══════════════════════════════════════════════════════════╗'));
     console.log(chalk.blue.bold('║                       PASTELLA CLI                       ║'));
@@ -55,6 +66,10 @@ class InteractiveMode {
     askQuestion();
   }
 
+  /**
+   *
+   * @param command
+   */
   async handleInteractiveCommand(command) {
     const trimmedCommand = command.trim();
     if (!trimmedCommand) {
@@ -116,12 +131,16 @@ class InteractiveMode {
     console.log('');
   }
 
+  /**
+   *
+   * @param args
+   */
   async handleSpamProtectionCommand(args) {
     if (args.length === 0 || args[0] === 'status') {
       try {
         const response = await this.cli.makeApiRequest('/api/spam-protection/status', 'GET');
         if (response && response.success && response.data) {
-          const data = response.data;
+          const { data } = response;
           console.log(chalk.blue.bold('🛡️  SPAM PROTECTION STATUS:'));
           console.log(chalk.cyan('  Rate Limiting:'), chalk.green('Enabled'));
           console.log(
@@ -165,6 +184,10 @@ class InteractiveMode {
     }
   }
 
+  /**
+   *
+   * @param args
+   */
   async handleReplayProtectionCommand(args) {
     if (args.length === 0 || args[0] === 'status') {
       try {
@@ -241,7 +264,7 @@ class InteractiveMode {
           console.log('');
 
           console.log(chalk.cyan('  Test Results:'));
-          response.testResults.tests.forEach((test, index) => {
+          response.testResults.tests.forEach(test => {
             const statusIcon = test.result === 'PASSED' ? '✅' : '❌';
             const statusColor = test.result === 'PASSED' ? chalk.green : chalk.red;
             console.log(statusColor(`    ${statusIcon} ${test.test}: ${test.result}`));
@@ -272,6 +295,10 @@ class InteractiveMode {
     }
   }
 
+  /**
+   *
+   * @param args
+   */
   async handleConsensusCommand(args) {
     if (args.length === 0 || args[0] === 'status') {
       try {
@@ -356,12 +383,16 @@ class InteractiveMode {
     }
   }
 
+  /**
+   *
+   * @param args
+   */
   async handleMemoryCommand(args) {
     if (args.length === 0 || args[0] === 'status') {
       try {
         const response = await this.cli.makeApiRequest('/api/blockchain/memory-protection', 'GET');
         if (response && response.success) {
-          const data = response.data;
+          const { data } = response;
           console.log(chalk.blue.bold('💾 MEMORY PROTECTION STATUS:'));
           console.log(chalk.cyan('  Current Usage:'), chalk.white(`${(data.currentUsage / 1024 / 1024).toFixed(2)}MB`));
           console.log(chalk.cyan('  Max Usage:'), chalk.white(`${(data.maxUsage / 1024 / 1024).toFixed(2)}MB`));
@@ -396,12 +427,16 @@ class InteractiveMode {
     }
   }
 
+  /**
+   *
+   * @param args
+   */
   async handleCPUCommand(args) {
     if (args.length === 0 || args[0] === 'status') {
       try {
         const response = await this.cli.makeApiRequest('/api/blockchain/cpu-protection', 'GET');
         if (response && response.success) {
-          const data = response.data;
+          const { data } = response;
           console.log(chalk.blue.bold('⚡ CPU PROTECTION STATUS:'));
           console.log(chalk.cyan('  Current Validations:'), chalk.white(data.currentValidationCount));
           console.log(chalk.cyan('  Max Validations/Second:'), chalk.white(data.maxValidationsPerSecond));
@@ -433,12 +468,16 @@ class InteractiveMode {
     }
   }
 
+  /**
+   *
+   * @param args
+   */
   async handleReputationCommand(args) {
     if (args.length === 0 || args[0] === 'status') {
       try {
         const response = await this.cli.makeApiRequest('/api/network/reputation-status', 'GET');
         if (response && response.success) {
-          const data = response.data;
+          const { data } = response;
           console.log(chalk.blue.bold('🏆 PEER REPUTATION STATUS:'));
           console.log(chalk.cyan('  Total Peers:'), chalk.white(data.totalPeers));
           console.log(chalk.cyan('  Suspicious Peers:'), chalk.white(data.suspiciousPeers));
@@ -476,7 +515,7 @@ class InteractiveMode {
       try {
         const response = await this.cli.makeApiRequest('/api/network/reputation-status', 'GET');
         if (response && response.success) {
-          const data = response.data;
+          const { data } = response;
           console.log(chalk.blue.bold('📊 REPUTATION STATISTICS:'));
           console.log(chalk.cyan('  Total Peers:'), chalk.white(data.totalPeers));
           console.log(chalk.cyan('  Suspicious Peers:'), chalk.white(data.suspiciousPeers));
@@ -494,6 +533,9 @@ class InteractiveMode {
     }
   }
 
+  /**
+   *
+   */
   showInteractiveHelp() {
     console.log(chalk.blue.bold('╔══════════════════════════════════════════════════════════╗'));
     console.log(chalk.blue.bold('║                      📖 COMMANDS 📖                      ║'));

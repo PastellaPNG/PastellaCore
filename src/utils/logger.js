@@ -1,6 +1,12 @@
 const chalk = require('chalk');
 
+/**
+ *
+ */
 class Logger {
+  /**
+   *
+   */
   constructor() {
     this.modules = {
       API: 'API',
@@ -31,6 +37,7 @@ class Logger {
 
   /**
    * Enable or disable debug mode
+   * @param enabled
    */
   setDebugMode(enabled) {
     this.debugMode = enabled;
@@ -54,6 +61,7 @@ class Logger {
 
   /**
    * Pad module name to ensure alignment
+   * @param module
    */
   padModule(module) {
     const maxLength = Math.max(...Object.values(this.modules).map(m => m.length));
@@ -62,6 +70,7 @@ class Logger {
 
   /**
    * Get colored module name
+   * @param module
    */
   getColoredModule(module) {
     const colors = {
@@ -86,6 +95,7 @@ class Logger {
 
   /**
    * Get colored log level
+   * @param level
    */
   getColoredLevel(level) {
     const colors = {
@@ -100,6 +110,9 @@ class Logger {
 
   /**
    * Log a message with the specified module and level
+   * @param module
+   * @param level
+   * @param message
    */
   log(module, level, message) {
     // Skip DEBUG messages if debug mode is disabled
@@ -120,19 +133,36 @@ class Logger {
 
   /**
    * Convenience methods for different log levels
+   * @param module
+   * @param message
    */
   info(module, message) {
     this.log(module, 'INFO', message);
   }
 
+  /**
+   *
+   * @param module
+   * @param message
+   */
   warn(module, message) {
     this.log(module, 'WARN', message);
   }
 
+  /**
+   *
+   * @param module
+   * @param message
+   */
   error(module, message) {
     this.log(module, 'ERROR', message);
   }
 
+  /**
+   *
+   * @param module
+   * @param message
+   */
   debug(module, message) {
     this.log(module, 'DEBUG', message);
   }

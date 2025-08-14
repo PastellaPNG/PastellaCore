@@ -2,6 +2,7 @@ const chalk = require('chalk');
 
 /**
  * Validate wallet address format
+ * @param address
  */
 function validateAddress(address) {
   // Basic validation: check if it's a string and has the expected format
@@ -17,23 +18,28 @@ function validateAddress(address) {
 
 /**
  * Format hash rate with appropriate units (H/s, KH/s, MH/s, GH/s)
+ * @param hashRate
  */
 function formatHashRate(hashRate) {
   if (hashRate === 0) return '0 H/s';
 
   if (hashRate >= 1000000000) {
     return `${(hashRate / 1000000000).toFixed(2)} GH/s`;
-  } else if (hashRate >= 1000000) {
-    return `${(hashRate / 1000000).toFixed(2)} MH/s`;
-  } else if (hashRate >= 1000) {
-    return `${(hashRate / 1000).toFixed(2)} KH/s`;
-  } else {
-    return `${hashRate.toFixed(2)} H/s`;
   }
+  if (hashRate >= 1000000) {
+    return `${(hashRate / 1000000).toFixed(2)} MH/s`;
+  }
+  if (hashRate >= 1000) {
+    return `${(hashRate / 1000).toFixed(2)} KH/s`;
+  }
+  return `${hashRate.toFixed(2)} H/s`;
 }
 
 /**
  * Calculate current hash rate based on recent mining activity
+ * @param totalHashes
+ * @param miningStartTime
+ * @param isMining
  */
 function calculateHashRate(totalHashes, miningStartTime, isMining) {
   if (!miningStartTime || !isMining) {
@@ -49,6 +55,9 @@ function calculateHashRate(totalHashes, miningStartTime, isMining) {
 
 /**
  * Generate CLI prompt based on wallet status and mining status
+ * @param walletLoaded
+ * @param walletName
+ * @param isMining
  */
 function generatePrompt(walletLoaded, walletName, isMining = false) {
   let prompt = '';

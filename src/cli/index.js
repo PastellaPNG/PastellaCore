@@ -1,27 +1,30 @@
+const chalk = require('chalk');
 const { Command } = require('commander');
 const inquirer = require('inquirer');
-const chalk = require('chalk');
-const os = require('os');
-const path = require('path');
-const fs = require('fs');
 
 // Increase max listeners to prevent warnings
 process.stdout.setMaxListeners(20);
 process.stderr.setMaxListeners(20);
 
-const config = require('../../config');
-const Blockchain = require('../models/Blockchain');
-const Wallet = require('../models/Wallet');
-const Block = require('../models/Block');
-const { Transaction } = require('../models/Transaction');
+const config = require('../../config.json');
+const Block = require('../models/Block.js');
+const Blockchain = require('../models/Blockchain.js');
+const { Transaction } = require('../models/Transaction.js');
+const Wallet = require('../models/Wallet.js');
 
-const AdvancedGPUMiner = require('./AdvancedGPUMiner');
-const WalletManager = require('./WalletManager');
-const NetworkManager = require('./NetworkManager');
-const InteractiveMode = require('./InteractiveMode');
-const { validateAddress } = require('./utils');
+const AdvancedGPUMiner = require('./AdvancedGPUMiner.js');
+const InteractiveMode = require('./InteractiveMode.js');
+const NetworkManager = require('./NetworkManager.js');
+const { validateAddress } = require('./utils.js');
+const WalletManager = require('./WalletManager.js');
 
+/**
+ *
+ */
 class PastellaCLI {
+  /**
+   *
+   */
   constructor() {
     this.apiBaseUrl = `http://localhost:${config.api.port}`;
     this.program = new Command();
@@ -55,10 +58,18 @@ class PastellaCLI {
   }
 
   // API and connection methods
+  /**
+   *
+   * @param host
+   * @param port
+   */
   updateApiUrl(host = 'localhost', port = config.api.port) {
     this.apiBaseUrl = `http://${host}:${port}`;
   }
 
+  /**
+   *
+   */
   parseConnectionArgs() {
     const args = process.argv.slice(2);
 
@@ -84,6 +95,12 @@ class PastellaCLI {
     }
   }
 
+  /**
+   *
+   * @param endpoint
+   * @param method
+   * @param data
+   */
   async makeApiRequest(endpoint, method = 'GET', data = null) {
     try {
       // Force IPv4 by using 127.0.0.1 instead of localhost
@@ -95,7 +112,7 @@ class PastellaCLI {
       }
 
       const options = {
-        method: method,
+        method,
         headers: {
           'Content-Type': 'application/json',
         },
@@ -140,9 +157,8 @@ class PastellaCLI {
       const contentType = response.headers.get('content-type');
       if (contentType && contentType.includes('application/json')) {
         return await response.json();
-      } else {
-        return await response.text();
       }
+      return await response.text();
     } catch (error) {
       if (error.name === 'TypeError' && error.message.includes('fetch')) {
         throw new Error('Network error: Unable to connect to daemon');
@@ -151,6 +167,9 @@ class PastellaCLI {
     }
   }
 
+  /**
+   *
+   */
   async checkDaemonConnection() {
     try {
       await this.makeApiRequest('/api/daemon/status');
@@ -163,6 +182,9 @@ class PastellaCLI {
   }
 
   // Command setup
+  /**
+   *
+   */
   setupCommands() {
     this.program
       .name('pastella')
@@ -243,7 +265,7 @@ class PastellaCLI {
     this.program
       .command('help')
       .description('Show detailed help information')
-      .action(async () => {
+      .action(() => {
         console.log(chalk.blue.bold('╔══════════════════════════════════════════════════════════╗'));
         console.log(chalk.blue.bold('║                    PASTELLA CLI HELP                     ║'));
         console.log(chalk.blue.bold('╚══════════════════════════════════════════════════════════╝'));
@@ -338,7 +360,7 @@ class PastellaCLI {
     this.program
       .command('connection')
       .description('Show connection information')
-      .action(async () => {
+      .action(() => {
         const options = this.program.opts();
         console.log(chalk.cyan('🔗 Connection Information:'));
         console.log(chalk.white(`  Host: ${options.host}`));
@@ -351,10 +373,17 @@ class PastellaCLI {
   }
 
   // Utility methods
+  /**
+   *
+   * @param address
+   */
   validateAddress(address) {
     return validateAddress(address);
   }
 
+  /**
+   *
+   */
   getConnectionInfo() {
     return {
       host: this.apiBaseUrl.split('://')[1].split(':')[0],
@@ -397,6 +426,7 @@ class PastellaCLI {
 
   /**
    * Parse global options manually for interactive mode
+   * @param args
    */
   parseGlobalOptions(args) {
     for (let i = 0; i < args.length; i++) {

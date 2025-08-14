@@ -4,6 +4,9 @@ const logger = require('../utils/logger');
  * Spam Protection System - Handles rate limiting and spam prevention
  */
 class SpamProtection {
+  /**
+   *
+   */
   constructor() {
     // SPAM PROTECTION SYSTEM
     this.addressRateLimits = new Map(); // Track transaction rate per address
@@ -18,6 +21,7 @@ class SpamProtection {
 
   /**
    * Check if address is allowed to submit transactions
+   * @param fromAddress
    */
   isAddressAllowedToSubmit(fromAddress) {
     const now = Date.now();
@@ -31,11 +35,10 @@ class SpamProtection {
           `Address ${fromAddress} is banned for spam (${Math.ceil((this.spamProtection.addressBanDuration - (now - banTime)) / 1000)}s remaining)`
         );
         return false;
-      } else {
-        // Ban expired, remove from banned list
-        this.spamProtection.bannedAddresses.delete(fromAddress);
-        this.addressRateLimits.delete(fromAddress);
       }
+      // Ban expired, remove from banned list
+      this.spamProtection.bannedAddresses.delete(fromAddress);
+      this.addressRateLimits.delete(fromAddress);
     }
 
     // Get current rate limit data for this address
@@ -67,6 +70,7 @@ class SpamProtection {
 
   /**
    * Check global transaction rate limit
+   * @param pendingTransactions
    */
   isGlobalRateLimitExceeded(pendingTransactions) {
     const now = Date.now();
@@ -144,6 +148,7 @@ class SpamProtection {
 
   /**
    * Update configuration
+   * @param config
    */
   updateConfig(config) {
     if (config.maxTransactionsPerAddress !== undefined) {

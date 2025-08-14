@@ -1,11 +1,22 @@
 const chalk = require('chalk');
 
+/**
+ *
+ */
 class NetworkManager {
+  /**
+   *
+   * @param cli
+   */
   constructor(cli) {
     this.cli = cli;
   }
 
   // Chain commands
+  /**
+   *
+   * @param args
+   */
   async handleChainCommand(args) {
     if (!args || args.length === 0) {
       console.log(chalk.red('❌ Missing chain command'));
@@ -63,6 +74,9 @@ class NetworkManager {
     }
   }
 
+  /**
+   *
+   */
   async showChainStatus() {
     try {
       const connected = await this.cli.checkDaemonConnection();
@@ -94,6 +108,9 @@ class NetworkManager {
     }
   }
 
+  /**
+   *
+   */
   async showChainSecurity() {
     try {
       const connected = await this.cli.checkDaemonConnection();
@@ -154,6 +171,9 @@ class NetworkManager {
     }
   }
 
+  /**
+   *
+   */
   async showReplayProtectionStatus() {
     try {
       const connected = await this.cli.checkDaemonConnection();
@@ -189,6 +209,9 @@ class NetworkManager {
     }
   }
 
+  /**
+   *
+   */
   async showRateLimitStats() {
     try {
       const connected = await this.cli.checkDaemonConnection();
@@ -225,6 +248,10 @@ class NetworkManager {
     }
   }
 
+  /**
+   *
+   * @param ip
+   */
   async resetRateLimitsForIP(ip) {
     try {
       const connected = await this.cli.checkDaemonConnection();
@@ -247,6 +274,9 @@ class NetworkManager {
     }
   }
 
+  /**
+   *
+   */
   async resetAllRateLimits() {
     try {
       const connected = await this.cli.checkDaemonConnection();
@@ -269,6 +299,9 @@ class NetworkManager {
     }
   }
 
+  /**
+   *
+   */
   async resetBlockchain() {
     try {
       const connected = await this.cli.checkDaemonConnection();
@@ -296,6 +329,10 @@ class NetworkManager {
     }
   }
 
+  /**
+   *
+   * @param limit
+   */
   async showBlocks(limit) {
     try {
       const connected = await this.cli.checkDaemonConnection();
@@ -307,7 +344,7 @@ class NetworkManager {
       const response = await this.cli.makeApiRequest(`/api/blockchain/blocks?limit=${limit}`);
 
       console.log(chalk.blue(`🔗 Recent blocks (${response.blocks.length}):`));
-      response.blocks.forEach((block, index) => {
+      response.blocks.forEach(block => {
         console.log(chalk.cyan(`${block.index}. Block ${block.index}`));
         console.log(`   Hash: ${block.hash}`);
         console.log(`   Previous: ${block.previousHash}`);
@@ -320,6 +357,10 @@ class NetworkManager {
     }
   }
 
+  /**
+   *
+   * @param index
+   */
   async showBlock(index) {
     try {
       const connected = await this.cli.checkDaemonConnection();
@@ -343,6 +384,9 @@ class NetworkManager {
     }
   }
 
+  /**
+   *
+   */
   async showPendingTransactions() {
     try {
       const connected = await this.cli.checkDaemonConnection();
@@ -372,6 +416,10 @@ class NetworkManager {
   }
 
   // Network commands
+  /**
+   *
+   * @param args
+   */
   async handleNetworkCommand(args) {
     if (!args || args.length === 0) {
       console.log(chalk.red('❌ Missing network command'));
@@ -431,6 +479,9 @@ class NetworkManager {
     }
   }
 
+  /**
+   *
+   */
   async showNetworkStatus() {
     try {
       const connected = await this.cli.checkDaemonConnection();
@@ -508,6 +559,9 @@ class NetworkManager {
     }
   }
 
+  /**
+   *
+   */
   async showPeers() {
     try {
       const connected = await this.cli.checkDaemonConnection();
@@ -557,6 +611,11 @@ class NetworkManager {
     }
   }
 
+  /**
+   *
+   * @param host
+   * @param port
+   */
   async connectToPeer(host, port) {
     try {
       const connected = await this.cli.checkDaemonConnection();
@@ -566,7 +625,7 @@ class NetworkManager {
       }
 
       await this.cli.makeApiRequest('/api/network/connect', 'POST', {
-        host: host,
+        host,
         port: parseInt(port),
       });
 
@@ -577,6 +636,10 @@ class NetworkManager {
   }
 
   // Daemon commands
+  /**
+   *
+   * @param args
+   */
   async handleDaemonCommand(args) {
     if (!args || args.length === 0) {
       console.log(chalk.red('❌ Missing daemon command'));
@@ -593,6 +656,9 @@ class NetworkManager {
     }
   }
 
+  /**
+   *
+   */
   async showDaemonStatus() {
     try {
       const connected = await this.cli.checkDaemonConnection();
@@ -635,6 +701,9 @@ class NetworkManager {
   }
 
   // Reputation commands
+  /**
+   *
+   */
   async showReputationStats() {
     try {
       const connected = await this.cli.checkDaemonConnection();
@@ -657,6 +726,10 @@ class NetworkManager {
     }
   }
 
+  /**
+   *
+   * @param peerAddress
+   */
   async showPeerReputation(peerAddress) {
     try {
       const connected = await this.cli.checkDaemonConnection();
@@ -688,6 +761,9 @@ class NetworkManager {
   }
 
   // Node Identity commands
+  /**
+   *
+   */
   async showNodeIdentity() {
     try {
       const connected = await this.cli.checkDaemonConnection();
@@ -719,6 +795,9 @@ class NetworkManager {
     }
   }
 
+  /**
+   *
+   */
   async showAuthenticatedPeers() {
     try {
       const connected = await this.cli.checkDaemonConnection();
@@ -753,6 +832,9 @@ class NetworkManager {
     }
   }
 
+  /**
+   *
+   */
   async showMessageValidationStats() {
     try {
       const connected = await this.cli.checkDaemonConnection();
@@ -768,9 +850,9 @@ class NetworkManager {
       console.log(chalk.green(`Valid Messages: ${response.validMessages.toLocaleString()}`));
       console.log(chalk.red(`Invalid Messages: ${response.invalidMessages.toLocaleString()}`));
 
-      const validationRate = response.validationRate;
+      const { validationRate } = response;
       const rateColor = validationRate >= 95 ? chalk.green : validationRate >= 80 ? chalk.yellow : chalk.red;
-      console.log(chalk.cyan(`Validation Rate: ${rateColor(validationRate + '%')}`));
+      console.log(chalk.cyan(`Validation Rate: ${rateColor(`${validationRate}%`)}`));
 
       console.log(chalk.cyan(`Supported Message Types: ${response.validatorStats.messageTypes}`));
 
@@ -813,6 +895,9 @@ class NetworkManager {
     }
   }
 
+  /**
+   *
+   */
   async resetMessageValidationStats() {
     try {
       const connected = await this.cli.checkDaemonConnection();
@@ -832,6 +917,9 @@ class NetworkManager {
     }
   }
 
+  /**
+   *
+   */
   async showPartitionStats() {
     try {
       const connected = await this.cli.checkDaemonConnection();
@@ -873,6 +961,9 @@ class NetworkManager {
     }
   }
 
+  /**
+   *
+   */
   async resetPartitionStats() {
     try {
       const connected = await this.cli.checkDaemonConnection();
@@ -896,6 +987,7 @@ class NetworkManager {
 
   /**
    * Validate blockchain using different methods
+   * @param method
    */
   async validateChain(method = 'checkpoint') {
     try {
@@ -953,6 +1045,8 @@ class NetworkManager {
 
   /**
    * Manage checkpoints
+   * @param action
+   * @param height
    */
   async manageCheckpoints(action, height) {
     try {
@@ -997,6 +1091,9 @@ class NetworkManager {
     }
   }
 
+  /**
+   *
+   */
   async listCheckpoints() {
     try {
       const response = await this.cli.makeApiRequest('/api/blockchain/checkpoints');
@@ -1025,6 +1122,10 @@ class NetworkManager {
     }
   }
 
+  /**
+   *
+   * @param height
+   */
   async addCheckpoint(height) {
     try {
       const response = await this.cli.makeApiRequest('/api/blockchain/checkpoints/add', 'POST', { height });
@@ -1042,6 +1143,9 @@ class NetworkManager {
     }
   }
 
+  /**
+   *
+   */
   async updateCheckpoints() {
     try {
       const response = await this.cli.makeApiRequest('/api/blockchain/checkpoints/update', 'POST');
@@ -1061,6 +1165,9 @@ class NetworkManager {
     }
   }
 
+  /**
+   *
+   */
   async clearCheckpoints() {
     try {
       const response = await this.cli.makeApiRequest('/api/blockchain/checkpoints/clear', 'POST');

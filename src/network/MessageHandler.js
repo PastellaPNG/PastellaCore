@@ -1,11 +1,17 @@
+const WebSocket = require('ws');
+
 const logger = require('../utils/logger');
 const MessageValidator = require('../utils/MessageValidator');
-const WebSocket = require('ws');
 
 /**
  * Message Handler - Handles all message processing and routing
  */
 class MessageHandler {
+  /**
+   *
+   * @param blockchain
+   * @param peerReputation
+   */
   constructor(blockchain, peerReputation) {
     logger.debug('MESSAGE_HANDLER', `Initializing MessageHandler...`);
     logger.debug(
@@ -86,6 +92,10 @@ class MessageHandler {
 
   /**
    * Handle incoming message
+   * @param ws
+   * @param message
+   * @param peerAddress
+   * @param isPeerAuthenticated
    */
   handleMessage(ws, message, peerAddress, isPeerAuthenticated) {
     logger.debug('MESSAGE_HANDLER', `Handling incoming message from peer ${peerAddress}...`);
@@ -182,6 +192,9 @@ class MessageHandler {
 
   /**
    * Handle query latest block
+   * @param ws
+   * @param message
+   * @param peerAddress
    */
   handleQueryLatest(ws, message, peerAddress) {
     logger.debug('MESSAGE_HANDLER', `Latest block queried by ${peerAddress}`);
@@ -195,6 +208,9 @@ class MessageHandler {
 
   /**
    * Handle query all blocks
+   * @param ws
+   * @param message
+   * @param peerAddress
    */
   handleQueryAll(ws, message, peerAddress) {
     logger.debug('MESSAGE_HANDLER', `All blocks queried by ${peerAddress}`);
@@ -207,6 +223,9 @@ class MessageHandler {
 
   /**
    * Handle blockchain response
+   * @param ws
+   * @param message
+   * @param peerAddress
    */
   handleResponseBlockchain(ws, message, peerAddress) {
     logger.debug(
@@ -248,6 +267,9 @@ class MessageHandler {
 
   /**
    * Handle transaction pool query
+   * @param ws
+   * @param message
+   * @param peerAddress
    */
   handleQueryTransactionPool(ws, message, peerAddress) {
     logger.debug('MESSAGE_HANDLER', `Transaction pool queried by ${peerAddress}`);
@@ -260,6 +282,9 @@ class MessageHandler {
 
   /**
    * Handle transaction pool response
+   * @param ws
+   * @param message
+   * @param peerAddress
    */
   handleResponseTransactionPool(ws, message, peerAddress) {
     logger.debug(
@@ -279,6 +304,9 @@ class MessageHandler {
 
   /**
    * Handle new block announcement
+   * @param ws
+   * @param message
+   * @param peerAddress
    */
   handleNewBlock(ws, message, peerAddress) {
     logger.debug('MESSAGE_HANDLER', `New block announced by ${peerAddress}: ${message.data.index}`);
@@ -291,6 +319,9 @@ class MessageHandler {
 
   /**
    * Handle new transaction announcement
+   * @param ws
+   * @param message
+   * @param peerAddress
    */
   handleNewTransaction(ws, message, peerAddress) {
     logger.debug('MESSAGE_HANDLER', `New transaction announced by ${peerAddress}`);
@@ -303,6 +334,9 @@ class MessageHandler {
 
   /**
    * Handle seed node info
+   * @param ws
+   * @param message
+   * @param peerAddress
    */
   handleSeedNodeInfo(ws, message, peerAddress) {
     logger.debug('MESSAGE_HANDLER', `Seed node info received from ${peerAddress}`);
@@ -311,6 +345,9 @@ class MessageHandler {
 
   /**
    * Handle handshake
+   * @param ws
+   * @param message
+   * @param peerAddress
    */
   handleHandshake(ws, message, peerAddress) {
     logger.debug('MESSAGE_HANDLER', `Handshake received from ${peerAddress}`);
@@ -319,6 +356,9 @@ class MessageHandler {
 
   /**
    * Handle authentication challenge
+   * @param ws
+   * @param message
+   * @param peerAddress
    */
   handleAuthChallenge(ws, message, peerAddress) {
     logger.debug('MESSAGE_HANDLER', `Auth challenge received from ${peerAddress}`);
@@ -327,6 +367,9 @@ class MessageHandler {
 
   /**
    * Handle authentication response
+   * @param ws
+   * @param message
+   * @param peerAddress
    */
   handleAuthResponse(ws, message, peerAddress) {
     logger.debug('MESSAGE_HANDLER', `Auth response received from ${peerAddress}`);
@@ -335,6 +378,9 @@ class MessageHandler {
 
   /**
    * Handle authentication success
+   * @param ws
+   * @param message
+   * @param peerAddress
    */
   handleAuthSuccess(ws, message, peerAddress) {
     logger.debug('MESSAGE_HANDLER', `Auth success received from ${peerAddress}`);
@@ -343,6 +389,9 @@ class MessageHandler {
 
   /**
    * Handle authentication failure
+   * @param ws
+   * @param message
+   * @param peerAddress
    */
   handleAuthFailure(ws, message, peerAddress) {
     logger.debug('MESSAGE_HANDLER', `Auth failure received from ${peerAddress}`);
@@ -351,6 +400,9 @@ class MessageHandler {
 
   /**
    * Handle health status
+   * @param ws
+   * @param message
+   * @param peerAddress
    */
   handleHealthStatus(ws, message, peerAddress) {
     logger.debug('MESSAGE_HANDLER', `Health status received from ${peerAddress}: ${JSON.stringify(message.data)}`);
@@ -361,6 +413,9 @@ class MessageHandler {
 
   /**
    * Handle peer list request
+   * @param ws
+   * @param message
+   * @param peerAddress
    */
   handleRequestPeerList(ws, message, peerAddress) {
     logger.debug('MESSAGE_HANDLER', `Peer list requested by ${peerAddress}`);
@@ -382,6 +437,9 @@ class MessageHandler {
 
   /**
    * Handle heartbeat
+   * @param ws
+   * @param message
+   * @param peerAddress
    */
   handleHeartbeat(ws, message, peerAddress) {
     logger.debug('MESSAGE_HANDLER', `Heartbeat received from ${peerAddress}, sequence: ${message.data.sequence}`);
@@ -392,6 +450,8 @@ class MessageHandler {
 
   /**
    * Send message to peer
+   * @param ws
+   * @param message
    */
   sendMessage(ws, message) {
     try {

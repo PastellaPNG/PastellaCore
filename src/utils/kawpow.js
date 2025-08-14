@@ -1,5 +1,6 @@
-const keccak256 = require('keccak256');
 const crypto = require('crypto');
+
+const keccak256 = require('keccak256');
 
 /**
  * KawPow Algorithm Implementation
@@ -7,7 +8,13 @@ const crypto = require('crypto');
  * This is a simplified implementation focusing on the core mining logic
  */
 
+/**
+ *
+ */
 class KawPowUtils {
+  /**
+   *
+   */
   constructor() {
     // ProgPoW parameters (simplified for GPU mining)
     this.PROGPOW_PERIOD = 50;
@@ -25,6 +32,7 @@ class KawPowUtils {
 
   /**
    * Generate seed hash for ProgPoW
+   * @param blockNumber
    */
   generateSeedHash(blockNumber) {
     const seed = keccak256(Buffer.from(blockNumber.toString(), 'hex'));
@@ -62,6 +70,10 @@ class KawPowUtils {
 
   /**
    * ProgPoW hash function
+   * @param blockNumber
+   * @param headerHash
+   * @param nonce
+   * @param cache
    */
   progPowHash(blockNumber, headerHash, nonce, cache) {
     const seed = this.generateSeedHash(blockNumber);
@@ -100,19 +112,26 @@ class KawPowUtils {
 
   /**
    * Mixing function for ProgPoW
+   * @param a
+   * @param b
+   * @param c
    */
   mix(a, b, c) {
     // Simplified mixing operations suitable for GPU
     let result = a + b + c;
-    result = result ^ (result >>> 13);
-    result = result * 0x5bd1e995;
-    result = result ^ (result >>> 15);
-    result = result * 0x5bd1e995;
+    result ^= result >>> 13;
+    result *= 0x5bd1e995;
+    result ^= result >>> 15;
+    result *= 0x5bd1e995;
     return result;
   }
 
   /**
    * KawPow hash function (ProgPoW + Keccak256)
+   * @param blockNumber
+   * @param headerHash
+   * @param nonce
+   * @param cache
    */
   kawPowHash(blockNumber, headerHash, nonce, cache) {
     // First, run ProgPoW
@@ -132,11 +151,13 @@ class KawPowUtils {
 
   /**
    * Verify if hash meets difficulty target
+   * @param hash
+   * @param target
    */
   verifyHash(hash, target) {
     try {
-      const hashBigInt = BigInt('0x' + hash);
-      const targetBigInt = BigInt('0x' + target);
+      const hashBigInt = BigInt(`0x${hash}`);
+      const targetBigInt = BigInt(`0x${target}`);
       return hashBigInt <= targetBigInt;
     } catch (error) {
       return false;
@@ -145,15 +166,20 @@ class KawPowUtils {
 
   /**
    * Calculate target from difficulty
+   * @param difficulty
    */
   calculateTarget(difficulty) {
     const maxTarget = 'ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff';
-    const targetHex = BigInt('0x' + maxTarget) / BigInt(difficulty);
+    const targetHex = BigInt(`0x${maxTarget}`) / BigInt(difficulty);
     return targetHex.toString(16).padStart(64, '0');
   }
 
   /**
    * Generate mining data for GPU
+   * @param blockNumber
+   * @param headerHash
+   * @param nonce
+   * @param cache
    */
   generateMiningData(blockNumber, headerHash, nonce, cache) {
     return {
@@ -167,6 +193,10 @@ class KawPowUtils {
 
   /**
    * Process GPU mining results
+   * @param results
+   * @param blockNumber
+   * @param headerHash
+   * @param cache
    */
   processGPUResults(results, blockNumber, headerHash, cache) {
     const validResults = [];
@@ -187,6 +217,8 @@ class KawPowUtils {
 
   /**
    * Optimize cache for GPU transfer
+   * @param cache
+   * @param maxSize
    */
   optimizeCacheForGPU(cache, maxSize = 1000) {
     if (cache.length <= maxSize) {
@@ -206,6 +238,8 @@ class KawPowUtils {
 
   /**
    * Generate cache key for block
+   * @param blockNumber
+   * @param headerHash
    */
   generateCacheKey(blockNumber, headerHash) {
     return `cache_${blockNumber}_${headerHash.substring(0, 16)}`;
@@ -213,6 +247,8 @@ class KawPowUtils {
 
   /**
    * Validate cache integrity
+   * @param cache
+   * @param expectedSize
    */
   validateCache(cache, expectedSize) {
     if (!Array.isArray(cache) || cache.length !== expectedSize) {

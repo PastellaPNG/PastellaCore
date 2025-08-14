@@ -1,13 +1,15 @@
 const fs = require('fs');
-const path = require('path');
-const chalk = require('chalk');
 const os = require('os');
+const path = require('path');
+
+const chalk = require('chalk');
+
+const APIServer = require('./api/APIServer');
+const Blockchain = require('./models/Blockchain');
+const P2PNetwork = require('./network/P2PNetwork');
 const logger = require('./utils/logger');
 
 // Import core modules
-const Blockchain = require('./models/Blockchain');
-const P2PNetwork = require('./network/P2PNetwork');
-const APIServer = require('./api/APIServer');
 
 // Load configuration
 const config = JSON.parse(fs.readFileSync('./config.json', 'utf8'));
@@ -15,7 +17,13 @@ const config = JSON.parse(fs.readFileSync('./config.json', 'utf8'));
 // Load package.json for version info
 const packageJson = JSON.parse(fs.readFileSync('./package.json', 'utf8'));
 
+/**
+ *
+ */
 class PastellaDaemon {
+  /**
+   *
+   */
   constructor() {
     this.blockchain = new Blockchain();
     this.p2pNetwork = null;
@@ -26,9 +34,10 @@ class PastellaDaemon {
 
   /**
    * Display daemon intro with specifications
+   * @param currentConfig
    */
   displayIntro(currentConfig = config) {
-    const version = packageJson.version;
+    const { version } = packageJson;
     const freeMem = Math.round(os.freemem() / (1024 * 1024 * 1024));
     const cpuCores = os.cpus().length;
 
@@ -69,6 +78,7 @@ class PastellaDaemon {
 
   /**
    * Initialize the daemon
+   * @param updatedConfig
    */
   async initialize(updatedConfig = null) {
     // Use updated config if provided, otherwise use global config
@@ -93,7 +103,7 @@ class PastellaDaemon {
           logger.error('BLOCKCHAIN', 'Consider backing up your data and starting with a fresh blockchain.');
 
           // Backup the corrupted file
-          const backupPath = blockchainPath + '.backup.' + Date.now();
+          const backupPath = `${blockchainPath}.backup.${Date.now()}`;
           try {
             fs.copyFileSync(blockchainPath, backupPath);
             logger.info('BLOCKCHAIN', `Corrupted blockchain backed up to: ${backupPath}`);
@@ -151,6 +161,7 @@ class PastellaDaemon {
 
   /**
    * Start the daemon
+   * @param updatedConfig
    */
   async start(updatedConfig = null) {
     if (this.isRunning) {
@@ -460,7 +471,7 @@ class PastellaDaemon {
     console.log(chalk.cyan('  Difficulty:'), chalk.white(status.blockchain?.difficulty || 0));
     console.log(chalk.cyan('  Pending TXs:'), chalk.white(status.blockchain?.pendingTransactions || 0));
     if (latestBlock) {
-      console.log(chalk.cyan('  Latest Block:'), chalk.white(latestBlock.hash.substring(0, 16) + '...'));
+      console.log(chalk.cyan('  Latest Block:'), chalk.white(`${latestBlock.hash.substring(0, 16)}...`));
       console.log(chalk.cyan('  Block Time:'), chalk.white(new Date(latestBlock.timestamp).toLocaleString()));
     }
     console.log('');
@@ -584,8 +595,8 @@ class PastellaDaemon {
     if (latestBlock) {
       console.log(chalk.yellow.bold('🔗 LATEST BLOCK:'));
       console.log(chalk.cyan('  Index:'), chalk.white(latestBlock.index));
-      console.log(chalk.cyan('  Hash:'), chalk.white(latestBlock.hash.substring(0, 16) + '...'));
-      console.log(chalk.cyan('  Previous:'), chalk.white(latestBlock.previousHash.substring(0, 16) + '...'));
+      console.log(chalk.cyan('  Hash:'), chalk.white(`${latestBlock.hash.substring(0, 16)}...`));
+      console.log(chalk.cyan('  Previous:'), chalk.white(`${latestBlock.previousHash.substring(0, 16)}...`));
       console.log(chalk.cyan('  Nonce:'), chalk.white(latestBlock.nonce));
       console.log(chalk.cyan('  Difficulty:'), chalk.white(latestBlock.difficulty));
       console.log(chalk.cyan('  Transactions:'), chalk.white(latestBlock.transactions.length));
@@ -648,15 +659,16 @@ class PastellaDaemon {
 
     if (hours > 0) {
       return `${hours}h ${minutes}m ${seconds}s`;
-    } else if (minutes > 0) {
-      return `${minutes}m ${seconds}s`;
-    } else {
-      return `${seconds}s`;
     }
+    if (minutes > 0) {
+      return `${minutes}m ${seconds}s`;
+    }
+    return `${seconds}s`;
   }
 
   /**
    * Get time ago string
+   * @param timestamp
    */
   getTimeAgo(timestamp) {
     const now = Date.now();
@@ -668,17 +680,21 @@ class PastellaDaemon {
 
     if (days > 0) {
       return `${days}d ago`;
-    } else if (hours > 0) {
-      return `${hours}h ago`;
-    } else if (minutes > 0) {
-      return `${minutes}m ago`;
-    } else {
-      return `${seconds}s ago`;
     }
+    if (hours > 0) {
+      return `${hours}h ago`;
+    }
+    if (minutes > 0) {
+      return `${minutes}m ago`;
+    }
+    return `${seconds}s ago`;
   }
 }
 
 // Main execution
+/**
+ *
+ */
 async function main() {
   const daemon = new PastellaDaemon();
 
@@ -692,12 +708,12 @@ async function main() {
   }
 
   if (args.includes('--help') || args.includes('-h')) {
-    const version = packageJson.version;
+    const { version } = packageJson;
 
     console.log(chalk.blue.bold('╔══════════════════════════════════════════════════════════════╗'));
     console.log(chalk.blue.bold('║                    🚀 PASTELLA DAEMON                        ║'));
     console.log(chalk.blue.bold('║                   NodeJS Cryptocurrency                      ║'));
-    console.log(chalk.blue.bold('║                       Version ' + version + '                          ║'));
+    console.log(chalk.blue.bold(`║                       Version ${version}                          ║`));
     console.log(chalk.blue.bold('╚══════════════════════════════════════════════════════════════╝'));
     console.log('');
     console.log(chalk.cyan.bold('📖 DESCRIPTION:'));
@@ -807,6 +823,9 @@ async function main() {
 
     const question = query => new Promise(resolve => rl.question(query, resolve));
 
+    /**
+     *
+     */
     async function generateGenesis() {
       try {
         console.log(chalk.cyan.bold('📋 GENESIS BLOCK CONFIGURATION:'));
@@ -889,21 +908,21 @@ async function main() {
 
         // Find valid nonce
         console.log(chalk.yellow.bold('⛏️  MINING GENESIS BLOCK (KawPow Algorithm)'));
-        console.log(chalk.gray('   Target: ' + target.substring(0, 16) + '...'));
-        console.log(chalk.gray('   Difficulty: ' + difficulty));
+        console.log(chalk.gray(`   Target: ${target.substring(0, 16)}...`));
+        console.log(chalk.gray(`   Difficulty: ${difficulty}`));
         console.log(chalk.gray('   Algorithm: KawPow (ProgPoW + Keccak256)'));
         console.log('');
 
         let nonce = 0;
         const maxAttempts = 10000000; // 10 million attempts
         const startTime = Date.now();
-        let lastUpdate = 0;
+        const lastUpdate = 0;
 
         // Progress bar setup
         const progressBarLength = 30;
         const updateInterval = 10000; // Update every 10k nonces
 
-        console.log(chalk.cyan('   Progress: [' + '░'.repeat(progressBarLength) + '] 0%'));
+        console.log(chalk.cyan(`   Progress: [${'░'.repeat(progressBarLength)}] 0%`));
 
         while (nonce < maxAttempts) {
           genesisBlock.nonce = nonce;
@@ -913,12 +932,12 @@ async function main() {
           genesisBlock.algorithm = 'kawpow';
 
           // Check if hash meets difficulty requirement
-          const hashNum = BigInt('0x' + genesisBlock.hash);
-          const targetNum = BigInt('0x' + target);
+          const hashNum = BigInt(`0x${genesisBlock.hash}`);
+          const targetNum = BigInt(`0x${target}`);
 
           if (hashNum <= targetNum) {
             // Clear the progress line
-            process.stdout.write('\r' + ' '.repeat(80) + '\r');
+            process.stdout.write(`\r${' '.repeat(80)}\r`);
 
             const miningTime = ((Date.now() - startTime) / 1000).toFixed(2);
             const hashRate = Math.floor(nonce / (miningTime / 1000));
@@ -958,7 +977,7 @@ async function main() {
 
         if (nonce >= maxAttempts) {
           // Clear the progress line
-          process.stdout.write('\r' + ' '.repeat(80) + '\r');
+          process.stdout.write(`\r${' '.repeat(80)}\r`);
 
           const miningTime = ((Date.now() - startTime) / 1000).toFixed(2);
           const hashRate = Math.floor(nonce / (miningTime / 1000));
@@ -991,14 +1010,14 @@ async function main() {
         console.log('');
         console.log(chalk.gray('{'));
         console.log(chalk.gray('  "blockchain": {'));
-        console.log(chalk.gray('    "difficulty": ' + difficulty + ','));
+        console.log(chalk.gray(`    "difficulty": ${difficulty},`));
         console.log(chalk.gray('    "genesis": {'));
-        console.log(chalk.gray('      "timestamp": ' + genesisTimestamp + ','));
-        console.log(chalk.gray('      "premineAmount": ' + premineAmount + ','));
-        console.log(chalk.gray('      "premineAddress": "' + premineAddress + '",'));
-        console.log(chalk.gray('      "difficulty": ' + difficulty + ','));
-        console.log(chalk.gray('      "nonce": ' + nonce + ','));
-        console.log(chalk.gray('      "hash": "' + genesisBlock.hash + '",'));
+        console.log(chalk.gray(`      "timestamp": ${genesisTimestamp},`));
+        console.log(chalk.gray(`      "premineAmount": ${premineAmount},`));
+        console.log(chalk.gray(`      "premineAddress": "${premineAddress}",`));
+        console.log(chalk.gray(`      "difficulty": ${difficulty},`));
+        console.log(chalk.gray(`      "nonce": ${nonce},`));
+        console.log(chalk.gray(`      "hash": "${genesisBlock.hash}",`));
         console.log(chalk.gray('      "algorithm": "kawpow"'));
         console.log(chalk.gray('    }'));
         console.log(chalk.gray('  }'));
@@ -1010,13 +1029,13 @@ async function main() {
           ...config,
           blockchain: {
             ...config.blockchain,
-            difficulty: difficulty,
+            difficulty,
             genesis: {
               timestamp: genesisTimestamp,
-              premineAmount: premineAmount,
-              premineAddress: premineAddress,
-              difficulty: difficulty,
-              nonce: nonce,
+              premineAmount,
+              premineAddress,
+              difficulty,
+              nonce,
               hash: genesisBlock.hash,
               algorithm: 'kawpow',
             },
@@ -1070,7 +1089,7 @@ async function main() {
   }
 
   if (args.includes('--version') || args.includes('-v')) {
-    const version = packageJson.version;
+    const { version } = packageJson;
     const nodeVersion = process.version;
     const platform = os.platform();
     const arch = os.arch();

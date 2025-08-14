@@ -1,6 +1,12 @@
 const logger = require('./logger');
 
+/**
+ *
+ */
 class MessageValidator {
+  /**
+   *
+   */
   constructor() {
     // Define comprehensive message schemas
     this.messageSchemas = {
@@ -289,6 +295,8 @@ class MessageValidator {
 
   /**
    * Validate a message against its schema
+   * @param message
+   * @param peerAddress
    */
   validateMessage(message, peerAddress = 'unknown') {
     try {
@@ -325,6 +333,7 @@ class MessageValidator {
 
   /**
    * Validate basic message structure
+   * @param message
    */
   validateBasicStructure(message) {
     if (!message || typeof message !== 'object') {
@@ -344,6 +353,7 @@ class MessageValidator {
 
   /**
    * Validate message size
+   * @param message
    */
   validateMessageSize(message) {
     const messageSize = JSON.stringify(message).length;
@@ -361,6 +371,7 @@ class MessageValidator {
 
   /**
    * Validate message against schema
+   * @param message
    */
   validateAgainstSchema(message) {
     const schema = this.messageSchemas[message.type];
@@ -390,6 +401,8 @@ class MessageValidator {
 
   /**
    * Validate required fields
+   * @param message
+   * @param schema
    */
   validateRequiredFields(message, schema) {
     if (!schema.required) {
@@ -411,6 +424,8 @@ class MessageValidator {
 
   /**
    * Validate properties
+   * @param message
+   * @param schema
    */
   validateProperties(message, schema) {
     if (!schema.properties) {
@@ -438,6 +453,9 @@ class MessageValidator {
 
   /**
    * Validate a single field
+   * @param value
+   * @param schema
+   * @param fieldName
    */
   validateField(value, schema, fieldName) {
     // Type validation
@@ -507,6 +525,9 @@ class MessageValidator {
 
   /**
    * Validate string field
+   * @param value
+   * @param schema
+   * @param fieldName
    */
   validateStringField(value, schema, fieldName) {
     if (typeof value !== 'string') {
@@ -560,6 +581,9 @@ class MessageValidator {
 
   /**
    * Validate number field
+   * @param value
+   * @param schema
+   * @param fieldName
    */
   validateNumberField(value, schema, fieldName) {
     if (typeof value !== 'number' || isNaN(value)) {
@@ -592,6 +616,9 @@ class MessageValidator {
 
   /**
    * Validate array field
+   * @param value
+   * @param schema
+   * @param fieldName
    */
   validateArrayField(value, schema, fieldName) {
     if (!Array.isArray(value)) {
@@ -624,6 +651,9 @@ class MessageValidator {
 
   /**
    * Validate object field
+   * @param value
+   * @param schema
+   * @param fieldName
    */
   validateObjectField(value, schema, fieldName) {
     if (typeof value !== 'object' || value === null || Array.isArray(value)) {
@@ -649,6 +679,7 @@ class MessageValidator {
 
   /**
    * Validate business logic
+   * @param message
    */
   validateBusinessLogic(message) {
     switch (message.type) {
@@ -668,6 +699,7 @@ class MessageValidator {
 
   /**
    * Validate new block message
+   * @param blockData
    */
   validateNewBlock(blockData) {
     // Validate block size
@@ -714,6 +746,7 @@ class MessageValidator {
 
   /**
    * Validate new transaction message
+   * @param txData
    */
   validateNewTransaction(txData) {
     // Validate transaction size
@@ -757,6 +790,7 @@ class MessageValidator {
 
   /**
    * Validate handshake message
+   * @param handshakeData
    */
   validateHandshake(handshakeData) {
     // Validate timestamp
@@ -784,6 +818,7 @@ class MessageValidator {
 
   /**
    * Validate authentication messages
+   * @param authData
    */
   validateAuthMessage(authData) {
     // Validate timestamp
@@ -814,6 +849,7 @@ class MessageValidator {
 
   /**
    * Update validation rules
+   * @param newRules
    */
   updateValidationRules(newRules) {
     this.validationRules = { ...this.validationRules, ...newRules };

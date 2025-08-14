@@ -1,11 +1,16 @@
 const fs = require('fs');
 const path = require('path');
+
 const logger = require('../utils/logger');
 
 /**
  * CRITICAL: Enhanced peer reputation system with manipulation protection
  */
 class PeerReputation {
+  /**
+   *
+   * @param dataDir
+   */
   constructor(dataDir = './data') {
     this.peerReputation = new Map(); // Map<peerAddress, reputationData>
     this.peerReputationFile = path.join(dataDir, 'peer-reputation.json');
@@ -94,6 +99,7 @@ class PeerReputation {
 
   /**
    * CRITICAL: Detect alternating positive/negative score changes
+   * @param scoreChanges
    */
   detectAlternatingPattern(scoreChanges) {
     if (scoreChanges.length < 3) return false;
@@ -113,6 +119,8 @@ class PeerReputation {
 
   /**
    * CRITICAL: Detect coordinated reputation changes
+   * @param peerAddress
+   * @param recentChanges
    */
   detectCoordinatedChanges(peerAddress, recentChanges) {
     // Check if multiple peers are changing this peer's reputation simultaneously
@@ -172,6 +180,7 @@ class PeerReputation {
 
   /**
    * Get reputation data for a specific peer
+   * @param peerAddress
    */
   getReputationData(peerAddress) {
     return this.peerReputation.get(peerAddress) || null;
@@ -179,6 +188,9 @@ class PeerReputation {
 
   /**
    * Update peer reputation based on behavior
+   * @param peerAddress
+   * @param behavior
+   * @param details
    */
   updatePeerReputation(peerAddress, behavior, details = {}) {
     let reputationData = this.getReputationData(peerAddress);
@@ -244,9 +256,9 @@ class PeerReputation {
     // Record behavior
     reputationData.behaviors.push({
       type: behaviorType,
-      behavior: behavior,
-      scoreChange: scoreChange,
-      details: details,
+      behavior,
+      scoreChange,
+      details,
       timestamp: now,
     });
 
@@ -276,6 +288,7 @@ class PeerReputation {
 
   /**
    * Check if peer is banned
+   * @param peerAddress
    */
   isPeerBanned(peerAddress) {
     const reputation = this.peerReputation.get(peerAddress);
@@ -286,6 +299,7 @@ class PeerReputation {
 
   /**
    * Get peer score
+   * @param peerAddress
    */
   getPeerScore(peerAddress) {
     const reputation = this.peerReputation.get(peerAddress);
@@ -294,6 +308,7 @@ class PeerReputation {
 
   /**
    * Get peer reputation
+   * @param peerAddress
    */
   getPeerReputation(peerAddress) {
     return (
@@ -309,6 +324,7 @@ class PeerReputation {
 
   /**
    * Unban peer
+   * @param peerAddress
    */
   unbanPeer(peerAddress) {
     const reputation = this.peerReputation.get(peerAddress);
@@ -322,6 +338,8 @@ class PeerReputation {
 
   /**
    * Ban peer
+   * @param peerAddress
+   * @param reason
    */
   banPeer(peerAddress, reason = '') {
     const reputation = this.peerReputation.get(peerAddress) || {
@@ -437,6 +455,7 @@ class PeerReputation {
 
   /**
    * Reset peer reputation
+   * @param peerAddress
    */
   resetPeerReputation(peerAddress) {
     this.peerReputation.delete(peerAddress);

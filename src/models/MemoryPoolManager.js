@@ -4,6 +4,9 @@ const logger = require('../utils/logger');
  * CRITICAL: Memory exhaustion protection system
  */
 class MemoryProtection {
+  /**
+   *
+   */
   constructor() {
     this.maxMemoryUsage = 100 * 1024 * 1024; // 100MB default limit
     this.maxTransactionSize = 1024 * 1024; // 1MB per transaction
@@ -92,6 +95,7 @@ class MemoryProtection {
 
   /**
    * CRITICAL: Check if transaction size is acceptable
+   * @param transaction
    */
   validateTransactionSize(transaction) {
     try {
@@ -109,6 +113,7 @@ class MemoryProtection {
 
   /**
    * CRITICAL: Check if adding transaction would exceed memory limits
+   * @param transaction
    */
   canAddTransaction(transaction) {
     try {
@@ -145,6 +150,7 @@ class MemoryProtection {
 
   /**
    * CRITICAL: Update memory limits
+   * @param newLimits
    */
   updateMemoryLimits(newLimits) {
     if (newLimits.maxMemoryUsage) {
@@ -168,6 +174,9 @@ class MemoryProtection {
  * Memory Pool Manager - Handles transaction pool management and batch processing
  */
 class MemoryPoolManager {
+  /**
+   *
+   */
   constructor() {
     this.pendingTransactions = [];
 
@@ -256,6 +265,8 @@ class MemoryPoolManager {
 
   /**
    * Batch transaction validation
+   * @param transactions
+   * @param maxBatchSize
    */
   validateTransactionBatch(transactions, maxBatchSize = 100) {
     const results = {
@@ -310,6 +321,7 @@ class MemoryPoolManager {
 
   /**
    * CRITICAL: Add transaction with memory protection
+   * @param transaction
    */
   addTransaction(transaction) {
     try {
@@ -360,6 +372,7 @@ class MemoryPoolManager {
 
   /**
    * Remove transactions from pending pool
+   * @param transactions
    */
   removeTransactions(transactions) {
     const txIds = transactions.map(tx => tx.id);
@@ -389,6 +402,7 @@ class MemoryPoolManager {
 
   /**
    * Check if transaction exists in pool
+   * @param txId
    */
   hasTransaction(txId) {
     return this.pendingTransactions.some(tx => tx.id === txId);
@@ -396,6 +410,7 @@ class MemoryPoolManager {
 
   /**
    * Get transaction by ID
+   * @param txId
    */
   getTransaction(txId) {
     return this.pendingTransactions.find(tx => tx.id === txId);

@@ -1,9 +1,19 @@
 const crypto = require('crypto');
 const fs = require('fs');
 const path = require('path');
+
 const logger = require('../utils/logger');
 
+/**
+ *
+ */
 class NodeIdentity {
+  /**
+   *
+   * @param nodeId
+   * @param privateKey
+   * @param dataDir
+   */
   constructor(nodeId = null, privateKey = null, dataDir = './data') {
     this.nodeId = nodeId;
     this.privateKey = privateKey;
@@ -67,6 +77,7 @@ class NodeIdentity {
 
   /**
    * Derive public key from private key
+   * @param privateKey
    */
   derivePublicKey(privateKey) {
     try {
@@ -106,6 +117,7 @@ class NodeIdentity {
 
   /**
    * Sign data with private key
+   * @param data
    */
   sign(data) {
     try {
@@ -121,6 +133,9 @@ class NodeIdentity {
 
   /**
    * Verify signature with public key
+   * @param data
+   * @param signature
+   * @param publicKey
    */
   verify(data, signature, publicKey) {
     try {
@@ -155,6 +170,10 @@ class NodeIdentity {
 
   /**
    * Verify authentication challenge response
+   * @param challenge
+   * @param response
+   * @param peerNodeId
+   * @param peerPublicKey
    */
   verifyChallengeResponse(challenge, response, peerNodeId, peerPublicKey) {
     try {
@@ -195,6 +214,8 @@ class NodeIdentity {
 
   /**
    * Create challenge response
+   * @param challenge
+   * @param timestamp
    */
   createChallengeResponse(challenge, timestamp) {
     const responseData = {
@@ -223,6 +244,8 @@ class NodeIdentity {
 
   /**
    * Validate peer identity
+   * @param peerNodeId
+   * @param peerPublicKey
    */
   validatePeerIdentity(peerNodeId, peerPublicKey) {
     // Basic validation
@@ -273,6 +296,7 @@ class NodeIdentity {
 
   /**
    * Verify handshake message
+   * @param handshake
    */
   verifyHandshake(handshake) {
     try {

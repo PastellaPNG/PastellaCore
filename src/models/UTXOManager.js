@@ -4,6 +4,9 @@ const logger = require('../utils/logger');
  * UTXO Manager - Handles all UTXO operations and validation
  */
 class UTXOManager {
+  /**
+   *
+   */
   constructor() {
     this.utxos = [];
     this.utxoSet = new Map(); // Map of UTXO: txHash:outputIndex -> {address, amount}
@@ -11,6 +14,8 @@ class UTXOManager {
 
   /**
    * Find a specific UTXO by transaction hash and output index
+   * @param txHash
+   * @param outputIndex
    */
   findUTXO(txHash, outputIndex) {
     for (const utxo of this.utxos) {
@@ -23,6 +28,8 @@ class UTXOManager {
 
   /**
    * Check if a UTXO is already spent
+   * @param txHash
+   * @param outputIndex
    */
   isUTXOSpent(txHash, outputIndex) {
     // Check if this UTXO exists in our current UTXO set
@@ -31,6 +38,7 @@ class UTXOManager {
 
   /**
    * Update UTXO set when adding a block
+   * @param block
    */
   updateUTXOSet(block) {
     block.transactions.forEach(transaction => {
@@ -54,6 +62,7 @@ class UTXOManager {
 
   /**
    * Rebuild UTXO set from entire chain
+   * @param chain
    */
   rebuildUTXOSet(chain) {
     this.utxoSet.clear();
@@ -73,6 +82,7 @@ class UTXOManager {
 
   /**
    * Get balance for an address
+   * @param address
    */
   getBalance(address) {
     let balance = 0;
@@ -88,6 +98,7 @@ class UTXOManager {
 
   /**
    * Get UTXOs for an address
+   * @param address
    */
   getUTXOsForAddress(address) {
     const utxos = [];
@@ -109,6 +120,7 @@ class UTXOManager {
 
   /**
    * Clean up orphaned UTXOs that are no longer referenced
+   * @param chain
    */
   cleanupOrphanedUTXOs(chain) {
     const initialCount = this.utxos.length;
@@ -136,6 +148,8 @@ class UTXOManager {
 
   /**
    * Find block index containing a specific transaction
+   * @param txHash
+   * @param chain
    */
   findBlockContainingTransaction(txHash, chain) {
     for (let i = 0; i < chain.length; i++) {
@@ -156,6 +170,7 @@ class UTXOManager {
 
   /**
    * Add UTXO to the set
+   * @param utxo
    */
   addUTXO(utxo) {
     this.utxos.push(utxo);
@@ -163,6 +178,8 @@ class UTXOManager {
 
   /**
    * Remove UTXO from the set
+   * @param txHash
+   * @param outputIndex
    */
   removeUTXO(txHash, outputIndex) {
     this.utxos = this.utxos.filter(utxo => !(utxo.txHash === txHash && utxo.outputIndex === outputIndex));

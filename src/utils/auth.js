@@ -4,6 +4,10 @@ const logger = require('./logger');
  * Authentication utilities for API key validation
  */
 class AuthMiddleware {
+  /**
+   *
+   * @param apiKey
+   */
   constructor(apiKey = null) {
     this.apiKey = apiKey;
     this.enabled = !!apiKey;
@@ -11,8 +15,8 @@ class AuthMiddleware {
 
   /**
    * Middleware function for Express to validate API key
-   * @param {Object} req - Express request object
-   * @param {Object} res - Express response object
+   * @param {object} req - Express request object
+   * @param {object} res - Express response object
    * @param {Function} next - Express next function
    */
   validateApiKey(req, res, next) {
@@ -20,7 +24,7 @@ class AuthMiddleware {
     logger.debug('AUTH', `Validating API key for ${req.method} ${req.path}`);
     logger.debug(
       'AUTH',
-      `Authentication enabled: ${this.enabled}, API key stored: ${this.apiKey ? this.apiKey.substring(0, 8) + '...' : 'none'}`
+      `Authentication enabled: ${this.enabled}, API key stored: ${this.apiKey ? `${this.apiKey.substring(0, 8)}...` : 'none'}`
     );
 
     // If authentication is not enabled, skip validation
@@ -91,7 +95,7 @@ class AuthMiddleware {
 
   /**
    * Get authentication status
-   * @returns {Object} - Authentication configuration
+   * @returns {object} - Authentication configuration
    */
   getAuthStatus() {
     return {

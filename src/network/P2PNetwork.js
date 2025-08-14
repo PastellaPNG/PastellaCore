@@ -1,21 +1,24 @@
-const WebSocket = require('ws');
 const dns = require('dns');
-const { promisify } = require('util');
-const path = require('path');
-const Blockchain = require('../models/Blockchain');
-const Block = require('../models/Block');
-const { Transaction } = require('../models/Transaction');
 const fs = require('fs');
+const path = require('path');
+const { promisify } = require('util');
+
+const WebSocket = require('ws');
+
+const Block = require('../models/Block');
+const Blockchain = require('../models/Blockchain');
+const { Transaction } = require('../models/Transaction');
 const logger = require('../utils/logger');
-const NodeIdentity = require('./NodeIdentity');
+
+const MessageHandler = require('./MessageHandler');
 const NetworkPartitionHandler = require('./NetworkPartitionHandler');
+const NetworkSync = require('./NetworkSync');
+const NodeIdentity = require('./NodeIdentity');
 
 // Import modular components
 const PeerManager = require('./PeerManager');
-const SeedNodeManager = require('./SeedNodeManager');
 const PeerReputation = require('./PeerReputation');
-const MessageHandler = require('./MessageHandler');
-const NetworkSync = require('./NetworkSync');
+const SeedNodeManager = require('./SeedNodeManager');
 
 // Promisify DNS functions
 const dnsResolve4 = promisify(dns.resolve4);
@@ -38,6 +41,12 @@ const dnsResolve = promisify(dns.resolve);
  * - Reduced file size and complexity
  */
 class P2PNetwork {
+  /**
+   *
+   * @param blockchain
+   * @param port
+   * @param config
+   */
   constructor(blockchain, port = 3001, config = null) {
     logger.debug('P2P_NETWORK', `Initializing P2P Network: port=${port}, config=${config ? 'present' : 'null'}`);
     logger.debug('P2P_NETWORK', `Blockchain instance: ${blockchain ? 'present' : 'null'}, type: ${typeof blockchain}`);
@@ -136,6 +145,7 @@ class P2PNetwork {
 
   /**
    * Setup seed node configuration
+   * @param seedConfig
    */
   setupSeedNode(seedConfig) {
     this.seedNodeManager.setupSeedNode(seedConfig);
@@ -179,7 +189,7 @@ class P2PNetwork {
 
       logger.debug('P2P_NETWORK', `Setting up WebSocket connection handler...`);
       this.wss.on('connection', (ws, req) => {
-        const remoteAddress = req.socket.remoteAddress;
+        const { remoteAddress } = req.socket;
         logger.info('P2P', `New peer connected: ${remoteAddress}:${req.socket.remotePort}`);
         logger.debug('P2P_NETWORK', `Handling new connection from ${remoteAddress}:${req.socket.remotePort}`);
         this.handleConnection(ws);
@@ -283,6 +293,7 @@ class P2PNetwork {
 
   /**
    * Handle new WebSocket connection
+   * @param ws
    */
   handleConnection(ws) {
     logger.debug('P2P_NETWORK', `Handling new WebSocket connection...`);
@@ -368,6 +379,7 @@ class P2PNetwork {
 
   /**
    * Get peer address from WebSocket
+   * @param ws
    */
   getPeerAddress(ws) {
     return this.peerManager.getPeerAddress(ws);
@@ -375,6 +387,8 @@ class P2PNetwork {
 
   /**
    * Connect to a peer
+   * @param host
+   * @param port
    */
   async connectToPeer(host, port) {
     const peerAddress = `${host}:${port}`;
@@ -412,6 +426,7 @@ class P2PNetwork {
 
   /**
    * Check if peer is authenticated
+   * @param peerAddress
    */
   isPeerAuthenticated(peerAddress) {
     return this.authenticatedPeers.has(peerAddress);
@@ -495,6 +510,7 @@ class P2PNetwork {
 
   /**
    * Broadcast new block to all peers
+   * @param block
    */
   broadcastNewBlock(block) {
     return this.networkSync.broadcastNewBlock(block);
@@ -502,6 +518,7 @@ class P2PNetwork {
 
   /**
    * Broadcast new transaction to all peers
+   * @param transaction
    */
   broadcastNewTransaction(transaction) {
     return this.networkSync.broadcastNewTransaction(transaction);
@@ -530,6 +547,7 @@ class P2PNetwork {
 
   /**
    * Check if peer exists
+   * @param ws
    */
   hasPeer(ws) {
     return this.peerManager.hasPeer(ws);
@@ -537,6 +555,7 @@ class P2PNetwork {
 
   /**
    * Get peer reputation
+   * @param peerAddress
    */
   getPeerReputation(peerAddress) {
     return this.peerReputation.getPeerReputation(peerAddress);
@@ -544,6 +563,7 @@ class P2PNetwork {
 
   /**
    * Get peer score
+   * @param peerAddress
    */
   getPeerScore(peerAddress) {
     return this.peerReputation.getPeerScore(peerAddress);
@@ -551,6 +571,8 @@ class P2PNetwork {
 
   /**
    * Ban peer
+   * @param peerAddress
+   * @param duration
    */
   banPeer(peerAddress, duration = null) {
     return this.peerReputation.banPeer(peerAddress, duration);
@@ -558,6 +580,7 @@ class P2PNetwork {
 
   /**
    * Unban peer
+   * @param peerAddress
    */
   unbanPeer(peerAddress) {
     return this.peerReputation.unbanPeer(peerAddress);
@@ -565,6 +588,7 @@ class P2PNetwork {
 
   /**
    * Reset peer reputation
+   * @param peerAddress
    */
   resetPeerReputation(peerAddress) {
     return this.peerReputation.resetPeerReputation(peerAddress);
@@ -579,6 +603,7 @@ class P2PNetwork {
 
   /**
    * Start periodic sync
+   * @param intervalMs
    */
   startPeriodicSync(intervalMs = 30000) {
     this.networkSync.startPeriodicSync(intervalMs);

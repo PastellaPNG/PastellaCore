@@ -1,11 +1,19 @@
+const crypto = require('crypto');
 const fs = require('fs');
 const path = require('path');
-const crypto = require('crypto');
-const { CryptoUtils } = require('../utils/crypto');
-const { Transaction, TransactionInput, TransactionOutput } = require('./Transaction');
-const { TRANSACTION_TAGS } = require('../utils/constants');
 
+const { TRANSACTION_TAGS } = require('../utils/constants');
+const { CryptoUtils } = require('../utils/crypto');
+
+const { Transaction, TransactionInput, TransactionOutput } = require('./Transaction');
+
+/**
+ *
+ */
 class Wallet {
+  /**
+   *
+   */
   constructor() {
     this.privateKey = null;
     this.publicKey = null;
@@ -27,6 +35,10 @@ class Wallet {
     };
   }
 
+  /**
+   *
+   * @param password
+   */
   generateKeyPair(password) {
     const keyPair = CryptoUtils.generateKeyPair();
     this.privateKey = keyPair.privateKey;
@@ -42,6 +54,11 @@ class Wallet {
     };
   }
 
+  /**
+   *
+   * @param seed
+   * @param password
+   */
   importFromSeed(seed, password) {
     try {
       const keyPair = CryptoUtils.importFromSeed(seed);
@@ -61,6 +78,11 @@ class Wallet {
     }
   }
 
+  /**
+   *
+   * @param privateKeyHex
+   * @param password
+   */
   importFromPrivateKey(privateKeyHex, password) {
     try {
       const keyPair = CryptoUtils.importPrivateKey(privateKeyHex);
@@ -78,14 +100,24 @@ class Wallet {
     }
   }
 
+  /**
+   *
+   */
   getAddress() {
     return this.address;
   }
 
+  /**
+   *
+   */
   getSeed() {
     return this.seed;
   }
 
+  /**
+   *
+   * @param password
+   */
   showSeedInfo(password) {
     if (!this.seed) {
       throw new Error('No seed available for this wallet');
@@ -97,6 +129,11 @@ class Wallet {
     };
   }
 
+  /**
+   *
+   * @param data
+   * @param password
+   */
   encryptWalletData(data, password) {
     const salt = crypto.randomBytes(16);
     const key = crypto.pbkdf2Sync(password, salt, 100000, 32, 'sha256');
@@ -107,12 +144,17 @@ class Wallet {
     encrypted += cipher.final('hex');
 
     return {
-      encrypted: encrypted,
+      encrypted,
       iv: iv.toString('hex'),
       salt: salt.toString('hex'),
     };
   }
 
+  /**
+   *
+   * @param encryptedData
+   * @param password
+   */
   decryptWalletData(encryptedData, password) {
     try {
       const key = crypto.pbkdf2Sync(password, Buffer.from(encryptedData.salt, 'hex'), 100000, 32, 'sha256');
@@ -128,13 +170,22 @@ class Wallet {
     }
   }
 
+  /**
+   *
+   * @param filename
+   */
   ensureWalletExtension(filename) {
     if (!filename.endsWith('.wallet')) {
-      return filename + '.wallet';
+      return `${filename}.wallet`;
     }
     return filename;
   }
 
+  /**
+   *
+   * @param filePath
+   * @param password
+   */
   saveToFile(filePath, password) {
     try {
       const walletData = {
@@ -163,6 +214,11 @@ class Wallet {
     }
   }
 
+  /**
+   *
+   * @param filePath
+   * @param password
+   */
   loadFromFile(filePath, password) {
     try {
       if (!fs.existsSync(filePath)) {
@@ -193,6 +249,11 @@ class Wallet {
     }
   }
 
+  /**
+   *
+   * @param name
+   * @param password
+   */
   load(name, password) {
     try {
       const filePath = this.ensureWalletExtension(name);
@@ -202,6 +263,11 @@ class Wallet {
     }
   }
 
+  /**
+   *
+   * @param blockchain
+   * @param onTransactionDetected
+   */
   updateBalance(blockchain, onTransactionDetected = null) {
     const oldBalance = this.balance;
     const oldUtxoCount = this.utxos.length;
@@ -269,6 +335,8 @@ class Wallet {
 
   /**
    * Find the block height for a given transaction hash
+   * @param blockchain
+   * @param txHash
    */
   findBlockHeightForTransaction(blockchain, txHash) {
     for (let i = 0; i < blockchain.chain.length; i++) {
@@ -280,14 +348,28 @@ class Wallet {
     return null;
   }
 
+  /**
+   *
+   */
   getBalance() {
     return this.balance;
   }
 
+  /**
+   *
+   */
   getUTXOCount() {
     return this.utxos.length;
   }
 
+  /**
+   *
+   * @param toAddress
+   * @param amount
+   * @param fee
+   * @param blockchain
+   * @param tag
+   */
   createTransaction(toAddress, amount, fee, blockchain, tag = TRANSACTION_TAGS.TRANSACTION) {
     // Users can only create TRANSACTION tagged transactions
     if (tag !== TRANSACTION_TAGS.TRANSACTION) {
@@ -351,6 +433,9 @@ class Wallet {
     return transaction;
   }
 
+  /**
+   *
+   */
   getInfo() {
     return {
       address: this.address,
@@ -360,10 +445,18 @@ class Wallet {
     };
   }
 
+  /**
+   *
+   */
   isLoaded() {
     return !!(this.privateKey && this.publicKey && this.address);
   }
 
+  /**
+   *
+   * @param filePath
+   * @param password
+   */
   saveWallet(filePath = null, password = null) {
     if (!this.isLoaded()) {
       throw new Error('No wallet loaded to save');
@@ -381,6 +474,9 @@ class Wallet {
     }
   }
 
+  /**
+   *
+   */
   unloadWallet() {
     this.privateKey = null;
     this.publicKey = null;
@@ -400,10 +496,19 @@ class Wallet {
   }
 
   // Sync state methods
+  /**
+   *
+   */
   getSyncState() {
     return this.syncState;
   }
 
+  /**
+   *
+   * @param height
+   * @param hash
+   * @param transactionCount
+   */
   updateSyncState(height, hash, transactionCount = 0) {
     this.syncState.lastSyncedHeight = height;
     this.syncState.lastSyncedHash = hash;
@@ -412,6 +517,9 @@ class Wallet {
     this.syncState.lastBalance = this.balance;
   }
 
+  /**
+   *
+   */
   resetSyncState() {
     this.syncState = {
       lastSyncedHeight: 0,
@@ -422,16 +530,28 @@ class Wallet {
     };
   }
 
+  /**
+   *
+   * @param currentHeight
+   */
   isFullySynced(currentHeight) {
     return this.syncState.lastSyncedHeight >= currentHeight;
   }
 
+  /**
+   *
+   * @param currentHeight
+   */
   getSyncProgress(currentHeight) {
     if (currentHeight === 0) return 100;
     return Math.round((this.syncState.lastSyncedHeight / currentHeight) * 100);
   }
 
   // Transaction history methods
+  /**
+   *
+   * @param transaction
+   */
   addTransactionToHistory(transaction) {
     // Add transaction to history if not already present
     const exists = this.transactionHistory.find(tx => tx.id === transaction.id);
@@ -440,20 +560,35 @@ class Wallet {
     }
   }
 
+  /**
+   *
+   */
   getTransactionHistory() {
     return this.transactionHistory;
   }
 
+  /**
+   *
+   * @param page
+   * @param pageSize
+   */
   getTransactionHistoryPage(page, pageSize = 10) {
     const startIndex = page * pageSize;
     const endIndex = startIndex + pageSize;
     return this.transactionHistory.slice(startIndex, endIndex);
   }
 
+  /**
+   *
+   * @param pageSize
+   */
   getTransactionHistoryPages(pageSize = 10) {
     return Math.ceil(this.transactionHistory.length / pageSize);
   }
 
+  /**
+   *
+   */
   clearTransactionHistory() {
     this.transactionHistory = [];
   }

@@ -1,11 +1,18 @@
-const logger = require('../utils/logger');
-const { Transaction, TransactionInput, TransactionOutput } = require('./Transaction');
 const { TRANSACTION_TAGS } = require('../utils/constants');
+const logger = require('../utils/logger');
+
+const { Transaction, TransactionInput, TransactionOutput } = require('./Transaction');
 
 /**
  * Transaction Manager - Handles transaction validation and management
  */
 class TransactionManager {
+  /**
+   *
+   * @param utxoManager
+   * @param spamProtection
+   * @param memoryPool
+   */
   constructor(utxoManager, spamProtection, memoryPool) {
     this.utxoManager = utxoManager;
     this.spamProtection = spamProtection;
@@ -14,6 +21,7 @@ class TransactionManager {
 
   /**
    * Add transaction to pending pool with MANDATORY replay attack protection and SPAM PROTECTION
+   * @param transaction
    */
   addPendingTransaction(transaction) {
     // Convert JSON transaction to Transaction instance if needed
@@ -111,6 +119,7 @@ class TransactionManager {
 
   /**
    * Validate individual transaction including UTXO checks
+   * @param transaction
    */
   validateTransaction(transaction) {
     try {
@@ -175,6 +184,11 @@ class TransactionManager {
 
   /**
    * Create transaction
+   * @param fromAddress
+   * @param toAddress
+   * @param amount
+   * @param fee
+   * @param tag
    */
   createTransaction(fromAddress, toAddress, amount, fee = 0.001, tag = TRANSACTION_TAGS.TRANSACTION) {
     // Users can only create TRANSACTION tagged transactions
@@ -227,6 +241,7 @@ class TransactionManager {
 
   /**
    * Batch transaction addition
+   * @param transactions
    */
   addTransactionBatch(transactions) {
     const validationResults = this.memoryPool.validateTransactionBatch(transactions);
