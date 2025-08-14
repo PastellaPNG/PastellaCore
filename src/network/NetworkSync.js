@@ -36,7 +36,7 @@ class NetworkSync {
     this.networkSyncStatus.syncAttempts++;
 
     try {
-      logger.info('NETWORK_SYNC', 'Starting network synchronization...');
+      logger.debug('NETWORK_SYNC', 'Starting network synchronization...');
 
       // Query latest block from all peers
       const peers = this.peerManager.getAllPeers();
@@ -59,7 +59,7 @@ class NetworkSync {
       await new Promise(resolve => setTimeout(resolve, 2000));
 
       this.networkSyncStatus.lastSyncTime = Date.now();
-      logger.info('NETWORK_SYNC', 'Network synchronization completed');
+      logger.debug('NETWORK_SYNC', 'Network synchronization completed');
 
       return true;
     } catch (error) {

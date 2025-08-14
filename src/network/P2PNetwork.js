@@ -144,6 +144,28 @@ class P2PNetwork {
   loadSeedNodes() {
     if (this.config && this.config.network && this.config.network.seedNodes) {
       this.seedNodeManager.loadSeedNodes(this.config);
+      // Update PeerManager with seed node addresses for detection
+      this.updatePeerManagerSeedNodes();
+    }
+  }
+
+  /**
+   * Update PeerManager with seed node addresses for detection
+   */
+  updatePeerManagerSeedNodes() {
+    if (this.config?.network?.seedNodes) {
+      const seedNodeAddresses = this.config.network.seedNodes.map(seedNode => {
+        try {
+          const url = new URL(seedNode);
+          return `${url.hostname}:${url.port}`;
+        } catch (error) {
+          logger.warn('P2P_NETWORK', `Invalid seed node URL: ${seedNode}`);
+          return null;
+        }
+      }).filter(Boolean);
+
+      this.peerManager.setSeedNodeAddresses(seedNodeAddresses);
+      logger.info('P2P_NETWORK', `Seed node detection enabled for ${seedNodeAddresses.length} addresses: ${seedNodeAddresses.join(', ')}`);
     }
   }
 
@@ -306,6 +328,17 @@ class P2PNetwork {
     const peerAddress = this.extractPeerAddress(ws);
     logger.debug('P2P_NETWORK', `Peer address extracted: ${peerAddress}`);
 
+        // Track connection state
+    this.connectionStates = this.connectionStates || new Map();
+    this.connectionStates.set(peerAddress, 'connecting');
+    logger.debug('P2P_NETWORK', `Connection state set to 'connecting' for ${peerAddress}`);
+
+    // Check if this is a seed node connection
+    const isSeedNode = this.peerManager.isSeedNodeAddress(peerAddress);
+    if (isSeedNode) {
+      logger.debug('P2P_NETWORK', `Connection from seed node: ${peerAddress}`);
+    }
+
     // Check if peer is banned
     logger.debug('P2P_NETWORK', `Checking if peer ${peerAddress} is banned...`);
     if (this.peerReputation.isPeerBanned(peerAddress)) {
@@ -355,6 +388,11 @@ class P2PNetwork {
       // Update reputation for disconnect
       this.peerReputation.updatePeerReputation(peerAddress, 'disconnect');
 
+      // Clean up connection state
+      if (this.connectionStates) {
+        this.connectionStates.delete(peerAddress);
+      }
+
       // Clean up authentication data
       this.authenticatedPeers.delete(peerAddress);
       this.pendingChallenges.delete(peerAddress);
@@ -398,6 +436,7 @@ class P2PNetwork {
           nodeVersion: '1.0.0',
           timestamp: Date.now(),
           nodeId: this.nodeIdentity.nodeId,
+          listeningPort: this.port, // Add listening port for seed node detection
         },
       };
 
@@ -412,7 +451,7 @@ class P2PNetwork {
         logger.warn('P2P_NETWORK', `Handshake timeout with ${peerAddress}`);
         this.peerReputation.updatePeerReputation(peerAddress, 'bad_behavior', { reason: 'handshake_timeout' });
         ws.close(1000, 'Handshake timeout');
-      }, 10000); // 10 second timeout
+      }, 30000); // 30 second timeout (increased from 10 seconds)
 
       // Store timeout reference for cleanup
       this.pendingHandshakes = this.pendingHandshakes || new Map();
@@ -480,7 +519,13 @@ class P2PNetwork {
 
         ws.on('open', () => {
           clearTimeout(timeout);
-          this.handleConnection(ws);
+
+          // Add a small random delay to prevent simultaneous connection conflicts
+          const connectionDelay = Math.random() * 2000; // 0-2 seconds
+          setTimeout(() => {
+            this.handleConnection(ws);
+          }, connectionDelay);
+
           resolve(true);
         });
 
@@ -544,13 +589,24 @@ class P2PNetwork {
    * Get network status
    */
   getNetworkStatus() {
+    const peerList = this.peerManager.getPeerList();
+
+    // Add seed node detection info
+    const seedNodeInfo = {
+      configuredSeedNodes: this.config?.network?.seedNodes || [],
+      detectedSeedNodes: peerList.filter(peer => peer.isSeedNode).map(peer => peer.address),
+      totalSeedNodes: peerList.filter(peer => peer.isSeedNode).length,
+    };
+
     return {
       isRunning: this.isRunning,
       port: this.port,
       networkId: this.config?.networkId || 'unknown',
       peerCount: this.peerManager.getPeerCount(),
       maxPeers: this.peerManager.maxPeers,
+      peerList,
       seedNodeConnections: this.seedNodeManager.getSeedNodeStatus(),
+      seedNodeInfo,
       networkSync: this.networkSync.getNetworkSyncStatus(),
       nodeIdentity: this.nodeIdentity.getIdentityInfo(),
     };

@@ -518,7 +518,10 @@ class PastellaDaemon {
       const peersToShow = peerList.slice(0, maxPeersToShow);
 
       peersToShow.forEach((peer, index) => {
-        const statusText = peer.readyState === 1 ? chalk.green('(connected)') : chalk.red('(disconnected)');
+        // Check connection state using our tracking system instead of WebSocket readyState
+        const peerAddress = peer.address || peer.url.replace('ws://', '');
+        const isConnected = this.p2pNetwork?.connectionStates?.get(peerAddress) === 'connected';
+        const statusText = isConnected ? chalk.green('(connected)') : chalk.red('(disconnected)');
         const typeText = peer.isSeedNode ? chalk.blue('[seed]') : chalk.gray('[peer]');
         console.log(chalk.cyan(`  ${index + 1}.`), chalk.white(`${peer.url} ${statusText} ${typeText}`));
       });
@@ -559,7 +562,10 @@ class PastellaDaemon {
               (seedHost === 'localhost' && peerHost === '127.0.0.1') ||
               (peerHost === 'localhost' && seedHost === '127.0.0.1');
 
-            return portsMatch && hostsMatch && peer.readyState === 1;
+            // Use our connection state tracking instead of WebSocket readyState
+            const peerAddress = peer.address || peer.url.replace('ws://', '');
+            const connectionState = this.p2pNetwork?.connectionStates?.get(peerAddress);
+            return portsMatch && hostsMatch && connectionState === 'connected';
           });
 
           const statusText = isConnected ? chalk.green('(connected)') : chalk.red('(disconnected)');

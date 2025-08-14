@@ -451,6 +451,7 @@ class MessageHandler {
    */
   handleHandshake(ws, message, peerAddress) {
     logger.debug('MESSAGE_HANDLER', `Handshake received from ${peerAddress}`);
+    logger.debug('MESSAGE_HANDLER', `Handshake message data: ${JSON.stringify(message.data)}`);
 
     try {
       // Validate handshake message structure
@@ -519,6 +520,37 @@ class MessageHandler {
         reason: 'successful_handshake',
         networkId: peerNetworkId,
       });
+
+      // Update connection state to connected
+      if (this.p2pNetwork && this.p2pNetwork.connectionStates) {
+        this.p2pNetwork.connectionStates.set(peerAddress, 'connected');
+        logger.debug('MESSAGE_HANDLER', `Connection state updated to 'connected' for ${peerAddress}`);
+      }
+
+      // Enhanced seed node detection using listening port
+      const peerListeningPort = message.data.listeningPort;
+      let isSeedNode = false;
+
+      if (peerListeningPort) {
+        // Store the peer's listening port for future reference
+        if (this.p2pNetwork?.peerManager) {
+          this.p2pNetwork.peerManager.setPeerListeningPort(ws, peerListeningPort);
+        }
+
+        // Check if peer is a seed node by their listening port
+        isSeedNode = this.p2pNetwork?.peerManager?.isSeedNodeByListeningPort(peerAddress, peerListeningPort);
+        logger.debug('MESSAGE_HANDLER', `Peer ${peerAddress} listening on port ${peerListeningPort}, seed node: ${isSeedNode}`);
+      } else {
+        // Fallback to direct address check
+        isSeedNode = this.p2pNetwork?.peerManager?.isSeedNodeAddress(peerAddress);
+      }
+
+      // Check if this is a seed node and log it
+      if (isSeedNode) {
+        logger.info('MESSAGE_HANDLER', `Seed node handshake completed successfully with ${peerAddress} (listening on port ${peerListeningPort})`);
+      } else {
+        logger.info('MESSAGE_HANDLER', `Peer handshake completed successfully with ${peerAddress}`);
+      }
 
       logger.info('MESSAGE_HANDLER', `Handshake completed successfully with ${peerAddress}`);
     } catch (error) {

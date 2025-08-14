@@ -23,6 +23,7 @@ class MessageValidator {
               nodeVersion: { type: 'string', pattern: '^\\d+\\.\\d+\\.\\d+$', description: 'Semantic version' },
               timestamp: { type: 'number', minimum: 0, description: 'Unix timestamp' },
               nodeId: { type: 'string', minLength: 1, description: 'Node identifier' },
+              listeningPort: { type: 'number', minimum: 1, maximum: 65535, description: 'Port the node is listening on for incoming connections' },
             },
           },
         },

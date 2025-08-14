@@ -52,6 +52,17 @@ class PeerManager {
   }
 
   /**
+   * Set peer listening port for seed node detection
+   * @param ws
+   * @param listeningPort
+   */
+  setPeerListeningPort(ws, listeningPort) {
+    this.peerListeningPorts = this.peerListeningPorts || new Map();
+    this.peerListeningPorts.set(ws, listeningPort);
+    logger.debug('PEER_MANAGER', `Set peer ${this.getPeerAddress(ws)} listening port: ${listeningPort}`);
+  }
+
+  /**
    * Remove a peer connection
    * @param ws
    */
@@ -101,10 +112,62 @@ class PeerManager {
    * Get peer list for network sharing
    */
   getPeerList() {
-    return Array.from(this.peerAddresses.values()).map(address => ({
-      url: `ws://${address}`,
-      address,
-    }));
+    return Array.from(this.peerAddresses.entries()).map(([ws, address]) => {
+      // Get the listening port for this peer if available
+      const listeningPort = this.peerListeningPorts ? this.peerListeningPorts.get(ws) : null;
+
+      // Check if this is a seed node by listening port (more accurate)
+      let isSeedNode = false;
+      if (listeningPort) {
+        isSeedNode = this.isSeedNodeByListeningPort(address, listeningPort);
+      } else {
+        // Fallback to direct address check
+        isSeedNode = this.isSeedNodeAddress(address);
+      }
+
+      return {
+        url: `ws://${address}`,
+        address,
+        listeningPort,
+        isSeedNode,
+      };
+    });
+  }
+
+  /**
+   * Check if an address is a seed node
+   * @param address
+   */
+  isSeedNodeAddress(address) {
+    // This will be set by the P2PNetwork when it has access to seed node config
+    return this.seedNodeAddresses ? this.seedNodeAddresses.has(address) : false;
+  }
+
+  /**
+   * Check if a peer is a seed node by their listening port
+   * This handles the case where a seed node connects from a random outgoing port
+   * @param peerAddress - The address the peer connected from (e.g., 127.0.0.1:52672)
+   * @param peerListeningPort - The port the peer is listening on (e.g., 23001)
+   */
+  isSeedNodeByListeningPort(peerAddress, peerListeningPort) {
+    if (!this.seedNodeAddresses) return false;
+
+    // Check if the peer's listening port matches any seed node
+    const peerHost = peerAddress.split(':')[0];
+    const seedNodeMatch = Array.from(this.seedNodeAddresses).some(seedAddress => {
+      const [seedHost, seedPort] = seedAddress.split(':');
+      return seedHost === peerHost && seedPort === peerListeningPort.toString();
+    });
+
+    return seedNodeMatch;
+  }
+
+  /**
+   * Set seed node addresses for detection
+   * @param seedNodeAddresses
+   */
+  setSeedNodeAddresses(seedNodeAddresses) {
+    this.seedNodeAddresses = new Set(seedNodeAddresses);
   }
 
   /**
