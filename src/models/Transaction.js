@@ -128,17 +128,17 @@ class Transaction {
    * @param fee
    * @param tag
    */
-  constructor(inputs = [], outputs = [], fee = 0, tag = TRANSACTION_TAGS.TRANSACTION) {
+  constructor(inputs = [], outputs = [], fee = 0, tag = TRANSACTION_TAGS.TRANSACTION, timestamp = null, nonce = null, atomicSequence = null, isGenesisBlock = false) {
     this.id = null; // Transaction hash
     this.inputs = inputs; // Array of TransactionInput
     this.outputs = outputs; // Array of TransactionOutput
     this.fee = fee; // Transaction fee
-    this.timestamp = Date.now(); // Transaction timestamp
+    this.timestamp = timestamp || Date.now(); // Transaction timestamp (use provided timestamp or current time)
     this.isCoinbase = false; // Whether this is a coinbase transaction
     this.tag = tag; // Transaction tag (STAKING, GOVERNANCE, COINBASE, TRANSACTION, PREMINE)
 
     // REPLAY ATTACK PROTECTION
-    this.nonce = this.generateNonce(); // Unique nonce for replay protection
+    this.nonce = nonce || this.generateNonce(); // Use provided nonce or generate unique nonce for replay protection
     this.expiresAt = this.timestamp + 24 * 60 * 60 * 1000; // 24 hour expiration
     this.sequence = 0; // Sequence number for input ordering
 
@@ -147,7 +147,10 @@ class Transaction {
     this._isLocked = false; // Lock status
     this._lockTimestamp = null; // When lock was acquired
     this._lockTimeout = 30000; // 30 second lock timeout
-    this._atomicSequence = this.generateAtomicSequence(); // Atomic sequence for race protection
+    this._atomicSequence = atomicSequence || this.generateAtomicSequence(); // Use provided atomicSequence or generate unique one for race protection
+
+    // GENESIS BLOCK IDENTIFICATION
+    this._isGenesisBlock = isGenesisBlock; // Whether this transaction is part of the genesis block
   }
 
   /**
@@ -234,7 +237,17 @@ class Transaction {
       throw new Error('Transaction missing atomic sequence - potential race attack');
     }
 
-    // Validate sequence format
+    // For genesis block transactions (block 0), use a more lenient validation
+    // This allows static atomic sequences for deterministic genesis blocks
+    if (this.isCoinbase && this._isGenesisBlock) {
+      // Genesis block transactions can have static atomic sequences
+      // Just ensure it's not empty and has some content
+      if (this._atomicSequence.length < 5) {
+        throw new Error('Genesis block atomic sequence too short - potential race attack');
+      }
+      return true;
+    }
+    // For regular transactions, use strict validation
     const parts = this._atomicSequence.split('-');
     if (parts.length !== 4) {
       throw new Error('Invalid atomic sequence format - potential race attack');
@@ -656,9 +669,13 @@ class Transaction {
    * Create coinbase transaction
    * @param address
    * @param amount
+   * @param timestamp
+   * @param nonce
+   * @param atomicSequence
+   * @param isGenesisBlock
    */
-  static createCoinbase(address, amount) {
-    const transaction = new Transaction([], [new TransactionOutput(address, amount)], 0, TRANSACTION_TAGS.COINBASE);
+  static createCoinbase(address, amount, timestamp = null, nonce = null, atomicSequence = null, isGenesisBlock = false) {
+    const transaction = new Transaction([], [new TransactionOutput(address, amount)], 0, TRANSACTION_TAGS.COINBASE, timestamp, nonce, atomicSequence, isGenesisBlock);
     transaction.isCoinbase = true;
     transaction.calculateId();
     return transaction;
@@ -669,9 +686,12 @@ class Transaction {
    * @param inputs
    * @param outputs
    * @param fee
+   * @param timestamp
+   * @param nonce
+   * @param atomicSequence
    */
-  static createTransaction(inputs, outputs, fee = 0) {
-    const transaction = new Transaction(inputs, outputs, fee);
+  static createTransaction(inputs, outputs, fee = 0, timestamp = null, nonce = null, atomicSequence = null) {
+    const transaction = new Transaction(inputs, outputs, fee, TRANSACTION_TAGS.TRANSACTION, timestamp, nonce, atomicSequence);
     transaction.calculateId();
     return transaction;
   }
@@ -716,7 +736,11 @@ class Transaction {
         data.inputs.length > 0 ? data.inputs.map(input => TransactionInput.fromJSON(input)) : [],
         data.outputs.map(output => TransactionOutput.fromJSON(output)),
         data.fee || 0,
-        data.tag || TRANSACTION_TAGS.TRANSACTION
+        data.tag || TRANSACTION_TAGS.TRANSACTION,
+        data.timestamp || null,
+        data.nonce || null,
+        data._atomicSequence || null,
+        data._isGenesisBlock || false
       );
       transaction.id = data.id;
       transaction.timestamp = data.timestamp || Date.now();

@@ -228,7 +228,7 @@ class TransactionManager {
     }
 
     // Create transaction with tag (automatically includes replay protection)
-    const transaction = new Transaction(inputs, outputs, fee, tag);
+    const transaction = new Transaction(inputs, outputs, fee, tag, Date.now());
 
     // Verify replay protection fields are present
     if (!transaction.nonce || !transaction.expiresAt) {

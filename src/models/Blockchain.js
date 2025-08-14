@@ -125,9 +125,9 @@ class Blockchain {
         const { premineAmount } = genesisConfig;
         const { premineAddress } = genesisConfig;
 
-        const premineTransaction = Transaction.createCoinbase(premineAddress, premineAmount);
+        const premineTransaction = Transaction.createCoinbase(premineAddress, premineAmount, genesisTimestamp, this.config?.blockchain?.genesis?.coinbaseNonce, this.config?.blockchain?.genesis?.coinbaseAtomicSequence, true);
         premineTransaction.tag = TRANSACTION_TAGS.PREMINE;
-        premineTransaction.timestamp = genesisTimestamp;
+        // Don't override the timestamp - keep the config timestamp for determinism
         premineTransaction.calculateId();
 
         genesisBlock = Block.createGenesisBlock(
@@ -141,8 +141,9 @@ class Blockchain {
           logger.info('BLOCKCHAIN', `Genesis block created with premine: ${premineAmount} PAS to ${premineAddress}`);
         }
       } else {
-        const defaultTimestamp = Date.now();
-        genesisBlock = Block.createGenesisBlock(address, defaultTimestamp, [], this.difficulty);
+        // Use config timestamp if available, otherwise create without timestamp
+        const configTimestamp = this.config?.blockchain?.genesis?.timestamp;
+        genesisBlock = Block.createGenesisBlock(address, configTimestamp, [], this.difficulty, this.config?.blockchain?.genesis);
         if (!suppressLogging) {
           logger.info('BLOCKCHAIN', 'Genesis block created with default settings');
         }
@@ -223,58 +224,41 @@ class Blockchain {
       }
 
       // Check if block is already in chain
-      logger.debug('BLOCKCHAIN', `Checking if block ${block.index} already exists in chain`);
       const existingBlock = this.chain.find(existingBlock => existingBlock.hash === block.hash);
       if (existingBlock) {
         logger.warn('BLOCKCHAIN', `Block ${block.index} already exists in chain at index ${existingBlock.index}`);
-        logger.debug(
-          'BLOCKCHAIN',
-          `Existing block: index=${existingBlock.index}, hash=${existingBlock.hash?.substring(0, 16)}...`
-        );
         return false;
       }
-      logger.debug('BLOCKCHAIN', `Block ${block.index} is not a duplicate`);
 
       // Check if block links properly
-      logger.debug('BLOCKCHAIN', `Checking block linking for block ${block.index}`);
       const latestBlock = this.getLatestBlock();
-      logger.debug(
-        'BLOCKCHAIN',
-        `Latest block: index=${latestBlock?.index || 'none'}, hash=${latestBlock?.hash?.substring(0, 16) || 'none'}...`
-      );
-      logger.debug('BLOCKCHAIN', `Block previousHash: ${block.previousHash?.substring(0, 16)}...`);
 
-      if (block.previousHash !== latestBlock.hash) {
+      // For genesis block (index 0) or when chain is empty, skip linking validation
+      if (block.index === 0 || !latestBlock) {
+        // Skip linking validation for genesis block or empty chain
+      } else if (block.previousHash !== latestBlock.hash) {
         logger.error('BLOCKCHAIN', `Block ${block.index} does not link to latest block`);
         logger.error('BLOCKCHAIN', `  Block previousHash: ${block.previousHash}`);
         logger.error('BLOCKCHAIN', `  Latest block hash: ${latestBlock.hash}`);
         return false;
       }
-      logger.debug('BLOCKCHAIN', `Block ${block.index} links properly to latest block`);
 
       // CRITICAL: Add transactions to historical database for replay attack protection
-      logger.debug('BLOCKCHAIN', `Adding transactions to historical database for block ${block.index}`);
       this.addTransactionsToHistoricalDatabase(block);
 
       // Add block to chain
-      logger.debug('BLOCKCHAIN', `Adding block ${block.index} to chain array`);
       this.chain.push(block);
-      logger.debug('BLOCKCHAIN', `Chain length after adding block: ${this.chain.length}`);
 
       // Update UTXO set
-      logger.debug('BLOCKCHAIN', `Updating UTXO set for block ${block.index}`);
       this.utxoManager.updateUTXOSet(block);
 
       // Remove transactions from pending pool
-      logger.debug('BLOCKCHAIN', `Removing transactions from pending pool for block ${block.index}`);
       this.memoryPool.removeTransactions(block.transactions);
 
       // Adjust difficulty
-      logger.debug('BLOCKCHAIN', `Adjusting difficulty after adding block ${block.index}`);
       this.adjustDifficulty();
 
       logger.info('BLOCKCHAIN', `Block ${block.index} added to chain successfully. Hash: ${block.hash}`);
-      logger.debug('BLOCKCHAIN', `Final chain length: ${this.chain.length}, new difficulty: ${this.difficulty}`);
       return true;
     } catch (error) {
       logger.error('BLOCKCHAIN', `Error adding block ${block.index}: ${error.message}`);

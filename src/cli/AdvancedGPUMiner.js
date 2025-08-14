@@ -1090,7 +1090,8 @@ class AdvancedGPUMiner {
         const baseReward = daemonStatus.miningReward || 50;
         const coinbaseTransaction = this.cli.Transaction.createCoinbase(
           this.miningAddress,
-          baseReward // Use config mining reward or default to 50
+          baseReward, // Use config mining reward or default to 50
+          Date.now()
         );
         coinbaseTransaction.timestamp = Date.now();
         coinbaseTransaction.calculateId();

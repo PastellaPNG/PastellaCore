@@ -267,16 +267,54 @@ class MessageHandler {
         `Received longer blockchain from ${peerAddress}. New length: ${receivedChain.length}`
       );
 
-      if (latestBlockHeld.hash === latestBlockReceived.previousHash) {
-        // We can append the new block to our chain
-        if (this.blockchain.addBlock(latestBlockReceived)) {
-          logger.info('MESSAGE_HANDLER', 'New block added to blockchain');
-        }
-      } else if (receivedChain.length === 1) {
-        // We have to query the chain from our peer
+      // Check if we received a complete chain or just partial data
+      if (receivedChain.length === 1 && latestBlockReceived.index > 0) {
+        // We received only one block with high index, need to request full chain
+        logger.info('MESSAGE_HANDLER', `Received single block ${latestBlockReceived.index}, requesting full chain`);
         this.sendMessage(ws, { type: 'QUERY_ALL' });
-      } else {
-        // We have to query the chain from our peer
+        return;
+      }
+
+      // Convert received JSON blocks to Block instances for validation
+      try {
+        const Block = require('../models/Block.js');
+        const convertedChain = receivedChain.map(blockData => {
+          if (blockData instanceof Block) {
+            return blockData; // Already a Block instance
+          }
+          return Block.fromJSON(blockData); // Convert JSON to Block instance
+        });
+
+        // Check if the converted chain is valid
+        const isValidChain = this.blockchain.isValidChain(convertedChain);
+
+        if (isValidChain) {
+          logger.info('MESSAGE_HANDLER', 'Received chain is valid, replacing local blockchain');
+
+          // Clear the current chain and add all blocks from the received chain
+          this.blockchain.chain = [];
+          // Don't reinitialize - just add the received blocks directly
+
+          // Add all blocks from the received chain
+          for (const block of convertedChain) {
+            if (this.blockchain.addBlock(block)) {
+              logger.debug('MESSAGE_HANDLER', `Added block ${block.index} to blockchain`);
+            } else {
+              logger.error('MESSAGE_HANDLER', `Failed to add block ${block.index}`);
+            }
+          }
+
+          logger.info('MESSAGE_HANDLER', `Successfully synced blockchain to ${receivedChain.length} blocks`);
+        } else {
+          logger.warn('MESSAGE_HANDLER', 'Received chain is invalid, rejecting sync');
+          // If chain is invalid, request full chain to get correct data
+          logger.info('MESSAGE_HANDLER', 'Requesting full chain due to validation failure');
+          this.sendMessage(ws, { type: 'QUERY_ALL' });
+        }
+      } catch (error) {
+        logger.error('MESSAGE_HANDLER', `Error validating received chain: ${error.message}`);
+        // If validation throws error, request full chain
+        logger.info('MESSAGE_HANDLER', 'Requesting full chain due to validation error');
         this.sendMessage(ws, { type: 'QUERY_ALL' });
       }
     } else {
