@@ -721,6 +721,61 @@ class P2PNetwork {
   }
 
   /**
+   * Sync mempool with peers (Bitcoin-style)
+   */
+  syncMempoolWithPeers() {
+    try {
+      if (!this.networkSync) {
+        return { success: false, message: 'Network sync not available' };
+      }
+
+      // Trigger mempool sync
+      this.networkSync.syncMempoolState();
+
+      const peerCount = this.peerManager.getPeerCount();
+      return {
+        success: true,
+        peersNotified: peerCount,
+        message: `Mempool sync initiated with ${peerCount} peers`
+      };
+    } catch (error) {
+      logger.error('P2P_NETWORK', `Failed to sync mempool with peers: ${error.message}`);
+      return { success: false, message: error.message };
+    }
+  }
+
+  /**
+   * Get mempool synchronization status
+   */
+  getMempoolSyncStatus() {
+    try {
+      if (!this.networkSync) {
+        return { error: 'Network sync not available' };
+      }
+
+      const networkStatus = this.networkSync.getNetworkSyncStatus();
+      const mempoolStatus = this.blockchain.memoryPool.getMemoryStatus();
+
+      return {
+        networkSync: networkStatus,
+        mempool: {
+          poolSize: mempoolStatus.poolSize,
+          memoryUsage: mempoolStatus.memoryUsage,
+          lastCleanup: mempoolStatus.lastCleanup,
+          batchProcessing: this.blockchain.memoryPool.getBatchProcessingConfig()
+        },
+        lastSync: networkStatus.lastSync,
+        isSyncing: networkStatus.isSyncing,
+        peerCount: this.peerManager.getPeerCount(),
+        timestamp: Date.now()
+      };
+    } catch (error) {
+      logger.error('P2P_NETWORK', `Failed to get mempool sync status: ${error.message}`);
+      return { error: error.message };
+    }
+  }
+
+  /**
    * Get peer list
    */
   getPeerList() {

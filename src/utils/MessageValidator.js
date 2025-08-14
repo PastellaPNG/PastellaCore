@@ -326,6 +326,67 @@ class MessageValidator {
           },
         },
       },
+
+      // Mempool synchronization messages (Bitcoin-style)
+      MEMPOOL_SYNC_REQUEST: {
+        required: ['timestamp'],
+        optional: ['networkId'],
+        types: {
+          timestamp: 'number',
+          networkId: 'string'
+        }
+      },
+      MEMPOOL_SYNC_RESPONSE: {
+        required: ['timestamp'],
+        optional: ['status', 'message'],
+        types: {
+          timestamp: 'number',
+          status: 'string',
+          message: 'string'
+        }
+      },
+      MEMPOOL_INV: {
+        required: ['transactionHashes', 'count', 'timestamp'],
+        optional: [],
+        types: {
+          transactionHashes: 'array',
+          count: 'number',
+          timestamp: 'number'
+        }
+      },
+      MEMPOOL_GETDATA: {
+        required: ['transactionHashes', 'count'],
+        optional: [],
+        types: {
+          transactionHashes: 'array',
+          count: 'number'
+        }
+      },
+      MEMPOOL_TX: {
+        required: ['transaction', 'hash'],
+        optional: [],
+        types: {
+          transaction: 'object',
+          hash: 'string'
+        }
+      },
+      MEMPOOL_NOTFOUND: {
+        required: ['hash', 'reason'],
+        optional: [],
+        types: {
+          hash: 'string',
+          reason: 'string'
+        }
+      },
+      MEMPOOL_REJECT: {
+        required: ['hash', 'reason', 'code'],
+        optional: [],
+        types: {
+          hash: 'string',
+          reason: 'string',
+          code: 'number'
+        }
+      },
     };
 
     // Define validation rules

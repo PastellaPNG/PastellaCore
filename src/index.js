@@ -245,8 +245,7 @@ class PastellaDaemon {
 
     // Save blockchain state
     console.log(chalk.cyan('💾 Saving blockchain state...'));
-    const blockchainPath = path.join(config.storage.dataDir, config.storage.blockchainFile);
-    this.blockchain.saveToFile(blockchainPath);
+    this.blockchain.saveToDefaultFile();
 
     this.isRunning = false;
     console.log(chalk.green.bold('╔══════════════════════════════════════════════════════════════╗'));
@@ -262,8 +261,7 @@ class PastellaDaemon {
     setInterval(
       () => {
         if (this.isRunning) {
-          const blockchainPath = path.join(config.storage.dataDir, config.storage.blockchainFile);
-          this.blockchain.saveToFile(blockchainPath);
+          this.blockchain.saveToDefaultFile();
         }
       },
       2 * 60 * 1000
@@ -400,6 +398,9 @@ class PastellaDaemon {
         case 'c':
           this.showChainStatus();
           break;
+        case 'm':
+          this.showMempoolStatus();
+          break;
       }
     });
   }
@@ -416,6 +417,7 @@ class PastellaDaemon {
     console.log(chalk.cyan('  s - Status'), chalk.white('(show daemon status)'));
     console.log(chalk.cyan('  n - Network'), chalk.white('(show network status)'));
     console.log(chalk.cyan('  c - Chain'), chalk.white('(show blockchain status)'));
+    console.log(chalk.cyan('  m - Mempool'), chalk.white('(show mempool status & sync)'));
     console.log(chalk.cyan('  q - Quick info'), chalk.white('(show stop instructions)'));
     console.log(chalk.cyan('  Ctrl+C'), chalk.white('- Stop daemon'));
     console.log('');
@@ -621,6 +623,49 @@ class PastellaDaemon {
         console.log(chalk.cyan(`  ${block.index}.`), chalk.white(`${block.hash.substring(0, 16)}... (${timeAgo})`));
       });
       console.log('');
+    }
+
+    // Sync status
+    this.showSyncStatus();
+    console.log('');
+  }
+
+  /**
+   * Show mempool status
+   */
+  showMempoolStatus() {
+    console.log(chalk.blue.bold('╔══════════════════════════════════════════════════════════════╗'));
+    console.log(chalk.blue.bold('║                      💰 MEMPOOL STATUS                       ║'));
+    console.log(chalk.blue.bold('╚══════════════════════════════════════════════════════════════╝'));
+    console.log('');
+
+    const mempool = this.blockchain.memoryPool;
+    const pendingTxCount = mempool.getPendingTransactionCount();
+    const maxMempoolSize = mempool.getMaxMempoolSize();
+    const currentMempoolSize = mempool.getCurrentMempoolSize();
+    const oldestTxTimestamp = mempool.getOldestTransactionTimestamp();
+    const newestTxTimestamp = mempool.getNewestTransactionTimestamp();
+
+    console.log(chalk.yellow.bold('📊 MEMPOOL INFO:'));
+    console.log(chalk.cyan('  Pending TXs:'), chalk.white(pendingTxCount));
+    console.log(chalk.cyan('  Current Mempool Size:'), chalk.white(`${currentMempoolSize} KB`));
+    console.log(chalk.cyan('  Max Mempool Size:'), chalk.white(`${maxMempoolSize} KB`));
+    console.log(chalk.cyan('  Oldest TX:'), chalk.white(new Date(oldestTxTimestamp).toLocaleString()));
+    console.log(chalk.cyan('  Newest TX:'), chalk.white(new Date(newestTxTimestamp).toLocaleString()));
+    console.log('');
+
+    if (pendingTxCount > 0) {
+      console.log(chalk.yellow.bold('💰 PENDING TRANSACTIONS:'));
+      const transactions = mempool.getPendingTransactions();
+      transactions.forEach((tx, index) => {
+        console.log(chalk.cyan(`  ${index + 1}.`), chalk.white(`${tx.id} (Size: ${tx.size} bytes)`));
+        console.log(chalk.gray(`   • Fee: ${tx.fee} PAS, Age: ${this.getTimeAgo(tx.timestamp)}`));
+        console.log(chalk.gray(`   • Sender: ${tx.sender}, Receiver: ${tx.receiver}, Amount: ${tx.amount} PAS`));
+        console.log(chalk.gray(`   • Timestamp: ${new Date(tx.timestamp).toLocaleString()}`));
+        console.log('');
+      });
+    } else {
+      console.log(chalk.green('  No pending transactions in mempool.'));
     }
 
     // Sync status

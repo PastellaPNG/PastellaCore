@@ -81,6 +81,9 @@ class APIServer {
 
     this.app.use('/api/batch-processing/config', this.auth.validateApiKey.bind(this.auth));
 
+    this.app.use('/api/mempool/sync', this.auth.validateApiKey.bind(this.auth));
+    this.app.use('/api/mempool/sync/status', this.auth.validateApiKey.bind(this.auth));
+
     // Add error handling middleware
     this.app.use((error, req, res, _next) => {
       console.error(`❌ API Error: ${error.message}`);
@@ -203,6 +206,10 @@ class APIServer {
 
     // Batch Processing configuration route (protected by API key)
     this.app.get('/api/batch-processing/config', this.getBatchProcessingConfig.bind(this)); // Behind Key
+
+    // Mempool synchronization routes (protected by API key)
+    this.app.post('/api/mempool/sync', this.syncMempoolWithPeers.bind(this)); // Behind Key
+    this.app.get('/api/mempool/sync/status', this.getMempoolSyncStatus.bind(this)); // Behind Key
 
     // Checkpoint endpoints
     this.app.get('/api/blockchain/checkpoints', this.getCheckpoints.bind(this));
@@ -1229,27 +1236,26 @@ class APIServer {
       if (addResult) {
         logger.debug('API', `Block ${blockObj.index} added to blockchain successfully`);
 
-        // Save blockchain immediately after adding API block
-        try {
-          const blockchainPath = path.join(this.config?.storage?.dataDir || './data', this.config?.storage?.blockchainFile || 'blockchain.json');
-          this.blockchain.saveToFile(blockchainPath);
-          logger.debug('API', `Blockchain saved immediately after adding API block ${blockObj.index}`);
-        } catch (error) {
-          logger.warn('API', `Failed to save blockchain immediately: ${error.message}`);
-        }
-
         // Broadcast to network
-        if (this.p2pNetwork) {
+        try {
           logger.debug('API', `Broadcasting new block to P2P network`);
-          try {
+          if (this.p2pNetwork) {
             this.p2pNetwork.broadcastNewBlock(blockObj);
             logger.debug('API', `Block broadcasted successfully`);
-          } catch (broadcastError) {
-            logger.warn('API', `Failed to broadcast block: ${broadcastError.message}`);
-            logger.debug('API', `Broadcast error stack: ${broadcastError.stack}`);
+          } else {
+            logger.debug('API', `P2P network not available, skipping broadcast`);
           }
-        } else {
-          logger.debug('API', `P2P network not available, skipping broadcast`);
+        } catch (broadcastError) {
+          logger.warn('API', `Failed to broadcast block: ${broadcastError.message}`);
+          logger.debug('API', `Broadcast error stack: ${broadcastError.stack}`);
+        }
+
+        // Save blockchain immediately
+        try {
+          this.blockchain.saveToDefaultFile();
+          logger.debug('API', `Blockchain saved immediately after API block submission`);
+        } catch (saveError) {
+          logger.warn('API', `Failed to save blockchain immediately: ${saveError.message}`);
         }
 
         logger.debug('API', `Sending success response for block ${blockObj.index}`);
@@ -2032,6 +2038,77 @@ class APIServer {
       res.status(500).json({
         success: false,
         error: error.message,
+      });
+    }
+  }
+
+  /**
+   *
+   * @param req
+   * @param res
+   */
+  syncMempoolWithPeers(req, res) {
+    try {
+      if (!this.p2pNetwork) {
+        return res.status(503).json({
+          error: 'P2P network not available',
+        });
+      }
+
+      logger.info('API', `Manual mempool sync initiated by API request`);
+      const syncResult = this.p2pNetwork.syncMempoolWithPeers();
+
+      if (syncResult.success) {
+        res.json({
+          success: true,
+          message: `Mempool sync initiated. Peers notified: ${syncResult.peersNotified}`,
+          timestamp: new Date().toISOString(),
+        });
+      } else {
+        res.status(500).json({
+          success: false,
+          error: 'Failed to initiate mempool sync',
+          details: syncResult.message,
+          timestamp: new Date().toISOString(),
+        });
+      }
+    } catch (error) {
+      logger.error('API', `Error initiating mempool sync: ${error.message}`);
+      res.status(500).json({
+        success: false,
+        error: 'Internal server error during mempool sync',
+        details: error.message,
+        timestamp: new Date().toISOString(),
+      });
+    }
+  }
+
+  /**
+   *
+   * @param req
+   * @param res
+   */
+  getMempoolSyncStatus(req, res) {
+    try {
+      if (!this.p2pNetwork) {
+        return res.status(503).json({
+          error: 'P2P network not available',
+        });
+      }
+
+      const syncStatus = this.p2pNetwork.getMempoolSyncStatus();
+      res.json({
+        success: true,
+        data: syncStatus,
+        timestamp: new Date().toISOString(),
+      });
+    } catch (error) {
+      logger.error('API', `Error getting mempool sync status: ${error.message}`);
+      res.status(500).json({
+        success: false,
+        error: 'Internal server error',
+        details: error.message,
+        timestamp: new Date().toISOString(),
       });
     }
   }

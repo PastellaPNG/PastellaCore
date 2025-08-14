@@ -72,21 +72,97 @@ class NetworkSync {
 
   /**
    * Start periodic network synchronization
-   * @param intervalMs
    */
-  startPeriodicSync(intervalMs = 30000) {
-    // 30 seconds default
+  startPeriodicSync() {
     if (this.periodicSyncInterval) {
-      clearInterval(this.periodicSyncInterval);
+      logger.debug('NETWORK_SYNC', 'Periodic sync already running');
+      return;
     }
 
-    this.periodicSyncInterval = setInterval(async () => {
-      if (this.peerManager.getPeerCount() > 0) {
-        await this.syncWithNetwork();
-      }
-    }, intervalMs);
+    // Sync every 30 seconds (Bitcoin-style)
+    this.periodicSyncInterval = setInterval(() => {
+      this.performPeriodicSync();
+    }, 30000);
 
-    logger.info('NETWORK_SYNC', `Periodic network sync started (every ${intervalMs / 1000}s)`);
+    logger.info('NETWORK_SYNC', 'Periodic network synchronization started (30s interval)');
+  }
+
+  /**
+   * Perform periodic network synchronization
+   */
+  async performPeriodicSync() {
+    try {
+      const peers = this.peerManager.getAllPeers();
+      if (peers.length === 0) {
+        logger.debug('NETWORK_SYNC', 'No peers available for periodic sync');
+        return;
+      }
+
+      logger.debug('NETWORK_SYNC', `Performing periodic sync with ${peers.length} peers`);
+
+      // Sync blockchain state
+      await this.syncBlockchainState();
+
+      // Sync mempool state (Bitcoin-style)
+      await this.syncMempoolState();
+
+      // Update sync status
+      this.networkSyncStatus.lastSync = Date.now();
+      this.networkSyncStatus.isSyncing = false;
+
+      logger.debug('NETWORK_SYNC', 'Periodic sync completed successfully');
+    } catch (error) {
+      logger.error('NETWORK_SYNC', `Periodic sync failed: ${error.message}`);
+      this.networkSyncStatus.isSyncing = false;
+    }
+  }
+
+  /**
+   * Sync mempool state with peers (Bitcoin-style)
+   */
+  async syncMempoolState() {
+    try {
+      const peers = this.peerManager.getAllPeers();
+      if (peers.length === 0) return;
+
+      logger.debug('NETWORK_SYNC', 'Starting mempool synchronization with peers');
+
+      // Request mempool sync from a few random peers
+      const syncPeers = this.selectRandomPeers(peers, Math.min(3, peers.length));
+
+      for (const peer of syncPeers) {
+        try {
+          // Send mempool sync request
+          const message = {
+            type: 'MEMPOOL_SYNC_REQUEST',
+            data: {
+              timestamp: Date.now(),
+              networkId: this.blockchain.config?.networkId || 'unknown'
+            }
+          };
+
+          if (this.sendMessage(peer, message)) {
+            logger.debug('NETWORK_SYNC', `Mempool sync request sent to peer ${peer.url || 'unknown'}`);
+          }
+        } catch (error) {
+          logger.debug('NETWORK_SYNC', `Failed to send mempool sync request to peer: ${error.message}`);
+        }
+      }
+
+      logger.debug('NETWORK_SYNC', `Mempool sync requests sent to ${syncPeers.length} peers`);
+    } catch (error) {
+      logger.error('NETWORK_SYNC', `Mempool sync failed: ${error.message}`);
+    }
+  }
+
+  /**
+   * Select random peers for synchronization
+   * @param peers
+   * @param count
+   */
+  selectRandomPeers(peers, count) {
+    const shuffled = [...peers].sort(() => 0.5 - Math.random());
+    return shuffled.slice(0, count);
   }
 
   /**

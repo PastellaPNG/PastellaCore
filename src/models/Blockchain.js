@@ -887,6 +887,22 @@ class Blockchain {
   }
 
   /**
+   * Get default blockchain file path
+   */
+  getDefaultFilePath() {
+    const dataDir = this.config?.storage?.dataDir || this.dataDir || './data';
+    const fileName = this.config?.storage?.blockchainFile || 'blockchain.json';
+    return path.join(dataDir, fileName);
+  }
+
+  /**
+   * Save blockchain to default file location
+   */
+  saveToDefaultFile() {
+    return this.saveToFile(this.getDefaultFilePath());
+  }
+
+  /**
    * Load blockchain from file
    * @param filePath
    */
