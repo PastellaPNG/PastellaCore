@@ -231,12 +231,14 @@ class MemoryProtection {
 class MemoryPoolManager {
   /**
    *
+   * @param config
    */
-  constructor() {
+  constructor(config = null) {
     this.pendingTransactions = [];
+    this.config = config;
 
     // CRITICAL: Initialize memory protection
-    this.memoryProtection = new MemoryProtection();
+    this.memoryProtection = new MemoryProtection(config);
 
     // Start periodic cleanup
     setTimeout(() => {
@@ -323,7 +325,9 @@ class MemoryPoolManager {
    * @param transactions
    * @param maxBatchSize
    */
-  validateTransactionBatch(transactions, maxBatchSize = 100) {
+  validateTransactionBatch(transactions, maxBatchSize = null) {
+    // Use config value if not specified, fallback to default 100
+    const batchSize = maxBatchSize || this.config?.batchProcessing?.maxBatchSize || 100;
     const results = {
       valid: [],
       invalid: [],
@@ -331,8 +335,8 @@ class MemoryPoolManager {
     };
 
     // Process in batches to avoid memory issues
-    for (let i = 0; i < transactions.length; i += maxBatchSize) {
-      const batch = transactions.slice(i, i + maxBatchSize);
+    for (let i = 0; i < transactions.length; i += batchSize) {
+      const batch = transactions.slice(i, i + batchSize);
 
       for (const tx of batch) {
         try {
@@ -411,7 +415,10 @@ class MemoryPoolManager {
    * Start periodic cleanup of expired transactions and memory management
    */
   startPeriodicCleanup() {
-    // Clean up expired transactions every 5 minutes
+    // Use configurable cleanup interval, default to 5 minutes
+    const cleanupInterval = this.config?.batchProcessing?.cleanupInterval || 5 * 60 * 1000;
+
+    // Clean up expired transactions at configurable interval
     setInterval(
       () => {
         try {
@@ -421,8 +428,8 @@ class MemoryPoolManager {
           logger.error('MEMORY_POOL', `Periodic cleanup failed: ${error.message}`);
         }
       },
-      5 * 60 * 1000
-    ); // 5 minutes
+      cleanupInterval
+    );
   }
 
   /**
@@ -469,6 +476,17 @@ class MemoryPoolManager {
    */
   getTransaction(txId) {
     return this.pendingTransactions.find(tx => tx.id === txId);
+  }
+
+  /**
+   * Get batch processing configuration
+   */
+  getBatchProcessingConfig() {
+    return {
+      maxTransactionsPerBatch: this.config?.batchProcessing?.maxTransactionsPerBatch || 100,
+      maxBatchSize: this.config?.batchProcessing?.maxBatchSize || 100,
+      cleanupInterval: this.config?.batchProcessing?.cleanupInterval || 300000,
+    };
   }
 }
 

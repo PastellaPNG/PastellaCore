@@ -79,6 +79,8 @@ class APIServer {
     this.app.use('/api/cpu-protection/disable', this.auth.validateApiKey.bind(this.auth));
     this.app.use('/api/cpu-protection/settings', this.auth.validateApiKey.bind(this.auth));
 
+    this.app.use('/api/batch-processing/config', this.auth.validateApiKey.bind(this.auth));
+
     // Add error handling middleware
     this.app.use((error, req, res, _next) => {
       console.error(`❌ API Error: ${error.message}`);
@@ -198,6 +200,9 @@ class APIServer {
     this.app.post('/api/cpu-protection/enable', this.setCpuProtection.bind(this)); // Behind Key
     this.app.post('/api/cpu-protection/disable', this.setCpuProtection.bind(this)); // Behind Key
     this.app.post('/api/cpu-protection/settings', this.updateCpuProtection.bind(this)); // Behind Key
+
+    // Batch Processing configuration route (protected by API key)
+    this.app.get('/api/batch-processing/config', this.getBatchProcessingConfig.bind(this)); // Behind Key
 
     // Checkpoint endpoints
     this.app.get('/api/blockchain/checkpoints', this.getCheckpoints.bind(this));
@@ -1605,6 +1610,7 @@ class APIServer {
           maxPoolSize: this.config?.memory?.maxPoolSize || 10000,
           maxMemoryUsage: (this.config?.memory?.maxMemoryUsage || 2048) * 1024 * 1024, // Convert MB to bytes
           cpuProtection: status.cpuProtection,
+          batchProcessing: this.blockchain.memoryPool.getBatchProcessingConfig(),
         },
         timestamp: new Date().toISOString(),
       });
@@ -1692,6 +1698,26 @@ class APIServer {
       });
     } catch (error) {
       logger.error('API', `Error updating CPU protection: ${error.message}`);
+      res.status(500).json({ error: 'Internal server error' });
+    }
+  }
+
+  /**
+   * Get batch processing configuration
+   * @param req
+   * @param res
+   */
+  getBatchProcessingConfig(req, res) {
+    try {
+      const config = this.blockchain.memoryPool.getBatchProcessingConfig();
+
+      res.json({
+        success: true,
+        data: config,
+        timestamp: new Date().toISOString(),
+      });
+    } catch (error) {
+      logger.error('API', `Error getting batch processing config: ${error.message}`);
       res.status(500).json({ error: 'Internal server error' });
     }
   }

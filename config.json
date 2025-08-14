@@ -66,6 +66,11 @@
       "monitoringInterval": 10000
     }
   },
+  "batchProcessing": {
+    "maxTransactionsPerBatch": 100000,
+    "maxBatchSize": 100000,
+    "cleanupInterval": 300000
+  },
   "seedNode": {
     "enabled": false,
     "port": 23000,
