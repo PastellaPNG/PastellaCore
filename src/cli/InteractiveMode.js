@@ -84,7 +84,7 @@ class InteractiveMode {
         this.showInteractiveHelp();
         break;
       case 'wallet':
-        await this.cli.walletManager.handleCommand(args.slice(1));
+        await this.cli.networkWalletManager.handleCommand(args.slice(1));
         break;
       // CPU mining removed - only KawPow GPU mining available
       case 'mine':

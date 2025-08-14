@@ -213,6 +213,16 @@ class APIServer {
     // Utility routes (always available)
     this.app.get('/api/health', this.getHealth.bind(this));
     this.app.get('/api/info', this.getInfo.bind(this));
+
+    // Mempool synchronization routes (protected by API key)
+    this.app.post('/api/mempool/sync', this.syncMempoolWithPeers.bind(this)); // Behind Key
+    this.app.get('/api/mempool/sync/status', this.getMempoolSyncStatus.bind(this)); // Behind Key
+
+    // Wallet routes (public - no API key required)
+    this.app.get('/api/wallet/balance/:address', this.getWalletBalance.bind(this));
+    this.app.get('/api/wallet/transactions/:address', this.getWalletTransactions.bind(this));
+    this.app.get('/api/wallet/utxos/:address', this.getWalletUTXOs.bind(this));
+    this.app.post('/api/transactions/submit', this.submitTransaction.bind(this));
   }
 
   /**
@@ -837,130 +847,55 @@ class APIServer {
     try {
       const { transaction } = req.body;
 
-      // Input validation
       if (!transaction) {
-        return res.status(400).json({ error: 'Transaction data is required' });
-      }
-
-      // Validate transaction structure with InputValidator
-      const transactionSchema = {
-        id: value => InputValidator.validateString(value, { required: true, minLength: 1, maxLength: 100 }),
-        inputs: value =>
-          InputValidator.validateArray(
-            value,
-            input => {
-              const result = InputValidator.validateObject(input, {
-                txId: v => InputValidator.validateHash(v, { required: true }),
-                outputIndex: v => InputValidator.validateNumber(v, { required: true, integer: true, min: 0 }),
-                signature: v => InputValidator.validateString(v, { required: true, minLength: 1 }),
-                publicKey: v => InputValidator.validateString(v, { required: true, minLength: 1 }),
-              });
-              return result;
-            },
-            { required: true, minLength: 1 }
-          ),
-        outputs: value =>
-          InputValidator.validateArray(
-            value,
-            output => {
-              // First validate the required fields (address, amount)
-              const baseValidation = InputValidator.validateObject(output, {
-                address: v => InputValidator.validateAddress(v, { required: true }),
-                amount: v => InputValidator.validateAmount(v, { required: true, min: 0 }, this.config.decimals || 8),
-              });
-
-              if (!baseValidation) {
-                return null;
-              }
-
-              // Add the tag field to the validated output
-              const result = {
-                ...baseValidation,
-                tag: TRANSACTION_TAGS.TRANSACTION,
-              };
-
-              return result;
-            },
-            { required: true, minLength: 1 }
-          ),
-        fee: value => InputValidator.validateNumber(value, { required: true, min: 0 }),
-        timestamp: value => InputValidator.validateNumber(value, { required: true, min: 0 }),
-        isCoinbase: value =>
-          // Boolean validation - just return the value as is
-          value,
-        tag: value =>
-          // Tag validation - just return the value as is
-          value,
-        nonce: value =>
-          // Nonce validation for replay protection
-          InputValidator.validateString(value, { required: false, minLength: 1, maxLength: 100 }),
-        expiresAt: value =>
-          // Expiration validation for replay protection
-          InputValidator.validateNumber(value, { required: false, min: 0 }),
-        sequence: value =>
-          // Sequence validation for replay protection
-          InputValidator.validateNumber(value, { required: false, integer: true, min: 0 }),
-      };
-
-      const validatedTransaction = InputValidator.validateObject(transaction, transactionSchema);
-
-      if (!validatedTransaction) {
-        logger.error('API', `Transaction validation failed for transaction ${transaction.id || 'unknown'}`);
         return res.status(400).json({
-          error: 'Invalid transaction structure or data',
-          details: 'Check transaction format and required fields',
+          error: 'Transaction data is required',
         });
       }
 
-      // Validate minimum fee if configured
-      if (this.config.wallet && this.config.wallet.minFee !== undefined) {
-        if (!validatedTransaction.fee || validatedTransaction.fee < this.config.wallet.minFee) {
-          return res.status(400).json({
-            error: `Transaction fee must be at least ${this.config.wallet.minFee} PAS`,
-            minFee: this.config.wallet.minFee,
-            providedFee: validatedTransaction.fee || 0,
-          });
-        }
+      // Convert plain object to Transaction instance
+      const newTransaction = Transaction.fromJSON(transaction);
+
+      // Validate transaction
+      if (!newTransaction.isValid()) {
+        return res.status(400).json({
+          error: 'Invalid transaction',
+          details: 'Transaction validation failed',
+        });
       }
 
-      // Convert validated transaction to Transaction instance if needed
-      let transactionInstance = validatedTransaction;
-      if (typeof validatedTransaction === 'object' && !validatedTransaction.isValid) {
+      // Add to memory pool
+      if (this.blockchain.addPendingTransaction(newTransaction)) {
+        logger.info('API', `New transaction submitted: ${newTransaction.id}`);
+
+        // Broadcast to network
         try {
-          transactionInstance = Transaction.fromJSON(validatedTransaction);
-        } catch (error) {
-          logger.error('API', `Failed to convert transaction to Transaction instance: ${error.message}`);
-          return res.status(400).json({
-            error: 'Invalid transaction format',
-            details: 'Could not create transaction instance',
-          });
+          if (this.p2pNetwork) {
+            this.p2pNetwork.broadcastNewTransaction(newTransaction);
+            logger.debug('API', `Transaction broadcasted to P2P network`);
+          }
+        } catch (broadcastError) {
+          logger.warn('API', `Failed to broadcast transaction: ${broadcastError.message}`);
         }
-      }
 
-      // Add transaction to mempool
-      let success;
-      try {
-        success = this.blockchain.addPendingTransaction(transactionInstance);
-      } catch (error) {
-        logger.error('API', `Error in addPendingTransaction: ${error.message}`);
-        return res.status(500).json({
-          error: 'Failed to add transaction to mempool',
-          details: error.message,
+        res.json({
+          success: true,
+          transactionId: newTransaction.id,
+          message: 'Transaction submitted successfully',
+          timestamp: new Date().toISOString(),
+        });
+      } else {
+        res.status(400).json({
+          error: 'Failed to add transaction to memory pool',
+          details: 'Transaction may already exist or be invalid',
         });
       }
-
-      if (!success) {
-        return res.status(400).json({ error: 'Failed to add transaction to mempool' });
-      }
-
-      res.json({
-        success: true,
-        transactionId: validatedTransaction.id,
-        message: 'Transaction submitted successfully',
-      });
     } catch (error) {
-      logger.error('API', `Unexpected error in submitTransaction: ${error.message}`);
-      res.status(500).json({ error: error.message });
+      logger.error('API', `Error submitting transaction: ${error.message}`);
+      res.status(500).json({
+        error: 'Internal server error',
+        details: error.message,
+      });
     }
   }
 
@@ -2030,6 +1965,219 @@ class APIServer {
       res.status(500).json({
         success: false,
         error: error.message,
+      });
+    }
+  }
+
+  // Wallet routes (public - no API key required)
+  /**
+   *
+   * @param req
+   * @param res
+   */
+  getWalletBalance(req, res) {
+    try {
+      const { address } = req.params;
+
+      // For network-based wallet system, get balance from blockchain UTXOs
+      if (!this.blockchain) {
+        return res.status(503).json({
+          error: 'Blockchain not available',
+        });
+      }
+
+      // Get all UTXOs for the address from the blockchain
+      const utxos = this.blockchain.getUTXOsForAddress(address);
+      const balance = utxos.reduce((total, utxo) => total + utxo.amount, 0);
+
+      res.json({
+        success: true,
+        address,
+        balance,
+        utxoCount: utxos.length,
+        timestamp: new Date().toISOString(),
+      });
+    } catch (error) {
+      logger.error('API', `Error getting wallet balance for ${req.params.address}: ${error.message}`);
+      res.status(500).json({
+        error: 'Internal server error',
+        details: error.message,
+      });
+    }
+  }
+
+  /**
+   *
+   * @param req
+   * @param res
+   */
+  getWalletTransactions(req, res) {
+    try {
+      const { address } = req.params;
+
+      // For network-based wallet system, get transactions from blockchain
+      if (!this.blockchain) {
+        return res.status(503).json({
+          error: 'Blockchain not available',
+        });
+      }
+
+      // Get all transactions involving this address from the blockchain
+      const transactions = [];
+      for (const block of this.blockchain.chain) {
+        for (const tx of block.transactions) {
+          // Check if address is involved in inputs or outputs
+          const isInvolved = tx.inputs.some(input => input.address === address) ||
+                            tx.outputs.some(output => output.address === address);
+
+          if (isInvolved) {
+            // Show complete transaction context instead of filtering
+            transactions.push({
+              id: tx.id,
+              blockHeight: block.index,
+              blockHash: block.hash,
+              timestamp: block.timestamp,
+              // Show ALL inputs and outputs for complete context
+              inputs: tx.inputs,
+              outputs: tx.outputs,
+              tag: tx.tag,
+              // Add helpful flags to identify address involvement
+              isSender: tx.inputs.some(input => input.address === address),
+              isReceiver: tx.outputs.some(output => output.address === address),
+              // Calculate net amount for this address
+              netAmount: this.calculateNetAmountForAddress(tx, address)
+            });
+          }
+        }
+      }
+
+      res.json({
+        success: true,
+        address,
+        transactions,
+        count: transactions.length,
+        timestamp: new Date().toISOString(),
+      });
+    } catch (error) {
+      logger.error('API', `Error getting wallet transactions for ${req.params.address}: ${error.message}`);
+      res.status(500).json({
+        error: 'Internal server error',
+        details: error.message,
+      });
+    }
+  }
+
+  /**
+   * Calculate net amount for a specific address in a transaction
+   * @param transaction
+   * @param address
+   * @returns {number}
+   */
+  calculateNetAmountForAddress(transaction, address) {
+    let netAmount = 0;
+
+    // Add outputs TO this address (received)
+    transaction.outputs.forEach(output => {
+      if (output.address === address) {
+        netAmount += output.amount;
+      }
+    });
+
+    // Subtract inputs FROM this address (sent)
+    transaction.inputs.forEach(input => {
+      if (input.address === address) {
+        // Note: We don't know the exact input amount from UTXO, so this is approximate
+        // In a real implementation, you'd look up the UTXO amount
+        netAmount -= 0; // Placeholder for actual UTXO amount
+      }
+    });
+
+    return netAmount;
+  }
+
+  /**
+   *
+   * @param req
+   * @param res
+   */
+  getWalletUTXOs(req, res) {
+    try {
+      const { address } = req.params;
+
+      if (!this.blockchain) {
+        return res.status(503).json({
+          error: 'Blockchain not available',
+        });
+      }
+
+      const utxos = this.blockchain.getUTXOsForAddress(address);
+
+      res.json({
+        success: true,
+        address,
+        utxos,
+        count: utxos.length,
+        timestamp: new Date().toISOString(),
+      });
+    } catch (error) {
+      logger.error('API', `Error getting UTXOs for ${req.params.address}: ${error.message}`);
+      res.status(500).json({
+        error: 'Internal server error',
+        details: error.message,
+      });
+    }
+  }
+
+  /**
+   *
+   * @param req
+   * @param res
+   */
+  syncMempoolWithPeers(req, res) {
+    try {
+      if (!this.p2pNetwork) {
+        return res.status(503).json({
+          error: 'P2P network not available',
+        });
+      }
+      this.p2pNetwork.syncMempoolWithPeers();
+      res.json({
+        success: true,
+        message: 'Mempool sync initiated with peers',
+        timestamp: new Date().toISOString(),
+      });
+    } catch (error) {
+      logger.error('API', `Error syncing mempool with peers: ${error.message}`);
+      res.status(500).json({
+        error: 'Internal server error',
+        details: error.message,
+      });
+    }
+  }
+
+  /**
+   *
+   * @param req
+   * @param res
+   */
+  getMempoolSyncStatus(req, res) {
+    try {
+      if (!this.p2pNetwork) {
+        return res.status(503).json({
+          error: 'P2P network not available',
+        });
+      }
+      const status = this.p2pNetwork.getMempoolSyncStatus();
+      res.json({
+        success: true,
+        data: status,
+        timestamp: new Date().toISOString(),
+      });
+    } catch (error) {
+      logger.error('API', `Error getting mempool sync status: ${error.message}`);
+      res.status(500).json({
+        error: 'Internal server error',
+        details: error.message,
       });
     }
   }

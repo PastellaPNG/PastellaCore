@@ -16,7 +16,7 @@ const AdvancedGPUMiner = require('./AdvancedGPUMiner.js');
 const InteractiveMode = require('./InteractiveMode.js');
 const NetworkManager = require('./NetworkManager.js');
 const { validateAddress } = require('./utils.js');
-const WalletManager = require('./WalletManager.js');
+const NetworkWalletManager = require('./NetworkWalletManager.js'); // New network wallet
 
 /**
  *
@@ -33,11 +33,11 @@ class PastellaCLI {
 
     // Initialize managers (CPU mining removed)
     this.gpuMiningManager = new AdvancedGPUMiner(this);
-    this.walletManager = new WalletManager(this);
+    this.networkWalletManager = new NetworkWalletManager(); // New network wallet manager
     this.networkManager = new NetworkManager(this);
     this.interactiveMode = new InteractiveMode(this);
 
-    // Local components
+    // Local components (kept for backward compatibility)
     this.localBlockchain = new Blockchain();
     this.localWallet = new Wallet();
 
@@ -53,6 +53,13 @@ class PastellaCLI {
     this.walletPassword = null;
     this.lastSyncHeight = 0;
     this.syncInterval = null;
+
+    // Network wallet state
+    this.networkWalletConnected = false;
+    this.currentNetworkWallet = null;
+
+    // Initialize network wallet manager with CLI reference
+    this.networkWalletManager.setCLIReference(this);
 
     this.setupCommands();
   }
@@ -272,7 +279,7 @@ class PastellaCLI {
         console.log('');
         console.log(chalk.yellow.bold('📖 AVAILABLE COMMANDS:'));
         console.log(chalk.cyan('  wallet <command>                                             - Wallet management'));
-        console.log(chalk.cyan('  mine <command>                                           - KawPow GPU mining'));
+        console.log(chalk.cyan('  mine <command>                                               - KawPow GPU mining'));
         console.log(
           chalk.cyan('  chain <command>                                              - Blockchain operations')
         );
@@ -339,6 +346,9 @@ class PastellaCLI {
             '  pastella wallet transaction-info <tx-id>                       - Show transaction details & protection'
           )
         );
+        console.log(chalk.cyan('  pastella wallet seed-import                                  - Import wallet from seed phrase'));
+        console.log(chalk.cyan('  pastella wallet key-import                                   - Import wallet from private key'));
+        console.log(chalk.cyan('  pastella wallet connect 127.0.0.1 22000                      - Connect to local node'));
         console.log(chalk.cyan('  pastella mine start                                      - Start GPU mining'));
         console.log(chalk.cyan('  pastella chain validate checkpoint                           - Fast validation'));
         console.log(
