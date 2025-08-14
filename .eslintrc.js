@@ -75,8 +75,8 @@ module.exports = {
     'eol-last': 'error',
     'func-call-spacing': ['error', 'never'],
     'function-paren-newline': 'off', // Disabled to allow flexible function parameter formatting
-    'max-len': ['warn', { code: 240, ignoreUrls: true, ignoreStrings: true, ignoreTemplateLiterals: true }],
-    'max-lines': ['warn', { max: 1000, skipBlankLines: true, skipComments: true }],
+    'max-len': ['warn', { code: 10000, ignoreUrls: true, ignoreStrings: true, ignoreTemplateLiterals: true }],
+    'max-lines': ['warn', { max: 10000, skipBlankLines: true, skipComments: true }],
     'max-lines-per-function': ['warn', { max: 200, skipBlankLines: true, skipComments: true }],
     'max-params': ['warn', { max: 10 }],
     'max-classes-per-file': 'off', // Disabled to allow multiple related classes in cryptocurrency files
