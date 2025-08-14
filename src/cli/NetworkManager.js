@@ -88,6 +88,7 @@ class NetworkManager {
       const response = await this.cli.makeApiRequest('/api/blockchain/status');
 
       console.log(chalk.blue('🔗 Blockchain Status:'));
+      console.log(chalk.cyan(`Network ID: ${response.networkId || 'unknown'}`));
       console.log(chalk.cyan(`Height: ${response.length}`));
       console.log(chalk.cyan(`Difficulty: ${response.difficulty}`));
       console.log(chalk.cyan(`Pending Transactions: ${response.pendingTransactions || 0}`));

@@ -73,8 +73,11 @@ class P2PNetwork {
       this.peerReputation = new PeerReputation(dataDir);
       logger.debug('P2P_NETWORK', `PeerReputation initialized: dataDir=${dataDir}`);
 
-      this.messageHandler = new MessageHandler(blockchain, this.peerReputation);
+      this.messageHandler = new MessageHandler(blockchain, this.peerReputation, config);
       logger.debug('P2P_NETWORK', `MessageHandler initialized with blockchain and peerReputation`);
+
+      // Set cross-reference for handshake handling
+      this.messageHandler.setP2PNetworkReference(this);
 
       this.networkSync = new NetworkSync(blockchain, this.peerManager, this.seedNodeManager);
       logger.debug('P2P_NETWORK', `NetworkSync initialized with blockchain, peerManager, and seedNodeManager`);
@@ -329,6 +332,9 @@ class P2PNetwork {
       return;
     }
 
+    // Initiate handshake with network ID validation
+    this.initiateHandshake(ws, peerAddress);
+
     ws.on('message', data => {
       try {
         const message = JSON.parse(data);
@@ -375,6 +381,45 @@ class P2PNetwork {
       this.pendingChallenges.delete(peerAddress);
       this.initiatedAuthentication.delete(peerAddress);
     });
+  }
+
+  /**
+   * Initiate handshake with a new peer
+   * @param ws
+   * @param peerAddress
+   */
+  initiateHandshake(ws, peerAddress) {
+    try {
+      const handshakeMessage = {
+        type: 'HANDSHAKE',
+        data: {
+          networkId: this.config?.networkId || 'unknown',
+          nodeVersion: '1.0.0',
+          timestamp: Date.now(),
+          nodeId: this.nodeIdentity.getNodeId(),
+        },
+      };
+
+      logger.debug(
+        'P2P_NETWORK',
+        `Initiating handshake with ${peerAddress}: networkId=${handshakeMessage.data.networkId}`
+      );
+      ws.send(JSON.stringify(handshakeMessage));
+
+      // Set a timeout for handshake response
+      const handshakeTimeout = setTimeout(() => {
+        logger.warn('P2P_NETWORK', `Handshake timeout with ${peerAddress}`);
+        this.peerReputation.updatePeerReputation(peerAddress, 'bad_behavior', { reason: 'handshake_timeout' });
+        ws.close(1000, 'Handshake timeout');
+      }, 10000); // 10 second timeout
+
+      // Store timeout reference for cleanup
+      this.pendingHandshakes = this.pendingHandshakes || new Map();
+      this.pendingHandshakes.set(peerAddress, handshakeTimeout);
+    } catch (error) {
+      logger.error('P2P_NETWORK', `Error initiating handshake with ${peerAddress}: ${error.message}`);
+      this.peerReputation.updatePeerReputation(peerAddress, 'bad_behavior', { reason: 'handshake_initiation_error' });
+    }
   }
 
   /**
@@ -476,6 +521,7 @@ class P2PNetwork {
     return {
       isRunning: this.isRunning,
       port: this.port,
+      networkId: this.config?.networkId || 'unknown',
       peerCount: this.peerManager.getPeerCount(),
       maxPeers: this.peerManager.maxPeers,
       seedNodeConnections: this.seedNodeManager.getSeedNodeStatus(),

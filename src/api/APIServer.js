@@ -293,6 +293,7 @@ class APIServer {
       res.json({
         ...status,
         height: status.chainLength,
+        networkId: this.config.networkId || 'unknown',
       });
     } catch (error) {
       res.status(500).json({
@@ -1108,6 +1109,7 @@ class APIServer {
       name: this.config.name,
       ticker: this.config.ticker,
       version: '1.0.0',
+      networkId: this.config.networkId || 'unknown',
       uptime: process.uptime(),
       apiPort: this.port,
       p2pPort: this.p2pPort,

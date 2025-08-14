@@ -1,7 +1,7 @@
 const WebSocket = require('ws');
 
-const logger = require('../utils/logger');
-const MessageValidator = require('../utils/MessageValidator');
+const logger = require('../utils/logger.js');
+const MessageValidator = require('../utils/MessageValidator.js');
 
 /**
  * Message Handler - Handles all message processing and routing
@@ -11,8 +11,9 @@ class MessageHandler {
    *
    * @param blockchain
    * @param peerReputation
+   * @param config
    */
-  constructor(blockchain, peerReputation) {
+  constructor(blockchain, peerReputation, config) {
     logger.debug('MESSAGE_HANDLER', `Initializing MessageHandler...`);
     logger.debug(
       'MESSAGE_HANDLER',
@@ -22,9 +23,15 @@ class MessageHandler {
       'MESSAGE_HANDLER',
       `PeerReputation instance: ${peerReputation ? 'present' : 'null'}, type: ${typeof peerReputation}`
     );
+    logger.debug(
+      'MESSAGE_HANDLER',
+      `Config instance: ${config ? 'present' : 'null'}, networkId: ${config?.networkId || 'undefined'}`
+    );
 
     this.blockchain = blockchain;
     this.peerReputation = peerReputation;
+    this.config = config;
+    this.p2pNetwork = null; // Will be set by P2PNetwork after initialization
     this.messageHandlers = new Map();
     this.messageValidator = new MessageValidator();
     this.messageValidationStats = {
@@ -48,6 +55,15 @@ class MessageHandler {
   }
 
   /**
+   * Set P2PNetwork reference for cross-component communication
+   * @param p2pNetwork
+   */
+  setP2PNetworkReference(p2pNetwork) {
+    this.p2pNetwork = p2pNetwork;
+    logger.debug('MESSAGE_HANDLER', `P2PNetwork reference set`);
+  }
+
+  /**
    * Setup message handlers
    */
   setupMessageHandlers() {
@@ -68,6 +84,9 @@ class MessageHandler {
     // Authentication message handlers
     logger.debug('MESSAGE_HANDLER', `Setting up authentication message handlers...`);
     this.messageHandlers.set('HANDSHAKE', this.handleHandshake.bind(this));
+    this.messageHandlers.set('HANDSHAKE_ACCEPTED', this.handleHandshakeAccepted.bind(this));
+    this.messageHandlers.set('HANDSHAKE_REJECTED', this.handleHandshakeRejected.bind(this));
+    this.messageHandlers.set('HANDSHAKE_ERROR', this.handleHandshakeError.bind(this));
     this.messageHandlers.set('AUTH_CHALLENGE', this.handleAuthChallenge.bind(this));
     this.messageHandlers.set('AUTH_RESPONSE', this.handleAuthResponse.bind(this));
     this.messageHandlers.set('AUTH_SUCCESS', this.handleAuthSuccess.bind(this));
@@ -351,7 +370,198 @@ class MessageHandler {
    */
   handleHandshake(ws, message, peerAddress) {
     logger.debug('MESSAGE_HANDLER', `Handshake received from ${peerAddress}`);
-    // Handle handshake authentication
+
+    try {
+      // Validate handshake message structure
+      if (!message.data || !message.data.networkId) {
+        logger.warn('MESSAGE_HANDLER', `Invalid handshake from ${peerAddress}: missing networkId`);
+        this.sendMessage(ws, {
+          type: 'HANDSHAKE_REJECTED',
+          data: {
+            reason: 'Invalid handshake format',
+            timestamp: Date.now(),
+          },
+        });
+        return;
+      }
+
+      const peerNetworkId = message.data.networkId;
+      const localNetworkId = this.config?.networkId || 'unknown';
+
+      // Check if network IDs match
+      if (peerNetworkId !== localNetworkId) {
+        logger.warn(
+          'MESSAGE_HANDLER',
+          `Network ID mismatch from ${peerAddress}: expected ${localNetworkId}, got ${peerNetworkId}`
+        );
+
+        // Send rejection message with network ID info
+        this.sendMessage(ws, {
+          type: 'HANDSHAKE_REJECTED',
+          data: {
+            reason: 'Network ID mismatch',
+            expectedNetworkId: localNetworkId,
+            receivedNetworkId: peerNetworkId,
+            timestamp: Date.now(),
+            message: 'This node is running on a different network. Please check your configuration.',
+          },
+        });
+
+        // Close connection after sending rejection
+        setTimeout(() => {
+          try {
+            ws.close(1000, 'Network ID mismatch');
+          } catch (error) {
+            logger.debug('MESSAGE_HANDLER', `Error closing connection: ${error.message}`);
+          }
+        }, 1000);
+
+        return;
+      }
+
+      // Network ID matches - proceed with handshake
+      logger.info('MESSAGE_HANDLER', `Network ID match with ${peerAddress}: ${peerNetworkId}`);
+
+      // Send successful handshake response
+      this.sendMessage(ws, {
+        type: 'HANDSHAKE_ACCEPTED',
+        data: {
+          networkId: localNetworkId,
+          nodeVersion: '1.0.0',
+          timestamp: Date.now(),
+          message: 'Network ID verified successfully',
+        },
+      });
+
+      // Update peer reputation for successful handshake
+      this.peerReputation.updatePeerReputation(peerAddress, 'good_behavior', {
+        reason: 'successful_handshake',
+        networkId: peerNetworkId,
+      });
+
+      logger.info('MESSAGE_HANDLER', `Handshake completed successfully with ${peerAddress}`);
+    } catch (error) {
+      logger.error('MESSAGE_HANDLER', `Error during handshake with ${peerAddress}: ${error.message}`);
+
+      // Send error response
+      this.sendMessage(ws, {
+        type: 'HANDSHAKE_ERROR',
+        data: {
+          reason: 'Internal error during handshake',
+          timestamp: Date.now(),
+        },
+      });
+    }
+  }
+
+  /**
+   * Handle handshake accepted response
+   * @param ws
+   * @param message
+   * @param peerAddress
+   */
+  handleHandshakeAccepted(ws, message, peerAddress) {
+    logger.info('MESSAGE_HANDLER', `Handshake accepted by ${peerAddress}: ${message.data.networkId}`);
+
+    // Clear any pending handshake timeout
+    if (this.p2pNetwork && this.p2pNetwork.pendingHandshakes) {
+      const timeout = this.p2pNetwork.pendingHandshakes.get(peerAddress);
+      if (timeout) {
+        clearTimeout(timeout);
+        this.p2pNetwork.pendingHandshakes.delete(peerAddress);
+      }
+    }
+
+    // Mark peer as authenticated
+    if (this.p2pNetwork) {
+      this.p2pNetwork.authenticatedPeers.set(peerAddress, {
+        nodeId: message.data.nodeId || 'unknown',
+        networkId: message.data.networkId,
+        authenticatedAt: Date.now(),
+      });
+    }
+
+    // Update peer reputation
+    this.peerReputation.updatePeerReputation(peerAddress, 'good_behavior', {
+      reason: 'handshake_accepted',
+      networkId: message.data.networkId,
+    });
+  }
+
+  /**
+   * Handle handshake rejected response
+   * @param ws
+   * @param message
+   * @param peerAddress
+   */
+  handleHandshakeRejected(ws, message, peerAddress) {
+    logger.warn('MESSAGE_HANDLER', `Handshake rejected by ${peerAddress}: ${message.data.reason}`);
+
+    // Clear any pending handshake timeout
+    if (this.p2pNetwork && this.p2pNetwork.pendingHandshakes) {
+      const timeout = this.p2pNetwork.pendingHandshakes.get(peerAddress);
+      if (timeout) {
+        clearTimeout(timeout);
+        this.p2pNetwork.pendingHandshakes.delete(peerAddress);
+      }
+    }
+
+    // Log the rejection reason
+    if (message.data.expectedNetworkId && message.data.receivedNetworkId) {
+      logger.warn(
+        'MESSAGE_HANDLER',
+        `Network ID mismatch: expected ${message.data.expectedNetworkId}, received ${message.data.receivedNetworkId}`
+      );
+    }
+
+    // Update peer reputation
+    this.peerReputation.updatePeerReputation(peerAddress, 'bad_behavior', {
+      reason: 'handshake_rejected',
+      details: message.data.reason,
+    });
+
+    // Close connection after a short delay
+    setTimeout(() => {
+      try {
+        ws.close(1000, 'Handshake rejected');
+      } catch (error) {
+        logger.debug('MESSAGE_HANDLER', `Error closing connection: ${error.message}`);
+      }
+    }, 1000);
+  }
+
+  /**
+   * Handle handshake error response
+   * @param ws
+   * @param message
+   * @param peerAddress
+   */
+  handleHandshakeError(ws, message, peerAddress) {
+    logger.error('MESSAGE_HANDLER', `Handshake error from ${peerAddress}: ${message.data.reason}`);
+
+    // Clear any pending handshake timeout
+    if (this.p2pNetwork && this.p2pNetwork.pendingHandshakes) {
+      const timeout = this.p2pNetwork.pendingHandshakes.get(peerAddress);
+      if (timeout) {
+        clearTimeout(timeout);
+        this.p2pNetwork.pendingHandshakes.delete(peerAddress);
+      }
+    }
+
+    // Update peer reputation
+    this.peerReputation.updatePeerReputation(peerAddress, 'bad_behavior', {
+      reason: 'handshake_error',
+      details: message.data.reason,
+    });
+
+    // Close connection after a short delay
+    setTimeout(() => {
+      try {
+        ws.close(1000, 'Handshake error');
+      } catch (error) {
+        logger.debug('MESSAGE_HANDLER', `Error closing connection: ${error.message}`);
+      }
+    }, 1000);
   }
 
   /**

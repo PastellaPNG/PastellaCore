@@ -12,20 +12,69 @@ class MessageValidator {
     this.messageSchemas = {
       // Authentication messages
       HANDSHAKE: {
-        required: ['type', 'data', 'signature'],
+        required: ['type', 'data'],
         properties: {
           type: { type: 'string', enum: ['HANDSHAKE'] },
           data: {
             type: 'object',
-            required: ['nodeId', 'publicKey', 'timestamp', 'version'],
+            required: ['networkId', 'nodeVersion', 'timestamp', 'nodeId'],
             properties: {
-              nodeId: { type: 'string', pattern: '^[a-fA-F0-9]{64}$', description: '64-character hex node ID' },
-              publicKey: { type: 'string', minLength: 100, description: 'PEM format public key' },
+              networkId: { type: 'string', minLength: 1, description: 'Network identifier for compatibility check' },
+              nodeVersion: { type: 'string', pattern: '^\\d+\\.\\d+\\.\\d+$', description: 'Semantic version' },
               timestamp: { type: 'number', minimum: 0, description: 'Unix timestamp' },
-              version: { type: 'string', pattern: '^\\d+\\.\\d+\\.\\d+$', description: 'Semantic version' },
+              nodeId: { type: 'string', minLength: 1, description: 'Node identifier' },
             },
           },
-          signature: { type: 'string', minLength: 1, description: 'Base64 signature' },
+        },
+      },
+
+      HANDSHAKE_ACCEPTED: {
+        required: ['type', 'data'],
+        properties: {
+          type: { type: 'string', enum: ['HANDSHAKE_ACCEPTED'] },
+          data: {
+            type: 'object',
+            required: ['networkId', 'nodeVersion', 'timestamp'],
+            properties: {
+              networkId: { type: 'string', minLength: 1, description: 'Network identifier' },
+              nodeVersion: { type: 'string', pattern: '^\\d+\\.\\d+\\.\\d+$', description: 'Semantic version' },
+              timestamp: { type: 'number', minimum: 0, description: 'Unix timestamp' },
+              message: { type: 'string', minLength: 1, description: 'Success message' },
+            },
+          },
+        },
+      },
+
+      HANDSHAKE_REJECTED: {
+        required: ['type', 'data'],
+        properties: {
+          type: { type: 'string', enum: ['HANDSHAKE_REJECTED'] },
+          data: {
+            type: 'object',
+            required: ['reason', 'timestamp'],
+            properties: {
+              reason: { type: 'string', minLength: 1, description: 'Rejection reason' },
+              expectedNetworkId: { type: 'string', minLength: 1, description: 'Expected network ID' },
+              receivedNetworkId: { type: 'string', minLength: 1, description: 'Received network ID' },
+              timestamp: { type: 'number', minimum: 0, description: 'Unix timestamp' },
+              message: { type: 'string', minLength: 1, description: 'Detailed message' },
+            },
+          },
+        },
+      },
+
+      HANDSHAKE_ERROR: {
+        required: ['type', 'data'],
+        properties: {
+          type: { type: 'string', enum: ['HANDSHAKE_ERROR'] },
+          data: {
+            type: 'object',
+            required: ['reason', 'timestamp'],
+            properties: {
+              reason: { type: 'string', minLength: 1, description: 'Error reason' },
+              timestamp: { type: 'number', minimum: 0, description: 'Unix timestamp' },
+            },
+          },
         },
       },
 
@@ -689,6 +738,11 @@ class MessageValidator {
         return this.validateNewTransaction(message.data);
       case 'HANDSHAKE':
         return this.validateHandshake(message.data);
+      case 'HANDSHAKE_ACCEPTED':
+      case 'HANDSHAKE_REJECTED':
+      case 'HANDSHAKE_ERROR':
+        // These are response messages, basic validation is sufficient
+        return { valid: true };
       case 'AUTH_CHALLENGE':
       case 'AUTH_RESPONSE':
         return this.validateAuthMessage(message.data);
@@ -804,12 +858,30 @@ class MessageValidator {
       };
     }
 
-    // Validate public key format (basic PEM check)
-    if (!handshakeData.publicKey.includes('-----BEGIN PUBLIC KEY-----')) {
+    // Validate network ID
+    if (!handshakeData.networkId || typeof handshakeData.networkId !== 'string') {
       return {
         valid: false,
-        error: 'Invalid public key format',
-        details: 'Public key must be in PEM format',
+        error: 'Invalid network ID',
+        details: 'Network ID is required and must be a string',
+      };
+    }
+
+    // Validate node version format
+    if (!handshakeData.nodeVersion || !/^\d+\.\d+\.\d+$/.test(handshakeData.nodeVersion)) {
+      return {
+        valid: false,
+        error: 'Invalid node version',
+        details: 'Node version must be in semantic version format (e.g., 1.0.0)',
+      };
+    }
+
+    // Validate node ID
+    if (!handshakeData.nodeId || typeof handshakeData.nodeId !== 'string') {
+      return {
+        valid: false,
+        error: 'Invalid node ID',
+        details: 'Node ID is required and must be a string',
       };
     }
 

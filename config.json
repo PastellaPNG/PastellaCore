@@ -2,6 +2,7 @@
   "name": "Pastella",
   "ticker": "PAS",
   "decimals": 8,
+  "networkId": "pastella-14082025",
   "network": {
     "port": 22000,
     "p2pPort": 23000,

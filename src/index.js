@@ -467,6 +467,7 @@ class PastellaDaemon {
 
     // Blockchain status
     console.log(chalk.yellow.bold('🔗 BLOCKCHAIN:'));
+    console.log(chalk.cyan('  Network ID:'), chalk.white(status.blockchain?.networkId || 'unknown'));
     console.log(chalk.cyan('  Height:'), chalk.white(status.blockchain?.length || 0));
     console.log(chalk.cyan('  Difficulty:'), chalk.white(status.blockchain?.difficulty || 0));
     console.log(chalk.cyan('  Pending TXs:'), chalk.white(status.blockchain?.pendingTransactions || 0));
@@ -500,6 +501,7 @@ class PastellaDaemon {
 
     console.log(chalk.yellow.bold('📡 NETWORK INFO:'));
     console.log(chalk.cyan('  Status:'), networkStatus.isRunning ? chalk.green('Running') : chalk.red('Stopped'));
+    console.log(chalk.cyan('  Network ID:'), chalk.white(networkStatus.networkId || 'unknown'));
     console.log(chalk.cyan('  Port:'), chalk.white(networkStatus.port));
     console.log(chalk.cyan('  Peers:'), chalk.white(`${networkStatus.peerCount}/${networkStatus.maxPeers}`));
     console.log(
