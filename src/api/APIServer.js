@@ -52,7 +52,7 @@ class APIServer {
     this.app.use(express.urlencoded({ extended: true }));
 
     // Add rate limiting middleware for DoS protection
-    this.app.use(this.rateLimitMiddleware.bind(this));
+    this.app.use((req, res, next) => this.rateLimitMiddleware(req, res, next));
 
     // Add authentication middleware for sensitive endpoints
     // These endpoints require a valid API key to prevent unauthorized access
@@ -75,7 +75,7 @@ class APIServer {
     this.app.use('/api/transactions/batch', this.auth.validateApiKey.bind(this.auth));
 
     // Add error handling middleware
-    this.app.use((error, req, res) => {
+    this.app.use((error, req, res, _next) => {
       console.error(`❌ API Error: ${error.message}`);
       res.status(500).json({ error: error.message });
     });
