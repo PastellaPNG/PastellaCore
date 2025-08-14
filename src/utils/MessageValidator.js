@@ -147,11 +147,9 @@ class MessageValidator {
         properties: {
           type: { type: 'string', enum: ['RESPONSE_BLOCKCHAIN'] },
           data: {
-            type: 'object',
-            required: ['blocks'],
-            properties: {
-              blocks: { type: 'array', minItems: 1, description: 'Array of blocks' },
-            },
+            type: 'array',
+            minItems: 1,
+            description: 'Array of blocks',
           },
         },
       },
@@ -190,11 +188,8 @@ class MessageValidator {
         properties: {
           type: { type: 'string', enum: ['RESPONSE_TRANSACTION_POOL'] },
           data: {
-            type: 'object',
-            required: ['transactions'],
-            properties: {
-              transactions: { type: 'array', description: 'Array of transactions' },
-            },
+            type: 'array',
+            description: 'Array of transactions',
           },
         },
       },
