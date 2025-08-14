@@ -215,10 +215,10 @@ class AdvancedGPUMiner {
 
           // Optimized mixing function - more rounds for better hash quality
           for (let round = 0; round < 50; round++) {
-            // Efficient bit operations optimized for GPU
-            hash ^= hash << 13;
-            hash ^= hash >> 17;
-            hash ^= hash << 5;
+            // Efficient bit operations optimized for GPU (GLSL ES 2.0 compatible)
+            hash = hash ^ (hash << 13);
+            hash = hash ^ (hash >> 17);
+            hash = hash ^ (hash << 5);
 
             // Additional cache mixing for memory-hard characteristics
             const mixIndex = (hash + round) % 1000;
@@ -226,11 +226,11 @@ class AdvancedGPUMiner {
 
             // Fast multiplication and mixing
             hash *= 0x5bd1e995;
-            hash ^= hash >> 15;
+            hash = hash ^ (hash >> 15);
           }
 
-          // Return optimized result
-          return hash >>> 0;
+          // Return optimized result (GLSL ES 2.0 compatible)
+          return hash & 0xffffffff;
         },
         {
           output: [this.gpuConfig.threads],
@@ -242,6 +242,10 @@ class AdvancedGPUMiner {
           optimizeFloatMemory: true,
           precision: 'single',
           loopMaxIterations: 12, // Optimize loop performance
+          // GLSL ES 2.0 compatibility options
+          mode: 'gpu',
+          target: 'gl',
+          glslVersion: '100', // Use GLSL ES 1.00 for maximum compatibility
         }
       );
 
