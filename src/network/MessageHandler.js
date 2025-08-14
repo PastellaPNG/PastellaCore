@@ -1,5 +1,8 @@
+const path = require('path');
 const WebSocket = require('ws');
 
+const Block = require('../models/Block.js');
+const Transaction = require('../models/Transaction.js');
 const logger = require('../utils/logger.js');
 const MessageValidator = require('../utils/MessageValidator.js');
 
@@ -277,7 +280,6 @@ class MessageHandler {
 
       // Convert received JSON blocks to Block instances for validation
       try {
-        const Block = require('../models/Block.js');
         const convertedChain = receivedChain.map(blockData => {
           if (blockData instanceof Block) {
             return blockData; // Already a Block instance
@@ -305,6 +307,18 @@ class MessageHandler {
           }
 
           logger.info('MESSAGE_HANDLER', `Successfully synced blockchain to ${receivedChain.length} blocks`);
+
+          // Save blockchain after syncing all blocks
+          try {
+            const blockchainPath = path.join(
+              this.config?.storage?.dataDir || './data',
+              this.config?.storage?.blockchainFile || 'blockchain.json'
+            );
+            this.blockchain.saveToFile(blockchainPath);
+            logger.debug('MESSAGE_HANDLER', `Blockchain saved after syncing ${receivedChain.length} blocks`);
+          } catch (error) {
+            logger.warn('MESSAGE_HANDLER', `Failed to save blockchain after sync: ${error.message}`);
+          }
         } else {
           logger.warn('MESSAGE_HANDLER', 'Received chain is invalid, rejecting sync');
           // If chain is invalid, request full chain to get correct data
@@ -352,9 +366,12 @@ class MessageHandler {
     const receivedTransactions = message.data;
     receivedTransactions.forEach(transaction => {
       try {
-        this.blockchain.addPendingTransaction(transaction);
+        // Convert plain object to proper Transaction instance
+        const newTransaction = Transaction.fromJSON(transaction);
+        this.blockchain.addPendingTransaction(newTransaction);
       } catch (error) {
         logger.warn('MESSAGE_HANDLER', `Failed to add transaction from peer: ${error.message}`);
+        logger.warn('MESSAGE_HANDLER', `Error stack: ${error.stack}`);
       }
     });
   }
@@ -368,9 +385,28 @@ class MessageHandler {
   handleNewBlock(ws, message, peerAddress) {
     logger.debug('MESSAGE_HANDLER', `New block announced by ${peerAddress}: ${message.data.index}`);
 
-    const newBlock = message.data;
-    if (this.blockchain.addBlock(newBlock)) {
-      logger.info('MESSAGE_HANDLER', `New block added from peer: ${newBlock.index}`);
+    try {
+      // Convert plain object to proper Block instance with Transaction instances
+      const newBlock = Block.fromJSON(message.data);
+
+              if (this.blockchain.addBlock(newBlock)) {
+          logger.info('MESSAGE_HANDLER', `New block added from peer: ${newBlock.index}`);
+
+          // Save blockchain immediately after adding network block
+        try {
+          const blockchainPath = path.join(
+            this.config?.storage?.dataDir || './data',
+            this.config?.storage?.blockchainFile || 'blockchain.json'
+          );
+          this.blockchain.saveToFile(blockchainPath);
+          logger.debug('MESSAGE_HANDLER', `Blockchain saved immediately after adding network block ${newBlock.index}`);
+        } catch (error) {
+          logger.warn('MESSAGE_HANDLER', `Failed to save blockchain immediately: ${error.message}`);
+        }
+      }
+    } catch (error) {
+      logger.error('MESSAGE_HANDLER', `Failed to process new block from ${peerAddress}: ${error.message}`);
+      logger.error('MESSAGE_HANDLER', `Error stack: ${error.stack}`);
     }
   }
 
@@ -383,9 +419,16 @@ class MessageHandler {
   handleNewTransaction(ws, message, peerAddress) {
     logger.debug('MESSAGE_HANDLER', `New transaction announced by ${peerAddress}`);
 
-    const newTransaction = message.data;
-    if (this.blockchain.addPendingTransaction(newTransaction)) {
-      logger.info('MESSAGE_HANDLER', 'New transaction added from peer');
+    try {
+      // Convert plain object to proper Transaction instance
+      const newTransaction = Transaction.fromJSON(message.data);
+
+      if (this.blockchain.addPendingTransaction(newTransaction)) {
+        logger.info('MESSAGE_HANDLER', 'New transaction added from peer');
+      }
+    } catch (error) {
+      logger.error('MESSAGE_HANDLER', `Failed to process new transaction from ${peerAddress}: ${error.message}`);
+      logger.error('MESSAGE_HANDLER', `Error stack: ${error.stack}`);
     }
   }
 

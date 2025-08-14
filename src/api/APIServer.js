@@ -1,3 +1,4 @@
+const path = require('path');
 const cors = require('cors');
 const express = require('express');
 
@@ -1213,6 +1214,15 @@ class APIServer {
 
       if (addResult) {
         logger.debug('API', `Block ${blockObj.index} added to blockchain successfully`);
+
+        // Save blockchain immediately after adding API block
+        try {
+          const blockchainPath = path.join(this.config?.storage?.dataDir || './data', this.config?.storage?.blockchainFile || 'blockchain.json');
+          this.blockchain.saveToFile(blockchainPath);
+          logger.debug('API', `Blockchain saved immediately after adding API block ${blockObj.index}`);
+        } catch (error) {
+          logger.warn('API', `Failed to save blockchain immediately: ${error.message}`);
+        }
 
         // Broadcast to network
         if (this.p2pNetwork) {

@@ -258,7 +258,7 @@ class PastellaDaemon {
    * Setup periodic tasks
    */
   setupPeriodicTasks() {
-    // Save blockchain every 5 minutes
+    // Save blockchain every 2 minutes (reduced from 5 minutes for better persistence)
     setInterval(
       () => {
         if (this.isRunning) {
@@ -266,7 +266,7 @@ class PastellaDaemon {
           this.blockchain.saveToFile(blockchainPath);
         }
       },
-      5 * 60 * 1000
+      2 * 60 * 1000
     );
 
     // Cleanup expired transactions every 2 minutes (CRITICAL FEATURE)
