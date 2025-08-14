@@ -98,6 +98,7 @@ class P2PNetwork {
       this.authenticatedPeers = new Map(); // Map<peerAddress, {nodeId, publicKey, authenticatedAt}>
       this.pendingChallenges = new Map(); // Map<peerAddress, {challenge, timestamp, nodeId}>
       this.initiatedAuthentication = new Set(); // Set<peerAddress> - track which peers we've initiated auth with
+      this.pendingHandshakes = new Map(); // Map<peerAddress, timeout> - track handshake timeouts
       this.authenticationTimeout = 10000; // 10 seconds for authentication
 
       logger.debug('P2P_NETWORK', `Authentication system initialized: timeout=${this.authenticationTimeout}ms`);
@@ -301,8 +302,8 @@ class P2PNetwork {
   handleConnection(ws) {
     logger.debug('P2P_NETWORK', `Handling new WebSocket connection...`);
 
-    // Get peer address for reputation tracking
-    const peerAddress = this.getPeerAddress(ws);
+    // Extract peer address from WebSocket connection
+    const peerAddress = this.extractPeerAddress(ws);
     logger.debug('P2P_NETWORK', `Peer address extracted: ${peerAddress}`);
 
     // Check if peer is banned
@@ -396,7 +397,7 @@ class P2PNetwork {
           networkId: this.config?.networkId || 'unknown',
           nodeVersion: '1.0.0',
           timestamp: Date.now(),
-          nodeId: this.nodeIdentity.getNodeId(),
+          nodeId: this.nodeIdentity.nodeId,
         },
       };
 
@@ -423,7 +424,32 @@ class P2PNetwork {
   }
 
   /**
-   * Get peer address from WebSocket
+   * Extract peer address from WebSocket connection
+   * @param ws
+   */
+  extractPeerAddress(ws) {
+    try {
+      // Try to get address from WebSocket connection info
+      if (ws._socket && ws._socket.remoteAddress && ws._socket.remotePort) {
+        return `${ws._socket.remoteAddress}:${ws._socket.remotePort}`;
+      }
+
+      // Fallback for different WebSocket implementations
+      if (ws.url) {
+        const url = new URL(ws.url);
+        return `${url.hostname}:${url.port}`;
+      }
+
+      // If we can't determine the address, generate a unique identifier
+      return `peer-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    } catch (error) {
+      logger.warn('P2P_NETWORK', `Could not extract peer address: ${error.message}`);
+      return `unknown-${Date.now()}`;
+    }
+  }
+
+  /**
+   * Get peer address from PeerManager (for existing connections)
    * @param ws
    */
   getPeerAddress(ws) {
