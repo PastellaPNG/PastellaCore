@@ -18,7 +18,7 @@
     "blockTime": 15000,
     "maxBlockSize": 8388608,
     "coinbaseReward": 5000000000,
-    "halvingBlocks": 1000,
+    "halvingBlocks": 2102400,
     "difficultyAlgorithm": "lwma3",
     "difficultyBlocks": 60,
     "difficultyMinimum": 1,
@@ -35,13 +35,7 @@
     },
     "difficulty": 10000
   },
-  "mining": {
-    "enabled": false,
-    "threads": 1,
-    "maxNonce": 4294967295
-  },
   "wallet": {
-    "enabled": false,
     "defaultFee": 100000,
     "minFee": 100
   },
