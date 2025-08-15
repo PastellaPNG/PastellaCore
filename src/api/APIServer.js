@@ -416,7 +416,13 @@ class APIServer {
 
       const testOutputs = [new TransactionOutput('test-address', 10)];
 
-      const testTransaction = new Transaction(testInputs, testOutputs, 100000, TRANSACTION_TAGS.TRANSACTION, Date.now());
+      const testTransaction = new Transaction(
+        testInputs,
+        testOutputs,
+        100000,
+        TRANSACTION_TAGS.TRANSACTION,
+        Date.now()
+      );
       testTransaction.calculateId();
 
       // Test the replay protection
@@ -2031,8 +2037,8 @@ class APIServer {
       for (const block of this.blockchain.chain) {
         for (const tx of block.transactions) {
           // Check if address is involved in inputs or outputs
-          const isInvolved = tx.inputs.some(input => input.address === address) ||
-                            tx.outputs.some(output => output.address === address);
+          const isInvolved =
+            tx.inputs.some(input => input.address === address) || tx.outputs.some(output => output.address === address);
 
           if (isInvolved) {
             // Show complete transaction context instead of filtering
@@ -2049,7 +2055,7 @@ class APIServer {
               isSender: tx.inputs.some(input => input.address === address),
               isReceiver: tx.outputs.some(output => output.address === address),
               // Calculate net amount for this address
-              netAmount: this.calculateNetAmountForAddress(tx, address)
+              netAmount: this.calculateNetAmountForAddress(tx, address),
             });
           }
         }

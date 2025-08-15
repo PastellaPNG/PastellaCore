@@ -234,25 +234,57 @@ class PastellaCLI {
           // No subcommand provided, show wallet help
           console.log(chalk.yellow.bold('🔐 WALLET COMMANDS (Network-Based):'));
           console.log(chalk.cyan('  wallet create                                                - Create new wallet'));
-          console.log(chalk.cyan('  wallet seed-import                                           - Import from seed phrase'));
-          console.log(chalk.cyan('  wallet key-import                                            - Import from private key'));
-          console.log(chalk.cyan('  wallet load                                                  - Load existing wallet'));
-          console.log(chalk.cyan('  wallet unload                                                - Unload current wallet'));
-          console.log(chalk.cyan('  wallet balance                                               - Check wallet balance'));
-          console.log(chalk.cyan('  wallet send <address> <amount>                               - Send coins with replay protection'));
-          console.log(chalk.cyan('  wallet info                                                  - Show wallet information'));
-          console.log(chalk.cyan('  wallet sync                                                  - Sync wallet with network'));
+          console.log(
+            chalk.cyan('  wallet seed-import                                           - Import from seed phrase')
+          );
+          console.log(
+            chalk.cyan('  wallet key-import                                            - Import from private key')
+          );
+          console.log(
+            chalk.cyan('  wallet load                                                  - Load existing wallet')
+          );
+          console.log(
+            chalk.cyan('  wallet unload                                                - Unload current wallet')
+          );
+          console.log(
+            chalk.cyan('  wallet balance                                               - Check wallet balance')
+          );
+          console.log(
+            chalk.cyan(
+              '  wallet send <address> <amount>                               - Send coins with replay protection'
+            )
+          );
+          console.log(
+            chalk.cyan('  wallet info                                                  - Show wallet information')
+          );
+          console.log(
+            chalk.cyan('  wallet sync                                                  - Sync wallet with network')
+          );
           console.log(chalk.cyan('  wallet resync                                                - Resync wallet'));
           console.log(chalk.cyan('  wallet save                                                  - Save wallet'));
-          console.log(chalk.cyan('  wallet transactions                                          - Show transaction history'));
-          console.log(chalk.cyan('  wallet transaction-info <transaction-id>                     - Show transaction details & protection'));
+          console.log(
+            chalk.cyan('  wallet transactions                                          - Show transaction history')
+          );
+          console.log(
+            chalk.cyan(
+              '  wallet transaction-info <transaction-id>                     - Show transaction details & protection'
+            )
+          );
           console.log(chalk.cyan('  wallet connect <host> <port> [protocol]                      - Connect to a node'));
           console.log('');
           console.log(chalk.yellow('💡 Examples:'));
-          console.log(chalk.cyan('  wallet create                                                - Create a new wallet'));
-          console.log(chalk.cyan('  wallet load mywallet mypassword                              - Load existing wallet'));
-          console.log(chalk.cyan('  wallet connect 127.0.0.1 22000                              - Connect to local node'));
-          console.log(chalk.cyan('  wallet balance                                               - Check current balance'));
+          console.log(
+            chalk.cyan('  wallet create                                                - Create a new wallet')
+          );
+          console.log(
+            chalk.cyan('  wallet load mywallet mypassword                              - Load existing wallet')
+          );
+          console.log(
+            chalk.cyan('  wallet connect 127.0.0.1 22000                              - Connect to local node')
+          );
+          console.log(
+            chalk.cyan('  wallet balance                                               - Check current balance')
+          );
           return;
         }
 
@@ -354,24 +386,44 @@ class PastellaCLI {
         console.log('');
         console.log(chalk.yellow.bold('🔐 WALLET COMMANDS (Network-Based):'));
         console.log(chalk.cyan('  wallet create                                                - Create new wallet'));
-        console.log(chalk.cyan('  wallet seed-import                                           - Import from seed phrase'));
-        console.log(chalk.cyan('  wallet key-import                                            - Import from private key'));
-        console.log(chalk.cyan('  wallet load                                                  - Load existing wallet'));
-        console.log(chalk.cyan('  wallet unload                                                - Unload current wallet'));
-        console.log(chalk.cyan('  wallet balance                                               - Check wallet balance'));
-        console.log(chalk.cyan('  wallet send <address> <amount> [fee]                    - Send coins (amount in atomic units)'));
+        console.log(
+          chalk.cyan('  wallet seed-import                                           - Import from seed phrase')
+        );
+        console.log(
+          chalk.cyan('  wallet key-import                                            - Import from private key')
+        );
+        console.log(
+          chalk.cyan('  wallet load                                                  - Load existing wallet')
+        );
+        console.log(
+          chalk.cyan('  wallet unload                                                - Unload current wallet')
+        );
+        console.log(
+          chalk.cyan('  wallet balance                                               - Check wallet balance')
+        );
+        console.log(
+          chalk.cyan('  wallet send <address> <amount> [fee]                    - Send coins (amount in atomic units)')
+        );
         console.log(chalk.cyan('  wallet balance                                         - Check wallet balance'));
         console.log(chalk.cyan('  wallet transactions                                    - View transaction history'));
         console.log(chalk.cyan('  wallet utxos                                           - View UTXOs'));
-        console.log(chalk.cyan('  wallet resync                                          - Resync wallet with network'));
+        console.log(
+          chalk.cyan('  wallet resync                                          - Resync wallet with network')
+        );
         console.log(chalk.cyan('  wallet info                                            - Show wallet information'));
         console.log(chalk.cyan('  wallet unload                                          - Unload current wallet'));
         console.log(chalk.cyan('  wallet help                                            - Show this help'));
         console.log(chalk.white(''));
         console.log(chalk.yellow('Examples:'));
-        console.log(chalk.cyan('  pastella wallet send 15xMFBUhdJNUpVTbG1Tfs2DgmJzt17Xh8o 50000000 100000  - Send 0.5 PAS with 0.001 PAS fee'));
+        console.log(
+          chalk.cyan(
+            '  pastella wallet send 15xMFBUhdJNUpVTbG1Tfs2DgmJzt17Xh8o 50000000 100000  - Send 0.5 PAS with 0.001 PAS fee'
+          )
+        );
         console.log(chalk.cyan('  pastella wallet balance                                         - Check balance'));
-        console.log(chalk.cyan('  pastella wallet connect 127.0.0.1 22000                      - Connect to local node'));
+        console.log(
+          chalk.cyan('  pastella wallet connect 127.0.0.1 22000                      - Connect to local node')
+        );
         console.log('');
         console.log(chalk.yellow.bold('💡 CHECKPOINT SYSTEM:'));
         console.log(
@@ -429,9 +481,15 @@ class PastellaCLI {
             '  pastella wallet transaction-info <tx-id>                       - Show transaction details & protection'
           )
         );
-        console.log(chalk.cyan('  pastella wallet seed-import                                  - Import wallet from seed phrase'));
-        console.log(chalk.cyan('  pastella wallet key-import                                   - Import wallet from private key'));
-        console.log(chalk.cyan('  pastella wallet connect 127.0.0.1 22000                      - Connect to local node'));
+        console.log(
+          chalk.cyan('  pastella wallet seed-import                                  - Import wallet from seed phrase')
+        );
+        console.log(
+          chalk.cyan('  pastella wallet key-import                                   - Import wallet from private key')
+        );
+        console.log(
+          chalk.cyan('  pastella wallet connect 127.0.0.1 22000                      - Connect to local node')
+        );
         console.log(chalk.cyan('  pastella mine start                                      - Start GPU mining'));
         console.log(chalk.cyan('  pastella chain validate checkpoint                           - Fast validation'));
         console.log(

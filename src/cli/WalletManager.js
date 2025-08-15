@@ -21,12 +21,12 @@ class WalletManager {
     this.nodeConfig = {
       host: '127.0.0.1',
       port: 22000,
-      protocol: 'http'
+      protocol: 'http',
     };
 
     this.rl = readline.createInterface({
       input: process.stdin,
-      output: process.stdout
+      output: process.stdout,
     });
   }
 
@@ -73,9 +73,9 @@ class WalletManager {
         headers: {
           'Content-Type': 'application/json',
           'X-API-Key': options.apiKey || '',
-          ...options.headers
+          ...options.headers,
         },
-        body: options.body ? JSON.stringify(options.body) : undefined
+        body: options.body ? JSON.stringify(options.body) : undefined,
       });
 
       if (!response.ok) {
@@ -242,7 +242,7 @@ class WalletManager {
 
       if (response.success) {
         return response.data.transactions;
-        } else {
+      } else {
         throw new Error(response.error || 'Failed to get transactions');
       }
     } catch (error) {
@@ -274,8 +274,10 @@ class WalletManager {
       // Get current balance
       const balance = await this.getBalance(this.currentWallet.getAddress());
 
-      if (balance < (atomicAmount + atomicFee)) {
-        throw new Error(`Insufficient balance: ${formatAtomicUnits(balance)} PAS (need ${formatAtomicUnits(atomicAmount + atomicFee)} PAS)`);
+      if (balance < atomicAmount + atomicFee) {
+        throw new Error(
+          `Insufficient balance: ${formatAtomicUnits(balance)} PAS (need ${formatAtomicUnits(atomicAmount + atomicFee)} PAS)`
+        );
       }
 
       // Create transaction
@@ -292,8 +294,8 @@ class WalletManager {
       const response = await this.makeApiRequest('/api/transactions/submit', {
         method: 'POST',
         body: {
-          transaction: transaction.toJSON()
-        }
+          transaction: transaction.toJSON(),
+        },
       });
 
       if (response.success) {
@@ -341,7 +343,7 @@ class WalletManager {
       return {
         balance,
         transactions,
-        mempoolStatus
+        mempoolStatus,
       };
     } catch (error) {
       logger.error('WALLET_MANAGER', `Failed to sync wallet: ${error.message}`);
@@ -403,7 +405,7 @@ class WalletManager {
     console.log('');
 
     const prompt = () => {
-      this.rl.question('wallet> ', async (input) => {
+      this.rl.question('wallet> ', async input => {
         try {
           await this.processCommand(input.trim());
         } catch (error) {
@@ -432,8 +434,8 @@ class WalletManager {
       case 'connect':
         if (parts.length < 3) {
           console.log('Usage: connect <host> <port> [protocol]');
-        return;
-      }
+          return;
+        }
         const host = parts[1];
         const port = parseInt(parts[2]);
         const protocol = parts[3] || 'http';
@@ -451,8 +453,8 @@ class WalletManager {
       case 'seed-import':
         if (parts.length < 4) {
           console.log('Usage: seed-import <name> <seed-phrase> <password>');
-        return;
-      }
+          return;
+        }
         const seedPhrase = parts.slice(2, -1).join(' ');
         const seedPassword = parts[parts.length - 1];
         await this.importWalletFromSeed(parts[1], seedPhrase, seedPassword);
@@ -497,7 +499,7 @@ class WalletManager {
         const amount = parseFloat(parts[2]);
         const fee = parts[3] ? parseFloat(parts[3]) : 100000; // 0.001 PAS in atomic units
         await this.sendTransaction(parts[1], amount, fee);
-            break;
+        break;
 
       case 'sync':
         if (!this.currentWallet) {
@@ -516,7 +518,7 @@ class WalletManager {
         console.log('👋 Goodbye!');
         this.rl.close();
         process.exit(0);
-            break;
+        break;
 
       default:
         if (command.trim()) {
@@ -569,11 +571,10 @@ class WalletManager {
         const blockchainStatus = await this.getBlockchainStatus();
         console.log(`🔗 Blockchain: ${blockchainStatus.length || 0} blocks`);
         console.log(`⏰ Latest block: ${blockchainStatus.latestBlock || 'unknown'}`);
-
-        } catch (error) {
+      } catch (error) {
         console.log(`❌ Failed to get status: ${error.message}`);
-        }
-      } else {
+      }
+    } else {
       console.log('❌ Not connected to any node');
     }
 

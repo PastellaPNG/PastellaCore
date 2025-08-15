@@ -3,7 +3,13 @@ const path = require('path');
 
 const { TRANSACTION_TAGS } = require('../utils/constants');
 const logger = require('../utils/logger');
-const { toAtomicUnits, fromAtomicUnits, formatAtomicUnits, calculateHalvedReward, getHalvingInfo } = require('../utils/atomicUnits.js');
+const {
+  toAtomicUnits,
+  fromAtomicUnits,
+  formatAtomicUnits,
+  calculateHalvedReward,
+  getHalvingInfo,
+} = require('../utils/atomicUnits.js');
 
 const Block = require('./Block');
 const { Transaction } = require('./Transaction');
@@ -173,7 +179,10 @@ class Blockchain {
         );
         if (!suppressLogging) {
           const { formatAtomicUnits } = require('../utils/atomicUnits');
-          logger.info('BLOCKCHAIN', `Genesis block created with premine: ${formatAtomicUnits(premineAmount)} PAS to ${premineAddress}`);
+          logger.info(
+            'BLOCKCHAIN',
+            `Genesis block created with premine: ${formatAtomicUnits(premineAmount)} PAS to ${premineAddress}`
+          );
         }
       } else {
         // Use config timestamp if available, otherwise create without timestamp
@@ -985,32 +994,32 @@ class Blockchain {
           name: 'timestamp',
           expected: genesisConfig.timestamp,
           actual: genesisBlock.timestamp,
-          check: (expected, actual) => expected === actual
+          check: (expected, actual) => expected === actual,
         },
         {
           name: 'difficulty',
           expected: genesisConfig.difficulty,
           actual: genesisBlock.difficulty,
-          check: (expected, actual) => expected === actual
+          check: (expected, actual) => expected === actual,
         },
         {
           name: 'hash',
           expected: genesisConfig.hash,
           actual: genesisBlock.hash,
-          check: (expected, actual) => expected === actual
+          check: (expected, actual) => expected === actual,
         },
         {
           name: 'nonce',
           expected: genesisConfig.nonce,
           actual: genesisBlock.nonce,
-          check: (expected, actual) => expected === actual
+          check: (expected, actual) => expected === actual,
         },
         {
           name: 'algorithm',
           expected: genesisConfig.algorithm,
           actual: genesisBlock.algorithm,
-          check: (expected, actual) => expected === actual
-        }
+          check: (expected, actual) => expected === actual,
+        },
       ];
 
       let validationFailed = false;

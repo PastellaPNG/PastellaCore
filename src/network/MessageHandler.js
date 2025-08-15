@@ -346,7 +346,7 @@ class MessageHandler {
           } catch (error) {
             logger.warn('MESSAGE_HANDLER', `Failed to save blockchain after sync: ${error.message}`);
           }
-      } else {
+        } else {
           logger.warn('MESSAGE_HANDLER', 'Received chain is invalid, rejecting sync');
           // If chain is invalid, request full chain to get correct data
           logger.info('MESSAGE_HANDLER', 'Requesting full chain due to validation failure');
@@ -416,7 +416,7 @@ class MessageHandler {
       // Convert plain object to proper Block instance
       const newBlock = Block.fromJSON(message.data);
 
-    if (this.blockchain.addBlock(newBlock)) {
+      if (this.blockchain.addBlock(newBlock)) {
         logger.info('MESSAGE_HANDLER', 'New block added from peer');
 
         // CRITICAL: Invalidate mempool transactions that are now in the block (Bitcoin-style)
@@ -487,8 +487,8 @@ class MessageHandler {
       // Convert plain object to proper Transaction instance
       const newTransaction = Transaction.fromJSON(message.data);
 
-    if (this.blockchain.addPendingTransaction(newTransaction)) {
-      logger.info('MESSAGE_HANDLER', 'New transaction added from peer');
+      if (this.blockchain.addPendingTransaction(newTransaction)) {
+        logger.info('MESSAGE_HANDLER', 'New transaction added from peer');
 
         // CRITICAL: Broadcast to other peers (Bitcoin-style relay)
         this.broadcastTransactionToOtherPeers(newTransaction, peerAddress);

@@ -761,7 +761,9 @@ class AdvancedGPUMiner {
       console.log(chalk.white(`⏰ Mining Duration:      ${chalk.cyan(timeDisplay)}`));
       console.log(chalk.white(`🔢 Total Hashes:         ${chalk.cyan(this.totalHashes.toLocaleString())}`));
       console.log(chalk.white(`🏆 Blocks Mined:         ${chalk.green(this.blocksMined)}`));
-      console.log(chalk.white(`💸 Total Fees Collected: ${chalk.green(formatAtomicUnits(this.totalFeesCollected))} PAS`));
+      console.log(
+        chalk.white(`💸 Total Fees Collected: ${chalk.green(formatAtomicUnits(this.totalFeesCollected))} PAS`)
+      );
 
       if (this.currentMiningBlock) {
         console.log(chalk.white(`📦 Current Block:        ${chalk.cyan(`#${this.currentMiningBlock.index}`)}`));
@@ -1191,7 +1193,9 @@ class AdvancedGPUMiner {
     console.log(chalk.white(`💰 Base Reward:          ${chalk.cyan(formatAtomicUnits(baseReward))} PAS`));
     console.log(chalk.white(`💎 Current Reward:       ${chalk.green(formatAtomicUnits(currentReward))} PAS`));
     console.log(chalk.white(`💵 Total Current Rewards: ${chalk.green(formatAtomicUnits(totalCurrentReward))} PAS`));
-    console.log(chalk.white(`💸 Total Fees Collected:  ${chalk.green(formatAtomicUnits(this.totalFeesCollected))} PAS`));
+    console.log(
+      chalk.white(`💸 Total Fees Collected:  ${chalk.green(formatAtomicUnits(this.totalFeesCollected))} PAS`)
+    );
     console.log(chalk.white(`🏆 Total Earnings:       ${chalk.green(formatAtomicUnits(totalEarnings))} PAS`));
 
     console.log(chalk.blue('\n📈 HALVING INFORMATION'));
@@ -1200,7 +1204,9 @@ class AdvancedGPUMiner {
     console.log(chalk.white(`🔄 Halvings Completed:    ${chalk.yellow(halvingInfo.halvings)}`));
     console.log(chalk.white(`⏰ Next Halving:          ${chalk.cyan(halvingInfo.nextHalving)}`));
     console.log(chalk.white(`📊 Blocks Until Halving:  ${chalk.green(halvingInfo.blocksUntilHalving)}`));
-    console.log(chalk.white(`💎 Reward After Next:     ${chalk.yellow(formatAtomicUnits(halvingInfo.currentReward / 2))} PAS`));
+    console.log(
+      chalk.white(`💎 Reward After Next:     ${chalk.yellow(formatAtomicUnits(halvingInfo.currentReward / 2))} PAS`)
+    );
 
     console.log(chalk.blue('\n📊 SESSION BREAKDOWN'));
     console.log(chalk.blue('────────────────────────────────────────────────────────────────────────────────'));
@@ -1240,9 +1246,7 @@ class AdvancedGPUMiner {
           console.log(chalk.white(`📊 Pending Transactions: ${chalk.cyan(pendingTransactions.length)}`));
           console.log(chalk.white(`💸 Total Pending Fees: ${chalk.green(formatAtomicUnits(totalPendingFees))} PAS`));
           console.log(
-            chalk.white(
-              `🎯 Next Block Reward: ${chalk.green(formatAtomicUnits(currentReward + totalPendingFees))} PAS`
-            )
+            chalk.white(`🎯 Next Block Reward: ${chalk.green(formatAtomicUnits(currentReward + totalPendingFees))} PAS`)
           );
 
           // Show individual pending transaction fees
@@ -1267,24 +1271,20 @@ class AdvancedGPUMiner {
         } else {
           console.log(chalk.white(`📊 Pending Transactions: ${chalk.cyan(pendingTransactions.length)}`));
           console.log(chalk.white(`💸 Total Pending Fees: ${chalk.gray(formatAtomicUnits(0))} PAS`));
-          console.log(
-            chalk.white(
-              `🎯 Next Block Reward: ${chalk.green(formatAtomicUnits(currentReward))} PAS`
-            )
-          );
+          console.log(chalk.white(`🎯 Next Block Reward: ${chalk.green(formatAtomicUnits(currentReward))} PAS`));
         }
       } else {
         console.log(chalk.white(`📊 Pending Transactions: ${chalk.gray('0')}`));
         console.log(chalk.white(`💸 Total Pending Fees: ${chalk.gray(formatAtomicUnits(0))} PAS`));
-        console.log(
-          chalk.white(`🎯 Next Block Reward: ${chalk.green(formatAtomicUnits(currentReward))} PAS`)
-        );
+        console.log(chalk.white(`🎯 Next Block Reward: ${chalk.green(formatAtomicUnits(currentReward))} PAS`));
       }
     } catch (error) {
       console.log(chalk.white(`📊 Pending Transactions: ${chalk.red('Error fetching')}`));
       console.log(chalk.white(`💸 Total Pending Fees: ${chalk.red('Unknown')}`));
       console.log(
-        chalk.white(`🎯 Next Block Reward: ${chalk.green(formatAtomicUnits(this.cli.config.blockchain.coinbaseReward))} PAS`)
+        chalk.white(
+          `🎯 Next Block Reward: ${chalk.green(formatAtomicUnits(this.cli.config.blockchain.coinbaseReward))} PAS`
+        )
       );
     }
   }

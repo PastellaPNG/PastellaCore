@@ -21,7 +21,7 @@ class NetworkWalletManager {
     this.nodeConfig = {
       host: '127.0.0.1',
       port: 22000,
-      protocol: 'http'
+      protocol: 'http',
     };
 
     // CLI integration
@@ -50,7 +50,7 @@ class NetworkWalletManager {
       this.nodeConfig = {
         host: url.hostname,
         port: parseInt(url.port) || 22000,
-        protocol: url.protocol.replace(':', '')
+        protocol: url.protocol.replace(':', ''),
       };
       this.connectedNode = apiUrl;
     } catch (error) {
@@ -113,9 +113,9 @@ class NetworkWalletManager {
         headers: {
           'Content-Type': 'application/json',
           'X-API-Key': options.apiKey || '',
-          ...options.headers
+          ...options.headers,
         },
-        body: options.body ? JSON.stringify(options.body) : undefined
+        body: options.body ? JSON.stringify(options.body) : undefined,
       });
 
       if (!response.ok) {
@@ -213,7 +213,7 @@ class NetworkWalletManager {
           name: 'walletName',
           message: 'Enter wallet name:',
           default: 'default',
-          validate: (input) => {
+          validate: input => {
             if (!input.trim()) {
               return 'Wallet name cannot be empty';
             }
@@ -223,18 +223,18 @@ class NetworkWalletManager {
               return `Wallet '${input.trim()}' already exists. Please choose a different name.`;
             }
             return true;
-          }
+          },
         },
         {
           type: 'password',
           name: 'password',
           message: 'Enter wallet password:',
-          validate: (input) => {
+          validate: input => {
             if (input.length < 6) {
               return 'Password must be at least 6 characters long';
             }
             return true;
-          }
+          },
         },
         {
           type: 'password',
@@ -245,8 +245,8 @@ class NetworkWalletManager {
               return 'Passwords do not match';
             }
             return true;
-          }
-        }
+          },
+        },
       ]);
 
       // Check if wallet already exists in memory
@@ -288,10 +288,18 @@ class NetworkWalletManager {
       console.log(chalk.white('  └─────────────────────────────────────────────────────────────────────────┘'));
       console.log('');
       console.log(chalk.red('⚠️  SECURITY WARNING:'));
-      console.log(chalk.white('  ┌──────────────────────────────────────────────────────────────────────────────────────────────────┐'));
+      console.log(
+        chalk.white(
+          '  ┌──────────────────────────────────────────────────────────────────────────────────────────────────┐'
+        )
+      );
       console.log(chalk.white(`  │ ${chalk.yellow('Private Key:')} ${chalk.red(wallet.privateKey.padEnd(83))} │`));
       console.log(chalk.white(`  │ ${chalk.yellow('Seed Phrase:')} ${chalk.red(wallet.seed.padEnd(83))} │`));
-      console.log(chalk.white('  └──────────────────────────────────────────────────────────────────────────────────────────────────┘'));
+      console.log(
+        chalk.white(
+          '  └──────────────────────────────────────────────────────────────────────────────────────────────────┘'
+        )
+      );
       console.log('');
       console.log(chalk.red('🔒 IMPORTANT:'));
       console.log(chalk.white('  • Store your private key and seed phrase securely'));
@@ -305,7 +313,6 @@ class NetworkWalletManager {
       console.log(chalk.green('  ✅ Ready for use'));
       console.log('');
       console.log(chalk.blue('────────────────────────────────────────────────────────────────────────────────'));
-
     } catch (error) {
       console.log(`❌ Error: ${error.message}`);
     }
@@ -322,7 +329,7 @@ class NetworkWalletManager {
           name: 'walletName',
           message: 'Enter wallet name:',
           default: 'default',
-          validate: (input) => {
+          validate: input => {
             if (!input.trim()) {
               return 'Wallet name cannot be empty';
             }
@@ -332,29 +339,29 @@ class NetworkWalletManager {
               return `Wallet '${input.trim()}' already exists. Please choose a different name.`;
             }
             return true;
-          }
+          },
         },
         {
           type: 'input',
           name: 'seedPhrase',
           message: 'Enter seed phrase:',
-          validate: (input) => {
+          validate: input => {
             if (!input.trim()) {
               return 'Seed phrase cannot be empty';
             }
             return true;
-          }
+          },
         },
         {
           type: 'password',
           name: 'password',
           message: 'Enter wallet password:',
-          validate: (input) => {
+          validate: input => {
             if (input.length < 6) {
               return 'Password must be at least 6 characters long';
             }
             return true;
-          }
+          },
         },
         {
           type: 'password',
@@ -365,8 +372,8 @@ class NetworkWalletManager {
               return 'Passwords do not match';
             }
             return true;
-          }
-        }
+          },
+        },
       ]);
 
       // Check if wallet already exists in memory
@@ -395,7 +402,6 @@ class NetworkWalletManager {
       console.log('✅ Wallet imported from seed successfully!');
       console.log(`Name: ${answers.walletName}`);
       console.log(`Address: ${wallet.getAddress()}`);
-
     } catch (error) {
       console.log(`❌ Error: ${error.message}`);
     }
@@ -412,7 +418,7 @@ class NetworkWalletManager {
           name: 'walletName',
           message: 'Enter wallet name:',
           default: 'default',
-          validate: (input) => {
+          validate: input => {
             if (!input.trim()) {
               return 'Wallet name cannot be empty';
             }
@@ -422,29 +428,29 @@ class NetworkWalletManager {
               return `Wallet '${input.trim()}' already exists. Please choose a different name.`;
             }
             return true;
-          }
+          },
         },
         {
           type: 'input',
           name: 'privateKey',
           message: 'Enter private key:',
-          validate: (input) => {
+          validate: input => {
             if (!input.trim()) {
               return 'Private key cannot be empty';
             }
             return true;
-          }
+          },
         },
         {
           type: 'password',
           name: 'password',
           message: 'Enter wallet password:',
-          validate: (input) => {
+          validate: input => {
             if (input.length < 6) {
               return 'Password must be at least 6 characters long';
             }
             return true;
-          }
+          },
         },
         {
           type: 'password',
@@ -455,8 +461,8 @@ class NetworkWalletManager {
               return 'Passwords do not match';
             }
             return true;
-          }
-        }
+          },
+        },
       ]);
 
       // Check if wallet already exists in memory
@@ -485,7 +491,6 @@ class NetworkWalletManager {
       console.log('✅ Wallet imported from private key successfully!');
       console.log(`Name: ${answers.walletName}`);
       console.log(`Address: ${wallet.getAddress()}`);
-
     } catch (error) {
       console.log(`❌ Error: ${error.message}`);
     }
@@ -623,8 +628,14 @@ class NetworkWalletManager {
       console.log(chalk.cyan('📊 BALANCE INFORMATION:'));
       console.log(chalk.white('  ┌─────────────────────────────────────────────────────────────────────────┐'));
       console.log(chalk.white(`  │ ${chalk.yellow('Address:')} ${chalk.green(address.padEnd(62))} │`));
-      console.log(chalk.white(`  │ ${chalk.yellow('Balance:')} ${chalk.green(`${formatAtomicUnits(balance.balance)} PAS`.padEnd(62))} │`));
-      console.log(chalk.white(`  │ ${chalk.yellow('Atomic:')}  ${chalk.green(`${balance.balance} atomic units`.padEnd(62))} │`));
+      console.log(
+        chalk.white(
+          `  │ ${chalk.yellow('Balance:')} ${chalk.green(`${formatAtomicUnits(balance.balance)} PAS`.padEnd(62))} │`
+        )
+      );
+      console.log(
+        chalk.white(`  │ ${chalk.yellow('Atomic:')}  ${chalk.green(`${balance.balance} atomic units`.padEnd(62))} │`)
+      );
       console.log(chalk.white('  └─────────────────────────────────────────────────────────────────────────┘'));
 
       return balance;
@@ -654,7 +665,7 @@ class NetworkWalletManager {
           type: 'input',
           name: 'toAddress',
           message: 'Enter recipient address:',
-          validate: (input) => {
+          validate: input => {
             if (!input.trim()) {
               return 'Recipient address cannot be empty';
             }
@@ -663,13 +674,13 @@ class NetworkWalletManager {
               return 'Please enter a valid Pastella address';
             }
             return true;
-          }
+          },
         },
         {
           type: 'input',
           name: 'amount',
           message: 'Enter amount (in PAS):',
-          validate: (input) => {
+          validate: input => {
             if (!input.trim()) {
               return 'Amount cannot be empty';
             }
@@ -678,14 +689,14 @@ class NetworkWalletManager {
               return 'Please enter a valid positive amount';
             }
             return true;
-          }
+          },
         },
         {
           type: 'input',
           name: 'fee',
           message: `Enter fee (in PAS, default: ${formatAtomicUnits(this.cli.config.wallet.defaultFee)} PAS):`,
           default: formatAtomicUnits(this.cli.config.wallet.defaultFee),
-          validate: (input) => {
+          validate: input => {
             if (!input.trim()) {
               return 'Fee cannot be empty';
             }
@@ -694,8 +705,8 @@ class NetworkWalletManager {
               return 'Please enter a valid non-negative fee';
             }
             return true;
-          }
-        }
+          },
+        },
       ]);
 
       // Convert amount and fee to atomic units
@@ -705,8 +716,10 @@ class NetworkWalletManager {
       // Get current balance and UTXOs from the network
       const balance = await this.getBalance(this.currentWallet.getAddress());
 
-      if (balance < (atomicAmount + atomicFee)) {
-        throw new Error(`Insufficient balance: ${formatAtomicUnits(balance)} PAS (need ${formatAtomicUnits(atomicAmount + atomicFee)} PAS)`);
+      if (balance < atomicAmount + atomicFee) {
+        throw new Error(
+          `Insufficient balance: ${formatAtomicUnits(balance)} PAS (need ${formatAtomicUnits(atomicAmount + atomicFee)} PAS)`
+        );
       }
 
       // Get UTXOs for this address from the network
@@ -733,23 +746,30 @@ class NetworkWalletManager {
         }
 
         if (totalInput < atomicAmount + atomicFee) {
-          throw new Error(`Insufficient UTXOs: have ${formatAtomicUnits(totalInput)} PAS, need ${formatAtomicUnits(atomicAmount + atomicFee)} PAS`);
+          throw new Error(
+            `Insufficient UTXOs: have ${formatAtomicUnits(totalInput)} PAS, need ${formatAtomicUnits(atomicAmount + atomicFee)} PAS`
+          );
         }
 
-        console.log(chalk.cyan(`💳 Selected ${selectedUtxos.length} UTXOs (total: ${formatAtomicUnits(totalInput)} PAS)`));
+        console.log(
+          chalk.cyan(`💳 Selected ${selectedUtxos.length} UTXOs (total: ${formatAtomicUnits(totalInput)} PAS)`)
+        );
 
         // Create transaction inputs from selected UTXOs
-        const inputs = selectedUtxos.map(utxo => new TransactionInput(
-          utxo.txHash, // Real transaction hash
-          utxo.outputIndex, // Real output index
-          '', // Signature (will be added after signing)
-          this.currentWallet.publicKey
-        ));
+        const inputs = selectedUtxos.map(
+          utxo =>
+            new TransactionInput(
+              utxo.txHash, // Real transaction hash
+              utxo.outputIndex, // Real output index
+              '', // Signature (will be added after signing)
+              this.currentWallet.publicKey
+            )
+        );
 
         // Create transaction outputs
         const outputs = [
           new TransactionOutput(answers.toAddress, atomicAmount),
-          new TransactionOutput(this.currentWallet.getAddress(), totalInput - atomicAmount - atomicFee) // Change
+          new TransactionOutput(this.currentWallet.getAddress(), totalInput - atomicAmount - atomicFee), // Change
         ];
 
         // Create transaction with proper inputs and outputs
@@ -773,14 +793,18 @@ class NetworkWalletManager {
         console.log(chalk.white(`📥 To:             ${chalk.cyan(answers.toAddress)}`));
         console.log(chalk.white(`💰 Amount:         ${chalk.green(formatAtomicUnits(atomicAmount))} PAS`));
         console.log(chalk.white(`💸 Fee:            ${chalk.yellow(formatAtomicUnits(atomicFee))} PAS`));
-        console.log(chalk.white(`📥 Change:         ${chalk.cyan(formatAtomicUnits(totalInput - atomicAmount - atomicFee))} PAS`));
+        console.log(
+          chalk.white(`📥 Change:         ${chalk.cyan(formatAtomicUnits(totalInput - atomicAmount - atomicFee))} PAS`)
+        );
 
         console.log(chalk.blue('\n📦 UTXO BREAKDOWN'));
         console.log(chalk.blue('────────────────────────────────────────────────────────────────────────────────'));
         console.log(chalk.white(`💳 UTXOs Selected: ${chalk.green(selectedUtxos.length)}`));
         console.log(chalk.white(`💵 Total Input:    ${chalk.green(formatAtomicUnits(totalInput))} PAS`));
         console.log(chalk.white(`💸 Total Output:   ${chalk.green(formatAtomicUnits(atomicAmount + atomicFee))} PAS`));
-        console.log(chalk.white(`📊 Balance After:  ${chalk.cyan(formatAtomicUnits(totalInput - atomicAmount - atomicFee))} PAS`));
+        console.log(
+          chalk.white(`📊 Balance After:  ${chalk.cyan(formatAtomicUnits(totalInput - atomicAmount - atomicFee))} PAS`)
+        );
 
         console.log(chalk.blue('\n⚠️  IMPORTANT NOTES'));
         console.log(chalk.blue('────────────────────────────────────────────────────────────────────────────────'));
@@ -795,8 +819,8 @@ class NetworkWalletManager {
             type: 'confirm',
             name: 'confirm',
             message: chalk.cyan('🚀 Do you want to send this transaction?'),
-            default: false
-          }
+            default: false,
+          },
         ]);
 
         if (!confirmAnswer.confirm) {
@@ -810,8 +834,8 @@ class NetworkWalletManager {
         const response = await this.makeApiRequest('/api/transactions/submit', {
           method: 'POST',
           body: {
-            transaction: transaction.toJSON()
-          }
+            transaction: transaction.toJSON(),
+          },
         });
 
         if (response.success) {
@@ -829,7 +853,6 @@ class NetworkWalletManager {
         } else {
           throw new Error(response.error || 'Failed to send transaction');
         }
-
       } catch (utxoError) {
         console.log(chalk.yellow(`⚠️  UTXO fetch failed: ${utxoError.message}`));
         console.log(chalk.cyan(`📝 Creating simplified transaction preview instead...`));
@@ -838,7 +861,7 @@ class NetworkWalletManager {
         const inputs = [new TransactionInput('pending-utxo', 0, '', this.currentWallet.publicKey)];
         const outputs = [
           new TransactionOutput(answers.toAddress, atomicAmount),
-          new TransactionOutput(this.currentWallet.getAddress(), balance - atomicAmount - atomicFee)
+          new TransactionOutput(this.currentWallet.getAddress(), balance - atomicAmount - atomicFee),
         ];
 
         const transaction = new Transaction(inputs, outputs, atomicFee);
@@ -852,7 +875,6 @@ class NetworkWalletManager {
         console.log(chalk.yellow('\n⚠️  Note: This is a preview. Real submission requires UTXO access.'));
         console.log(chalk.blue('────────────────────────────────────────────────────────────────────────────────'));
       }
-
     } catch (error) {
       console.log(chalk.red(`❌ Error: ${error.message}`));
     }
@@ -893,7 +915,6 @@ class NetworkWalletManager {
       if (mempoolStatus) {
         console.log(`Mempool: ${mempoolStatus.poolSize} pending transactions`);
       }
-
     } catch (error) {
       console.log(`❌ Error: ${error.message}`);
     }
@@ -937,11 +958,25 @@ class NetworkWalletManager {
     console.log(chalk.blue('╚═══════════════════════════════════════════════════════════════════╝'));
     console.log('');
     console.log(chalk.cyan('🔐 WALLET DETAILS:'));
-    console.log(chalk.white('  ┌────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┐'));
-    console.log(chalk.white(`  │ ${chalk.yellow('Name:      ')} ${chalk.green(this.currentWallet.name || 'N/A'.padEnd(134))} │`));
-    console.log(chalk.white(`  │ ${chalk.yellow('Address:   ')} ${chalk.green(this.currentWallet.getAddress().padEnd(134))} │`));
-    console.log(chalk.white(`  │ ${chalk.yellow('Public Key:')} ${chalk.green(this.currentWallet.publicKey.padEnd(134))} │`));
-    console.log(chalk.white('  └────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┘'));
+    console.log(
+      chalk.white(
+        '  ┌────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┐'
+      )
+    );
+    console.log(
+      chalk.white(`  │ ${chalk.yellow('Name:      ')} ${chalk.green(this.currentWallet.name || 'N/A'.padEnd(134))} │`)
+    );
+    console.log(
+      chalk.white(`  │ ${chalk.yellow('Address:   ')} ${chalk.green(this.currentWallet.getAddress().padEnd(134))} │`)
+    );
+    console.log(
+      chalk.white(`  │ ${chalk.yellow('Public Key:')} ${chalk.green(this.currentWallet.publicKey.padEnd(134))} │`)
+    );
+    console.log(
+      chalk.white(
+        '  └────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┘'
+      )
+    );
     console.log('');
   }
 
@@ -972,7 +1007,6 @@ class NetworkWalletManager {
       transactions.forEach((tx, index) => {
         console.log(`${index + 1}. ${tx.id} - ${tx.amount || 0} PAS`);
       });
-
     } catch (error) {
       console.log(`❌ Error: ${error.message}`);
     }
@@ -1007,7 +1041,6 @@ class NetworkWalletManager {
       } else {
         console.log('❌ Transaction not found on network');
       }
-
     } catch (error) {
       console.log(`❌ Error: ${error.message}`);
     }
@@ -1034,7 +1067,7 @@ class NetworkWalletManager {
         seed: wallet.getSeed(),
         privateKey: wallet.privateKey,
         publicKey: wallet.publicKey,
-        timestamp: Date.now()
+        timestamp: Date.now(),
       };
 
       const encryptedData = wallet.encryptWalletData(walletData, password);
@@ -1050,7 +1083,6 @@ class NetworkWalletManager {
       } else {
         console.log(`❌ File was not created at ${filePath}`);
       }
-
     } catch (error) {
       console.log(`❌ Failed to save wallet '${walletName}': ${error.message}`);
       if (error.stack) {
@@ -1099,7 +1131,6 @@ class NetworkWalletManager {
       }
 
       return wallet;
-
     } catch (error) {
       console.log(`❌ Failed to load wallet '${walletName}': ${error.message}`);
       if (error.stack) {
@@ -1177,7 +1208,7 @@ class NetworkWalletManager {
         console.log(chalk.yellow('📭 No transactions found for this address.'));
         console.log(chalk.white('  This could mean:'));
         console.log(chalk.white('  • The address has never received any transactions'));
-        console.log(chalk.white('  • The address is new and hasn\'t been used yet'));
+        console.log(chalk.white("  • The address is new and hasn't been used yet"));
         console.log(chalk.white('  • There might be a network connection issue'));
         console.log('');
         console.log(chalk.blue('────────────────────────────────────────────────────────────────────────────────'));
@@ -1192,7 +1223,11 @@ class NetworkWalletManager {
       console.log(chalk.cyan('📊 TRANSACTION SUMMARY:'));
       console.log(chalk.white('  ┌─────────────────────────────────────────────────────────────────────────┐'));
       console.log(chalk.white(`  │ ${chalk.yellow('Address:')}     ${chalk.green(address.padEnd(58))} │`));
-      console.log(chalk.white(`  │ ${chalk.yellow('Total TXs:')}  ${chalk.green(`${transactions.length} transactions`.padEnd(58))} │`));
+      console.log(
+        chalk.white(
+          `  │ ${chalk.yellow('Total TXs:')}  ${chalk.green(`${transactions.length} transactions`.padEnd(58))} │`
+        )
+      );
       console.log(chalk.white('  └─────────────────────────────────────────────────────────────────────────┘'));
       console.log('');
       console.log(chalk.cyan('🔍 TRANSACTION DETAILS:'));
@@ -1204,10 +1239,18 @@ class NetworkWalletManager {
 
         console.log(chalk.white(`  ┌─ Transaction ${index + 1} ─────────────────────────────────────────────┐`));
         console.log(chalk.white(`  │ ${chalk.yellow('ID:')}        ${chalk.green(tx.id.padEnd(58))} │`));
-        console.log(chalk.white(`  │ ${chalk.yellow('Type:')}     ${chalk.green(`${isSender ? 'Sent' : ''}${isReceiver ? 'Received' : ''}`.padEnd(58))} │`));
+        console.log(
+          chalk.white(
+            `  │ ${chalk.yellow('Type:')}     ${chalk.green(`${isSender ? 'Sent' : ''}${isReceiver ? 'Received' : ''}`.padEnd(58))} │`
+          )
+        );
         console.log(chalk.white(`  │ ${chalk.yellow('Net Amount:')} ${chalk.green(`${netAmount} PSTL`.padEnd(58))} │`));
-        console.log(chalk.white(`  │ ${chalk.yellow('Inputs:')}   ${chalk.green(`${tx.inputs.length} inputs`.padEnd(58))} │`));
-        console.log(chalk.white(`  │ ${chalk.yellow('Outputs:')}  ${chalk.green(`${tx.outputs.length} outputs`.padEnd(58))} │`));
+        console.log(
+          chalk.white(`  │ ${chalk.yellow('Inputs:')}   ${chalk.green(`${tx.inputs.length} inputs`.padEnd(58))} │`)
+        );
+        console.log(
+          chalk.white(`  │ ${chalk.yellow('Outputs:')}  ${chalk.green(`${tx.outputs.length} outputs`.padEnd(58))} │`)
+        );
         console.log(chalk.white('  └─────────────────────────────────────────────────────────────────────────┘'));
         console.log('');
       });
@@ -1224,7 +1267,6 @@ class NetworkWalletManager {
       console.log(chalk.white('  • Resync wallet: wallet resync'));
       console.log('');
       console.log(chalk.blue('────────────────────────────────────────────────────────────────────────────────'));
-
     } catch (error) {
       console.log(chalk.red(`❌ Error: ${error.message}`));
     }

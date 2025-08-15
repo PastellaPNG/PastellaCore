@@ -537,7 +537,14 @@ class Block {
    * @param genesisConfig
    * @param config
    */
-  static createGenesisBlock(address, timestamp = null, transactions = null, difficulty = 4, genesisConfig = null, config = null) {
+  static createGenesisBlock(
+    address,
+    timestamp = null,
+    transactions = null,
+    difficulty = 4,
+    genesisConfig = null,
+    config = null
+  ) {
     const genesisTimestamp = timestamp || Date.now();
 
     let genesisTransactions = [];
