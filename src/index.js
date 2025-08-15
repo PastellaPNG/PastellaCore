@@ -892,7 +892,7 @@ async function main() {
 
         // Get user input
         const premineAddress = await question(chalk.cyan('🏦 Premine Address: '));
-        const premineAmount = parseFloat(await question(chalk.cyan('💰 Premine Amount (PAS): ')));
+        const premineAmount = parseFloat(await question(chalk.cyan('💰 Premine Amount (PAS): '))) * 100000000; // Convert to atomic units
         const difficulty = parseInt(
           await question(chalk.cyan('⚡ Mining Difficulty (100-10000, recommended: 1000): '))
         );
@@ -922,7 +922,7 @@ async function main() {
         console.log('');
         console.log(chalk.yellow.bold('⏳ Generating genesis block...'));
         console.log(chalk.gray(`• Address: ${premineAddress}`));
-        console.log(chalk.gray(`• Amount: ${premineAmount} PAS`));
+        console.log(chalk.gray(`• Amount: ${premineAmount / 100000000} PAS (${premineAmount} atomic units)`));
         console.log(chalk.gray(`• Difficulty: ${difficulty}`));
         console.log(chalk.gray(`• Timestamp: ${genesisTimestamp} (${new Date(genesisTimestamp).toISOString()})`));
         console.log('');
@@ -931,17 +931,28 @@ async function main() {
         const premineTransaction = Transaction.createCoinbase(
           premineAddress,
           premineAmount,
-          genesisConfig.timestamp,
-          genesisConfig.coinbaseNonce,
-          genesisConfig.coinbaseAtomicSequence,
+          genesisTimestamp,
+          null, // Let the transaction generate its own nonce
+          null, // Let the transaction generate its own atomicSequence
           true
         );
         premineTransaction.tag = TRANSACTION_TAGS.PREMINE;
+
+        // Override the atomicSequence for genesis blocks to use custom format
+        const randomNumber = Math.floor(Math.random() * 1000000);
+        premineTransaction._atomicSequence = `${genesisTimestamp}-genesis-coinbase-${randomNumber}`;
+
         // Don't override the timestamp - keep the config timestamp for determinism
         premineTransaction.calculateId();
 
+        // Get the generated values from the transaction
+        const coinbaseNonce = premineTransaction.nonce;
+        const coinbaseAtomicSequence = premineTransaction._atomicSequence;
+
         console.log(chalk.green('✅ Premine transaction created'));
         console.log(chalk.gray(`   Transaction ID: ${premineTransaction.id}`));
+        console.log(chalk.gray(`   Coinbase Nonce: ${coinbaseNonce}`));
+        console.log(chalk.gray(`   Coinbase Sequence: ${coinbaseAtomicSequence}`));
 
         // Create genesis block and find valid nonce
         const genesisBlock = new Block(0, genesisTimestamp, [premineTransaction], '0', 0, difficulty);
@@ -1004,7 +1015,7 @@ async function main() {
 
             console.log(chalk.green.bold('   🎉 GENESIS BLOCK MINED!'));
             console.log(chalk.green('   ════════════════════════════════════════════════════════════'));
-            console.log(chalk.cyan('   📊 Mining Statistics:'));
+            console.log(chalk.cyan('   �� Mining Statistics:'));
             console.log(chalk.gray(`      • Nonce: ${nonce.toLocaleString()}`));
             console.log(chalk.gray(`      • Hash: ${genesisBlock.hash}`));
             console.log(chalk.gray(`      • Time: ${miningTime}s`));
@@ -1078,11 +1089,15 @@ async function main() {
         console.log(chalk.gray(`      "difficulty": ${difficulty},`));
         console.log(chalk.gray(`      "nonce": ${nonce},`));
         console.log(chalk.gray(`      "hash": "${genesisBlock.hash}",`));
-        console.log(chalk.gray('      "algorithm": "kawpow"'));
+        console.log(chalk.gray(`      "algorithm": "kawpow",`));
+        console.log(chalk.gray(`      "coinbaseNonce": "${coinbaseNonce}",`));
+        console.log(chalk.gray(`      "coinbaseAtomicSequence": "${coinbaseAtomicSequence}"`));
         console.log(chalk.gray('    }'));
         console.log(chalk.gray('  }'));
         console.log(chalk.gray('}'));
         console.log('');
+        console.log(chalk.cyan('💡 Note: premineAmount is in atomic units (8 decimals)'));
+        console.log(chalk.gray(`   Your input: ${premineAmount / 100000000} PAS = ${premineAmount} atomic units`));
 
         // Generate complete config.json
         const newConfig = {
@@ -1098,6 +1113,8 @@ async function main() {
               nonce,
               hash: genesisBlock.hash,
               algorithm: 'kawpow',
+              coinbaseNonce,
+              coinbaseAtomicSequence,
             },
           },
         };

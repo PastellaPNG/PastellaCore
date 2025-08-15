@@ -7,6 +7,7 @@ const chalk = require('chalk'); // Added for beautified output
 const { Transaction, TransactionInput, TransactionOutput } = require('../models/Transaction.js');
 const Wallet = require('../models/Wallet.js');
 const logger = require('../utils/logger.js');
+const { toAtomicUnits, fromAtomicUnits, formatAtomicUnits } = require('../utils/atomicUnits.js');
 
 /**
  * Network Wallet Manager - Integrates with existing CLI structure
@@ -155,11 +156,7 @@ class NetworkWalletManager {
         await this.checkBalance();
         break;
       case 'send':
-        if (args.length < 3) {
-          console.log('❌ Usage: wallet send <address> <amount>');
-          return;
-        }
-        await this.sendTransaction(args[1], args[2]);
+        await this.sendTransaction();
         break;
       case 'info':
         await this.showWalletInfo();
@@ -626,9 +623,9 @@ class NetworkWalletManager {
       console.log(chalk.cyan('📊 BALANCE INFORMATION:'));
       console.log(chalk.white('  ┌─────────────────────────────────────────────────────────────────────────┐'));
       console.log(chalk.white(`  │ ${chalk.yellow('Address:')} ${chalk.green(address.padEnd(62))} │`));
-      console.log(chalk.white(`  │ ${chalk.yellow('Balance:')} ${chalk.green(`${balance.balance} PAS`.padEnd(62))} │`));
+      console.log(chalk.white(`  │ ${chalk.yellow('Balance:')} ${chalk.green(`${formatAtomicUnits(balance.balance)} PAS`.padEnd(62))} │`));
+      console.log(chalk.white(`  │ ${chalk.yellow('Atomic:')}  ${chalk.green(`${balance.balance} atomic units`.padEnd(62))} │`));
       console.log(chalk.white('  └─────────────────────────────────────────────────────────────────────────┘'));
-      console.log('');
 
       return balance;
     } catch (error) {
@@ -637,42 +634,83 @@ class NetworkWalletManager {
   }
 
   /**
-   * Send transaction via network
-   * @param toAddress
-   * @param amount
-   * @param fee
+   * Send transaction
    */
-  async sendTransaction(toAddress, amount, fee = 0.001) {
+  async sendTransaction() {
     try {
       if (!this.currentWallet) {
-        throw new Error('No wallet loaded');
+        console.log(chalk.red('❌ Error: No wallet loaded. Use "wallet load" first.'));
+        return;
       }
 
       if (!this.connectedNode) {
-        throw new Error('Not connected to any node');
+        console.log(chalk.red('❌ Error: Not connected to any node. Use "wallet connect" first.'));
+        return;
       }
 
-      // Parse amount and fee
-      const amountNum = parseFloat(amount);
-      const feeNum = parseFloat(fee);
+      // Interactive prompts for transaction details
+      const answers = await this.cli.inquirer.prompt([
+        {
+          type: 'input',
+          name: 'toAddress',
+          message: 'Enter recipient address:',
+          validate: (input) => {
+            if (!input.trim()) {
+              return 'Recipient address cannot be empty';
+            }
+            // Basic address validation (starts with 1 and has reasonable length)
+            if (!input.trim().startsWith('1') || input.trim().length < 20) {
+              return 'Please enter a valid Pastella address';
+            }
+            return true;
+          }
+        },
+        {
+          type: 'input',
+          name: 'amount',
+          message: 'Enter amount (in PAS):',
+          validate: (input) => {
+            if (!input.trim()) {
+              return 'Amount cannot be empty';
+            }
+            const amount = parseFloat(input.trim());
+            if (isNaN(amount) || amount <= 0) {
+              return 'Please enter a valid positive amount';
+            }
+            return true;
+          }
+        },
+        {
+          type: 'input',
+          name: 'fee',
+          message: `Enter fee (in PAS, default: ${formatAtomicUnits(this.cli.config.wallet.defaultFee)} PAS):`,
+          default: formatAtomicUnits(this.cli.config.wallet.defaultFee),
+          validate: (input) => {
+            if (!input.trim()) {
+              return 'Fee cannot be empty';
+            }
+            const fee = parseFloat(input.trim());
+            if (isNaN(fee) || fee < 0) {
+              return 'Please enter a valid non-negative fee';
+            }
+            return true;
+          }
+        }
+      ]);
 
-      if (isNaN(amountNum) || amountNum <= 0) {
-        throw new Error('Invalid amount. Must be a positive number.');
-      }
-
-      if (isNaN(feeNum) || feeNum < 0) {
-        throw new Error('Invalid fee. Must be a non-negative number.');
-      }
+      // Convert amount and fee to atomic units
+      const atomicAmount = toAtomicUnits(answers.amount);
+      const atomicFee = toAtomicUnits(answers.fee);
 
       // Get current balance and UTXOs from the network
       const balance = await this.getBalance(this.currentWallet.getAddress());
 
-      if (balance < (amountNum + feeNum)) {
-        throw new Error(`Insufficient balance: ${balance} PAS (need ${amountNum + feeNum} PAS)`);
+      if (balance < (atomicAmount + atomicFee)) {
+        throw new Error(`Insufficient balance: ${formatAtomicUnits(balance)} PAS (need ${formatAtomicUnits(atomicAmount + atomicFee)} PAS)`);
       }
 
       // Get UTXOs for this address from the network
-      console.log(`🔍 Fetching UTXOs for address: ${this.currentWallet.getAddress()}`);
+      console.log(chalk.blue('🔍 Fetching UTXOs for address:'), chalk.white(this.currentWallet.getAddress()));
 
       try {
         const utxoResponse = await this.makeApiRequest(`/api/wallet/utxos/${this.currentWallet.getAddress()}`);
@@ -682,23 +720,23 @@ class NetworkWalletManager {
         }
 
         const utxos = utxoResponse.utxos;
-        console.log(`📦 Found ${utxos.length} UTXOs`);
+        console.log(chalk.green(`📦 Found ${utxos.length} UTXOs`));
 
         // Select UTXOs to spend (simple greedy algorithm)
         let totalInput = 0;
         const selectedUtxos = [];
 
         for (const utxo of utxos) {
-          if (totalInput >= amountNum + feeNum) break;
+          if (totalInput >= atomicAmount + atomicFee) break;
           selectedUtxos.push(utxo);
           totalInput += utxo.amount;
         }
 
-        if (totalInput < amountNum + feeNum) {
-          throw new Error(`Insufficient UTXOs: have ${totalInput} PAS, need ${amountNum + feeNum} PAS`);
+        if (totalInput < atomicAmount + atomicFee) {
+          throw new Error(`Insufficient UTXOs: have ${formatAtomicUnits(totalInput)} PAS, need ${formatAtomicUnits(atomicAmount + atomicFee)} PAS`);
         }
 
-        console.log(`💳 Selected ${selectedUtxos.length} UTXOs (total: ${totalInput} PAS)`);
+        console.log(chalk.cyan(`💳 Selected ${selectedUtxos.length} UTXOs (total: ${formatAtomicUnits(totalInput)} PAS)`));
 
         // Create transaction inputs from selected UTXOs
         const inputs = selectedUtxos.map(utxo => new TransactionInput(
@@ -710,12 +748,12 @@ class NetworkWalletManager {
 
         // Create transaction outputs
         const outputs = [
-          new TransactionOutput(toAddress, amountNum),
-          new TransactionOutput(this.currentWallet.getAddress(), totalInput - amountNum - feeNum) // Change
+          new TransactionOutput(answers.toAddress, atomicAmount),
+          new TransactionOutput(this.currentWallet.getAddress(), totalInput - atomicAmount - atomicFee) // Change
         ];
 
         // Create transaction with proper inputs and outputs
-        const transaction = new Transaction(inputs, outputs, feeNum);
+        const transaction = new Transaction(inputs, outputs, atomicFee);
 
         // Calculate transaction ID immediately after creation
         transaction.calculateId();
@@ -723,15 +761,51 @@ class NetworkWalletManager {
         // Sign the transaction with the wallet's private key
         transaction.sign(this.currentWallet.privateKey);
 
-        console.log(`📝 Creating transaction...`);
-        console.log(`🆔 Transaction ID: ${transaction.id}`);
-        console.log(`💰 Amount: ${amountNum} PAS`);
-        console.log(`💸 Fee: ${feeNum} PAS`);
-        console.log(`📤 To: ${toAddress}`);
-        console.log(`📥 Change: ${totalInput - amountNum - feeNum} PAS`);
+        // Beautified transaction summary
+        console.log(chalk.blue('\n╔══════════════════════════════════════════════════════════════════════════════╗'));
+        console.log(chalk.blue('║                           📋 TRANSACTION SUMMARY                            ║'));
+        console.log(chalk.blue('╚══════════════════════════════════════════════════════════════════════════════╝'));
+
+        console.log(chalk.blue('\n📊 TRANSACTION DETAILS'));
+        console.log(chalk.blue('────────────────────────────────────────────────────────────────────────────────'));
+        console.log(chalk.white(`🆔 Transaction ID: ${chalk.cyan(transaction.id)}`));
+        console.log(chalk.white(`📤 From:           ${chalk.cyan(this.currentWallet.getAddress())}`));
+        console.log(chalk.white(`📥 To:             ${chalk.cyan(answers.toAddress)}`));
+        console.log(chalk.white(`💰 Amount:         ${chalk.green(formatAtomicUnits(atomicAmount))} PAS`));
+        console.log(chalk.white(`💸 Fee:            ${chalk.yellow(formatAtomicUnits(atomicFee))} PAS`));
+        console.log(chalk.white(`📥 Change:         ${chalk.cyan(formatAtomicUnits(totalInput - atomicAmount - atomicFee))} PAS`));
+
+        console.log(chalk.blue('\n📦 UTXO BREAKDOWN'));
+        console.log(chalk.blue('────────────────────────────────────────────────────────────────────────────────'));
+        console.log(chalk.white(`💳 UTXOs Selected: ${chalk.green(selectedUtxos.length)}`));
+        console.log(chalk.white(`💵 Total Input:    ${chalk.green(formatAtomicUnits(totalInput))} PAS`));
+        console.log(chalk.white(`💸 Total Output:   ${chalk.green(formatAtomicUnits(atomicAmount + atomicFee))} PAS`));
+        console.log(chalk.white(`📊 Balance After:  ${chalk.cyan(formatAtomicUnits(totalInput - atomicAmount - atomicFee))} PAS`));
+
+        console.log(chalk.blue('\n⚠️  IMPORTANT NOTES'));
+        console.log(chalk.blue('────────────────────────────────────────────────────────────────────────────────'));
+        console.log(chalk.yellow('• This transaction will be broadcast to the network'));
+        console.log(chalk.yellow('• Transaction fee is non-refundable'));
+        console.log(chalk.yellow('• Ensure the recipient address is correct'));
+        console.log(chalk.blue('────────────────────────────────────────────────────────────────────────────────'));
+
+        // Ask for confirmation
+        const confirmAnswer = await this.cli.inquirer.prompt([
+          {
+            type: 'confirm',
+            name: 'confirm',
+            message: chalk.cyan('🚀 Do you want to send this transaction?'),
+            default: false
+          }
+        ]);
+
+        if (!confirmAnswer.confirm) {
+          console.log(chalk.yellow('⏸️  Transaction cancelled by user'));
+          return;
+        }
 
         // Submit transaction to network
-        console.log(`🚀 Submitting transaction to network...`);
+        console.log(chalk.blue('\n🚀 Submitting transaction to network...'));
 
         const response = await this.makeApiRequest('/api/transactions/submit', {
           method: 'POST',
@@ -741,38 +815,46 @@ class NetworkWalletManager {
         });
 
         if (response.success) {
-          console.log('✅ Transaction sent successfully!');
-          console.log(`Transaction ID: ${response.transactionId || 'Pending'}`);
-          console.log(`Amount: ${amountNum} PAS`);
-          console.log(`Fee: ${feeNum} PAS`);
-          console.log(`To: ${toAddress}`);
+          console.log(chalk.blue('\n╔══════════════════════════════════════════════════════════════════════════════╗'));
+          console.log(chalk.blue('║                           🎉 TRANSACTION SENT! 🎉                            ║'));
+          console.log(chalk.blue('╚══════════════════════════════════════════════════════════════════════════════╝'));
+
+          console.log(chalk.green('✅ Transaction submitted successfully!'));
+          console.log(chalk.white(`🆔 Transaction ID: ${chalk.cyan(response.transactionId || transaction.id)}`));
+          console.log(chalk.white(`📤 To:            ${chalk.cyan(answers.toAddress)}`));
+          console.log(chalk.white(`💰 Amount:        ${chalk.green(formatAtomicUnits(atomicAmount))} PAS`));
+          console.log(chalk.white(`💸 Fee:           ${chalk.yellow(formatAtomicUnits(atomicFee))} PAS`));
+          console.log(chalk.white(`📊 Network Fee:   ${chalk.cyan(formatAtomicUnits(atomicFee))} PAS`));
+          console.log(chalk.white(`⏱️  Timestamp:     ${chalk.cyan(new Date().toLocaleString())}`));
         } else {
           throw new Error(response.error || 'Failed to send transaction');
         }
 
       } catch (utxoError) {
-        console.log(`⚠️  UTXO fetch failed: ${utxoError.message}`);
-        console.log(`📝 Creating simplified transaction preview instead...`);
+        console.log(chalk.yellow(`⚠️  UTXO fetch failed: ${utxoError.message}`));
+        console.log(chalk.cyan(`📝 Creating simplified transaction preview instead...`));
 
         // Fallback to simplified preview
         const inputs = [new TransactionInput('pending-utxo', 0, '', this.currentWallet.publicKey)];
         const outputs = [
-          new TransactionOutput(toAddress, amountNum),
-          new TransactionOutput(this.currentWallet.getAddress(), balance - amountNum - feeNum)
+          new TransactionOutput(answers.toAddress, atomicAmount),
+          new TransactionOutput(this.currentWallet.getAddress(), balance - atomicAmount - atomicFee)
         ];
 
-        const transaction = new Transaction(inputs, outputs, feeNum);
+        const transaction = new Transaction(inputs, outputs, atomicFee);
 
-        console.log(`📋 Transaction Preview:`);
-        console.log(`💰 Amount: ${amountNum} PAS`);
-        console.log(`💸 Fee: ${feeNum} PAS`);
-        console.log(`📤 To: ${toAddress}`);
-        console.log(`📥 Change: ${balance - amountNum - feeNum} PAS`);
-        console.log(`\n⚠️  Note: This is a preview. Real submission requires UTXO access.`);
+        console.log(chalk.blue('\n📋 TRANSACTION PREVIEW (UTXO Access Required)'));
+        console.log(chalk.blue('────────────────────────────────────────────────────────────────────────────────'));
+        console.log(chalk.white(`💰 Amount: ${chalk.green(formatAtomicUnits(atomicAmount))} PAS`));
+        console.log(chalk.white(`💸 Fee: ${chalk.yellow(formatAtomicUnits(atomicFee))} PAS`));
+        console.log(chalk.white(`📤 To: ${chalk.cyan(answers.toAddress)}`));
+        console.log(chalk.white(`📥 Change: ${chalk.cyan(formatAtomicUnits(balance - atomicAmount - atomicFee))} PAS`));
+        console.log(chalk.yellow('\n⚠️  Note: This is a preview. Real submission requires UTXO access.'));
+        console.log(chalk.blue('────────────────────────────────────────────────────────────────────────────────'));
       }
 
     } catch (error) {
-      console.log(`❌ Error: ${error.message}`);
+      console.log(chalk.red(`❌ Error: ${error.message}`));
     }
   }
 
@@ -805,7 +887,7 @@ class NetworkWalletManager {
       const mempoolStatus = mempoolResponse.success ? mempoolResponse.data : null;
 
       console.log('✅ Wallet synced successfully');
-      console.log(`Balance: ${balance} PAS`);
+      console.log(`Balance: ${formatAtomicUnits(balance)} PAS`);
       console.log(`Transactions: ${transactions.length}`);
 
       if (mempoolStatus) {
@@ -1066,7 +1148,7 @@ class NetworkWalletManager {
     console.log('');
     console.log('💰 Operations:');
     console.log('  wallet balance                          - Show current balance');
-    console.log('  wallet send <address> <amount> [fee]    - Send transaction');
+    console.log('  wallet send                                        - Send transaction (interactive)');
     console.log('  wallet sync                             - Sync wallet with network');
     console.log('  wallet resync                           - Resync wallet (alias for sync)');
     console.log('');
@@ -1137,7 +1219,7 @@ class NetworkWalletManager {
       console.log('');
       console.log(chalk.blue('💡 Available actions:'));
       console.log(chalk.white('  • Check balance: wallet balance'));
-      console.log(chalk.white('  • Send coins: wallet send <address> <amount>'));
+      console.log(chalk.white('  • Send coins: wallet send (interactive)'));
       console.log(chalk.white('  • View UTXOs: wallet utxos'));
       console.log(chalk.white('  • Resync wallet: wallet resync'));
       console.log('');

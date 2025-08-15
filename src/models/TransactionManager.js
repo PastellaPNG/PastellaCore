@@ -2,6 +2,7 @@ const { TRANSACTION_TAGS } = require('../utils/constants');
 const logger = require('../utils/logger');
 
 const { Transaction, TransactionInput, TransactionOutput } = require('./Transaction');
+const { toAtomicUnits, fromAtomicUnits, formatAtomicUnits } = require('../utils/atomicUnits.js');
 
 /**
  * Transaction Manager - Handles transaction validation and management
@@ -190,7 +191,7 @@ class TransactionManager {
    * @param fee
    * @param tag
    */
-  createTransaction(fromAddress, toAddress, amount, fee = 0.001, tag = TRANSACTION_TAGS.TRANSACTION) {
+  createTransaction(fromAddress, toAddress, amount, fee = 100000, tag = TRANSACTION_TAGS.TRANSACTION) {
     // Users can only create TRANSACTION tagged transactions
     if (tag !== TRANSACTION_TAGS.TRANSACTION) {
       throw new Error('Users can only create TRANSACTION tagged transactions. Other tags are reserved for system use.');
@@ -202,6 +203,10 @@ class TransactionManager {
     if (totalAvailable < amount + fee) {
       throw new Error('Insufficient balance');
     }
+
+    // Convert amount and fee to atomic units if they're not already
+    const atomicAmount = typeof amount === 'string' ? toAtomicUnits(amount) : amount;
+    const atomicFee = typeof fee === 'string' ? toAtomicUnits(fee) : fee;
 
     // Select UTXOs to spend
     let selectedAmount = 0;

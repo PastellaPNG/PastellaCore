@@ -1,5 +1,6 @@
 const cors = require('cors');
 const express = require('express');
+const { toAtomicUnits, fromAtomicUnits, formatAtomicUnits } = require('../utils/atomicUnits.js');
 
 const Block = require('../models/Block.js');
 const { Transaction, TransactionInput, TransactionOutput } = require('../models/Transaction.js');
@@ -410,12 +411,12 @@ class APIServer {
    */
   testReplayProtection(req, res) {
     try {
-      // Create a test transaction with replay protection
+      // Create a test transaction with atomic units
       const testInputs = [new TransactionInput('test-tx-hash', 0, 'test-signature', 'test-public-key')];
 
       const testOutputs = [new TransactionOutput('test-address', 10)];
 
-      const testTransaction = new Transaction(testInputs, testOutputs, 0.001, TRANSACTION_TAGS.TRANSACTION, Date.now());
+      const testTransaction = new Transaction(testInputs, testOutputs, 100000, TRANSACTION_TAGS.TRANSACTION, Date.now());
       testTransaction.calculateId();
 
       // Test the replay protection
@@ -653,7 +654,7 @@ class APIServer {
 
       // Create new genesis block with mandatory replay protection
       const genesisConfig = {
-        premineAmount: 1000000, // 1 million PAS
+        premineAmount: 42000000000, // 420 PAS in atomic units
         premineAddress: 'genesis-address',
         nonce: 0,
         hash: null, // Will be calculated
@@ -1067,6 +1068,9 @@ class APIServer {
       pendingTransactions: this.blockchain.memoryPool.getPendingTransactionCount(),
       blockTime: this.config.blockchain.blockTime,
       coinbaseReward: this.config.blockchain.coinbaseReward,
+      halvingBlocks: this.config.blockchain.halvingBlocks || 1000,
+      currentReward: this.blockchain.getCurrentMiningReward(),
+      halvingInfo: this.blockchain.getHalvingInfo(),
       premineReward: this.config.blockchain.genesis.premineAmount,
       defaultFee: this.config.wallet.defaultFee,
       minFee: this.config.wallet.minFee,

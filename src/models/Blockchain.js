@@ -3,15 +3,16 @@ const path = require('path');
 
 const { TRANSACTION_TAGS } = require('../utils/constants');
 const logger = require('../utils/logger');
+const { toAtomicUnits, fromAtomicUnits, formatAtomicUnits, calculateHalvedReward, getHalvingInfo } = require('../utils/atomicUnits.js');
 
 const Block = require('./Block');
+const { Transaction } = require('./Transaction');
 
 // Import modular components
 const BlockchainValidation = require('./BlockchainValidation');
 const CheckpointManager = require('./CheckpointManager');
 const MemoryPoolManager = require('./MemoryPoolManager');
 const SpamProtection = require('./SpamProtection');
-const { Transaction } = require('./Transaction');
 const TransactionManager = require('./TransactionManager');
 const UTXOManager = require('./UTXOManager');
 
@@ -40,7 +41,7 @@ class Blockchain {
   constructor(dataDir = './data', config = null) {
     this.chain = [];
     this.difficulty = 1000; // Default difficulty (will be overridden by config)
-    this.miningReward = 50;
+    this.miningReward = this.config?.blockchain?.coinbaseReward || 5000000000; // Use configured value or fallback
     this.blockTime = 60000; // 1 minute
     this.dataDir = dataDir;
     this.difficultyAlgorithm = 'lwma3'; // Default to LWMA-3 algorithm
@@ -90,6 +91,30 @@ class Blockchain {
       maxSingleMinerHashRate: 0.4, // Max 40% hash rate per single miner
       suspiciousActivity: new Set(), // Track suspicious mining patterns
     };
+  }
+
+  /**
+   * Get the current mining reward based on block height and halving configuration
+   * @returns {number} Current mining reward in atomic units
+   */
+  getCurrentMiningReward() {
+    const baseReward = this.config?.blockchain?.coinbaseReward || 5000000000;
+    const halvingBlocks = this.config?.blockchain?.halvingBlocks || 1000;
+    const currentHeight = this.chain.length;
+
+    return calculateHalvedReward(currentHeight, baseReward, halvingBlocks);
+  }
+
+  /**
+   * Get halving information for the current blockchain state
+   * @returns {object} Halving information
+   */
+  getHalvingInfo() {
+    const baseReward = this.config?.blockchain?.coinbaseReward || 5000000000;
+    const halvingBlocks = this.config?.blockchain?.halvingBlocks || 1000;
+    const currentHeight = this.chain.length;
+
+    return getHalvingInfo(currentHeight, baseReward, halvingBlocks);
   }
 
   /**
@@ -143,7 +168,8 @@ class Blockchain {
           genesisTimestamp,
           [premineTransaction],
           this.difficulty,
-          genesisConfig
+          genesisConfig,
+          this.config
         );
         if (!suppressLogging) {
           logger.info('BLOCKCHAIN', `Genesis block created with premine: ${premineAmount} PAS to ${premineAddress}`);
@@ -156,7 +182,8 @@ class Blockchain {
           configTimestamp,
           [],
           this.difficulty,
-          this.config?.blockchain?.genesis
+          this.config?.blockchain?.genesis,
+          this.config
         );
         if (!suppressLogging) {
           logger.info('BLOCKCHAIN', 'Genesis block created with default settings');
@@ -866,8 +893,17 @@ class Blockchain {
    * @param fee
    * @param tag
    */
-  createTransaction(fromAddress, toAddress, amount, fee = 0.001, tag = TRANSACTION_TAGS.TRANSACTION) {
-    return this.transactionManager.createTransaction(fromAddress, toAddress, amount, fee, tag);
+  createTransaction(fromAddress, toAddress, amount, fee = 100000, tag = TRANSACTION_TAGS.TRANSACTION) {
+    try {
+      // Convert amount and fee to atomic units if they're not already
+      const atomicAmount = typeof amount === 'string' ? toAtomicUnits(amount) : amount;
+      const atomicFee = typeof fee === 'string' ? toAtomicUnits(fee) : fee;
+
+      return this.transactionManager.createTransaction(fromAddress, toAddress, atomicAmount, atomicFee, tag);
+    } catch (error) {
+      logger.error('BLOCKCHAIN', `Failed to create transaction: ${error.message}`);
+      return null;
+    }
   }
 
   /**
@@ -913,6 +949,131 @@ class Blockchain {
    */
   saveToDefaultFile() {
     return this.saveToFile(this.getDefaultFilePath());
+  }
+
+  /**
+   * Validate genesis block against config.json specifications
+   * @returns {boolean} True if genesis block matches config, false otherwise
+   */
+  validateGenesisBlockAgainstConfig() {
+    try {
+      if (!this.config || !this.config.blockchain || !this.config.blockchain.genesis) {
+        logger.warn('BLOCKCHAIN', 'No genesis config found, skipping genesis validation');
+        return true;
+      }
+
+      if (this.chain.length === 0) {
+        logger.warn('BLOCKCHAIN', 'No blocks in chain, skipping genesis validation');
+        return true;
+      }
+
+      const genesisBlock = this.chain[0];
+      const genesisConfig = this.config.blockchain.genesis;
+
+      logger.debug('BLOCKCHAIN', 'Validating genesis block against config.json specifications...');
+
+      // Check if this is actually a genesis block
+      if (genesisBlock.index !== 0 || genesisBlock.previousHash !== '0') {
+        logger.error('BLOCKCHAIN', 'First block is not a valid genesis block');
+        return false;
+      }
+
+      // Validate genesis block properties against config
+      const validationChecks = [
+        {
+          name: 'timestamp',
+          expected: genesisConfig.timestamp,
+          actual: genesisBlock.timestamp,
+          check: (expected, actual) => expected === actual
+        },
+        {
+          name: 'difficulty',
+          expected: genesisConfig.difficulty,
+          actual: genesisBlock.difficulty,
+          check: (expected, actual) => expected === actual
+        },
+        {
+          name: 'hash',
+          expected: genesisConfig.hash,
+          actual: genesisBlock.hash,
+          check: (expected, actual) => expected === actual
+        },
+        {
+          name: 'nonce',
+          expected: genesisConfig.nonce,
+          actual: genesisBlock.nonce,
+          check: (expected, actual) => expected === actual
+        },
+        {
+          name: 'algorithm',
+          expected: genesisConfig.algorithm,
+          actual: genesisBlock.algorithm,
+          check: (expected, actual) => expected === actual
+        }
+      ];
+
+      let validationFailed = false;
+      for (const check of validationChecks) {
+        if (check.expected !== undefined && !check.check(check.expected, check.actual)) {
+          logger.error('BLOCKCHAIN', `Genesis block ${check.name} mismatch:`);
+          logger.error('BLOCKCHAIN', `  Expected: ${check.expected}`);
+          logger.error('BLOCKCHAIN', `  Actual:   ${check.actual}`);
+          validationFailed = true;
+        }
+      }
+
+      // Validate premine transaction if specified in config
+      if (genesisConfig.premineAmount && genesisConfig.premineAddress) {
+        if (genesisBlock.transactions.length === 0) {
+          logger.error('BLOCKCHAIN', 'Genesis block has no transactions but config specifies premine');
+          validationFailed = true;
+        } else {
+          const premineTransaction = genesisBlock.transactions[0];
+          if (!premineTransaction.isCoinbase) {
+            logger.error('BLOCKCHAIN', 'First transaction in genesis block is not a coinbase transaction');
+            validationFailed = true;
+          } else if (premineTransaction.outputs.length === 0) {
+            logger.error('BLOCKCHAIN', 'Genesis coinbase transaction has no outputs');
+            validationFailed = true;
+          } else {
+            const output = premineTransaction.outputs[0];
+            if (output.address !== genesisConfig.premineAddress) {
+              logger.error('BLOCKCHAIN', 'Genesis premine address mismatch:');
+              logger.error('BLOCKCHAIN', `  Expected: ${genesisConfig.premineAddress}`);
+              logger.error('BLOCKCHAIN', `  Actual:   ${output.address}`);
+              validationFailed = true;
+            }
+            if (output.amount !== genesisConfig.premineAmount) {
+              logger.error('BLOCKCHAIN', 'Genesis premine amount mismatch:');
+              logger.error('BLOCKCHAIN', `  Expected: ${genesisConfig.premineAmount}`);
+              logger.error('BLOCKCHAIN', `  Actual:   ${output.amount}`);
+              validationFailed = true;
+            }
+          }
+        }
+      }
+
+      if (validationFailed) {
+        logger.error('BLOCKCHAIN', 'Genesis block validation against config.json FAILED');
+        logger.error('BLOCKCHAIN', 'The loaded genesis block does not match the specifications in config.json');
+        logger.error('BLOCKCHAIN', '');
+        logger.error('BLOCKCHAIN', 'SOLUTION:');
+        logger.error('BLOCKCHAIN', '  • If you are FORKING: node src/index.js --generate-genesis');
+        logger.error('BLOCKCHAIN', '  • If you are SYNCING: Delete blockchain folder and redownload binaries');
+        logger.error('BLOCKCHAIN', '');
+        logger.error('BLOCKCHAIN', 'The daemon will now stop to prevent using an invalid genesis block.');
+        
+        // Stop the daemon immediately
+        process.exit(1);
+      }
+
+      logger.info('BLOCKCHAIN', 'Genesis block validation against config.json PASSED');
+      return true;
+    } catch (error) {
+      logger.error('BLOCKCHAIN', `Error validating genesis block against config: ${error.message}`);
+      logger.error('BLOCKCHAIN', `Error stack: ${error.stack}`);
+      return false;
+    }
   }
 
   /**
@@ -968,10 +1129,10 @@ class Blockchain {
 
         logger.debug(
           'BLOCKCHAIN',
-          `Setting blockchain properties: difficulty=${data.difficulty || 1000}, miningReward=${data.miningReward || 50}, blockTime=${data.blockTime || 60000}`
+          `Setting blockchain properties: difficulty=${data.difficulty || 1000}, miningReward=${data.miningReward || this.config.blockchain.coinbaseReward}, blockTime=${data.blockTime || 60000}`
         );
         this.difficulty = data.difficulty || 1000;
-        this.miningReward = data.miningReward || 50;
+        this.miningReward = this.config.blockchain.coinbaseReward;
         this.blockTime = data.blockTime || 60000;
 
         // CRITICAL: Load historical transaction database for replay attack protection
@@ -1008,6 +1169,20 @@ class Blockchain {
         if (!this.checkpointManager.loadCheckpoints()) {
           logger.error('BLOCKCHAIN', `Failed to load checkpoints`);
           return false;
+        }
+
+        // CRITICAL: Validate genesis block against config.json specifications
+        logger.debug('BLOCKCHAIN', `Validating genesis block against config.json...`);
+        if (!this.validateGenesisBlockAgainstConfig()) {
+          logger.error('BLOCKCHAIN', `Genesis block validation against config.json FAILED`);
+          logger.error('BLOCKCHAIN', `The daemon will stop to prevent using an invalid genesis block`);
+          logger.error('BLOCKCHAIN', '');
+          logger.error('BLOCKCHAIN', 'SOLUTION:');
+          logger.error('BLOCKCHAIN', '  • If you are FORKING: node src/index.js --generate-genesis');
+          logger.error('BLOCKCHAIN', '  • If you are SYNCING: Delete blockchain folder and redownload binaries');
+          
+          // Stop the daemon immediately
+          process.exit(1);
         }
 
         // CRITICAL: Validate checkpoints against loaded blockchain
@@ -1066,7 +1241,7 @@ class Blockchain {
   clearChain() {
     this.chain = [];
     this.difficulty = 1000;
-    this.miningReward = 50;
+    this.miningReward = this.config.blockchain.coinbaseReward;
     this.blockTime = 60000;
     this.historicalTransactions.clear();
     this.historicalTransactionIds.clear();
@@ -1079,26 +1254,26 @@ class Blockchain {
   }
 
   /**
-   * Calculate total supply based on mined blocks and mining rewards
+   * Calculate total supply including all mining rewards with halving
+   * @returns {number} Total supply in atomic units
    */
-  getTotalSupply() {
-    try {
-      // Calculate total supply from mining rewards
-      const totalMiningRewards = this.chain.length * this.miningReward;
+  calculateTotalSupply() {
+    let totalMiningRewards = 0;
+    const baseReward = this.config?.blockchain?.coinbaseReward || 5000000000;
+    const halvingBlocks = this.config?.blockchain?.halvingBlocks || 1000;
 
-      // Add any additional supply mechanisms (if implemented in the future)
-      // For now, only mining rewards contribute to supply
-
-      logger.debug(
-        'BLOCKCHAIN',
-        `Calculating total supply: ${this.chain.length} blocks × ${this.miningReward} PAS = ${totalMiningRewards} PAS`
-      );
-
-      return totalMiningRewards;
-    } catch (error) {
-      logger.error('BLOCKCHAIN', `Error calculating total supply: ${error.message}`);
-      return 0;
+    // Calculate rewards for each block considering halving
+    for (let i = 0; i < this.chain.length; i++) {
+      const blockReward = calculateHalvedReward(i, baseReward, halvingBlocks);
+      totalMiningRewards += blockReward;
     }
+
+    logger.debug(
+      'BLOCKCHAIN',
+      `Calculating total supply: ${this.chain.length} blocks with halving every ${halvingBlocks} blocks = ${totalMiningRewards} atomic units`
+    );
+
+    return totalMiningRewards;
   }
 
   /**
@@ -1114,6 +1289,17 @@ class Blockchain {
       spamProtection: this.spamProtection.getStatus(),
       validationStatus: this.isValidChain(),
     };
+  }
+
+  setBlockchainProperties(difficulty, miningReward, blockTime) {
+    this.difficulty = difficulty || this.difficulty;
+    // Don't store miningReward statically - use dynamic calculation instead
+    this.blockTime = blockTime || this.blockTime;
+
+    logger.debug(
+      'BLOCKCHAIN',
+      `Setting blockchain properties: difficulty=${this.difficulty}, blockTime=${this.blockTime}, halvingBlocks=${this.config?.blockchain?.halvingBlocks || 1000}`
+    );
   }
 }
 

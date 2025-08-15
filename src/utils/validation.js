@@ -1,4 +1,5 @@
 const logger = require('./logger.js');
+const { toAtomicUnits, fromAtomicUnits, formatAtomicUnits } = require('./atomicUnits.js');
 
 /**
  * Input validation and sanitization utilities
@@ -451,7 +452,7 @@ class InputValidator {
 
           const validatedOutput = {
             address: this.validateCryptocurrencyAddress(output.address, { required: true }),
-            amount: this.validateAmount(output.amount, { min: 0.00000001, required: true }),
+            amount: this.validateAmount(output.amount, { min: 1, required: true }), // 1 atomic unit minimum
           };
 
           if (Object.values(validatedOutput).some(v => v === null)) {

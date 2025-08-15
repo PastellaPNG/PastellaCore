@@ -1,5 +1,6 @@
 const { CryptoUtils } = require('../utils/crypto');
 const logger = require('../utils/logger');
+const { TRANSACTION_TAGS } = require('../utils/constants');
 
 const { Transaction } = require('./Transaction');
 
@@ -534,36 +535,31 @@ class Block {
    * @param transactions
    * @param difficulty
    * @param genesisConfig
+   * @param config
    */
-  static createGenesisBlock(address, timestamp = null, transactions = null, difficulty = 4, genesisConfig = null) {
-    // Use genesis config timestamp if available, otherwise use provided timestamp
-    const genesisTimestamp = genesisConfig?.timestamp || timestamp;
-
-    // Ensure we have a valid timestamp for deterministic genesis blocks
-    if (!genesisTimestamp) {
-      throw new Error('Genesis block requires a timestamp from config or parameter for determinism');
-    }
+  static createGenesisBlock(address, timestamp = null, transactions = null, difficulty = 4, genesisConfig = null, config = null) {
+    const genesisTimestamp = timestamp || Date.now();
 
     let genesisTransactions = [];
+
     if (genesisConfig && genesisConfig.premineAmount && genesisConfig.premineAddress) {
-      // Use config settings for premine
+      // Create premine transaction
       const premineTransaction = Transaction.createCoinbase(
         genesisConfig.premineAddress,
         genesisConfig.premineAmount,
-        genesisConfig.timestamp,
-        genesisConfig.coinbaseNonce,
+        genesisTimestamp,
+        genesisConfig.nonce || 0,
         genesisConfig.coinbaseAtomicSequence,
         true
       );
-      // Don't override the timestamp - keep the config timestamp for determinism
-      premineTransaction.calculateId();
       genesisTransactions = [premineTransaction];
     } else if (transactions) {
       // Use provided transactions
       genesisTransactions = transactions;
     } else {
-      // Create default coinbase transaction
-      const coinbaseTransaction = Transaction.createCoinbase(address, 100, genesisTimestamp);
+      // Create default coinbase transaction using configured coinbaseReward
+      const coinbaseReward = config?.blockchain?.coinbaseReward || 5000000000; // Default to 50 PAS in atomic units
+      const coinbaseTransaction = Transaction.createCoinbase(address, coinbaseReward, genesisTimestamp);
       // Don't override the timestamp - keep the passed timestamp for determinism
       coinbaseTransaction.calculateId();
       genesisTransactions = [coinbaseTransaction];

@@ -549,7 +549,7 @@ class Transaction {
     return this.inputs.reduce((total, input) => {
       // This would normally look up the actual UTXO amount
       // For now, we'll assume a default value for non-coinbase transactions
-      return total + 50; // Assume each input is worth 50 PAS (mining reward)
+      return total + 100000000; // Assume each input is worth 1 PAS (reasonable default) in atomic units
     }, 0);
   }
 

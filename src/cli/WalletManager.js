@@ -2,6 +2,8 @@ const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
 const readline = require('readline');
+const fetch = require('node-fetch');
+const { toAtomicUnits, fromAtomicUnits, formatAtomicUnits } = require('../utils/atomicUnits.js');
 
 const { Transaction, TransactionInput, TransactionOutput } = require('../models/Transaction.js');
 const { Wallet } = require('../models/Wallet.js');
@@ -255,7 +257,7 @@ class WalletManager {
    * @param amount
    * @param fee
    */
-  async sendTransaction(toAddress, amount, fee = 0.001) {
+  async sendTransaction(toAddress, amount, fee = 100000) {
     try {
       if (!this.currentWallet) {
         throw new Error('No wallet loaded');
@@ -265,19 +267,23 @@ class WalletManager {
         throw new Error('Not connected to any node');
       }
 
+      // Convert amount and fee to atomic units if they're not already
+      const atomicAmount = typeof amount === 'string' ? toAtomicUnits(amount) : amount;
+      const atomicFee = typeof fee === 'string' ? toAtomicUnits(fee) : fee;
+
       // Get current balance
       const balance = await this.getBalance(this.currentWallet.getAddress());
 
-      if (balance < (amount + fee)) {
-        throw new Error(`Insufficient balance: ${balance} PAS (need ${amount + fee} PAS)`);
+      if (balance < (atomicAmount + atomicFee)) {
+        throw new Error(`Insufficient balance: ${formatAtomicUnits(balance)} PAS (need ${formatAtomicUnits(atomicAmount + atomicFee)} PAS)`);
       }
 
       // Create transaction
       const transaction = new Transaction();
       transaction.addInput(this.currentWallet.getAddress(), balance);
-      transaction.addOutput(toAddress, amount);
-      transaction.addOutput(this.currentWallet.getAddress(), balance - amount - fee); // Change
-      transaction.fee = fee;
+      transaction.addOutput(toAddress, atomicAmount);
+      transaction.addOutput(this.currentWallet.getAddress(), balance - atomicAmount - atomicFee); // Change
+      transaction.fee = atomicFee;
 
       // Sign transaction
       transaction.sign(this.currentWallet.getPrivateKey());
@@ -325,7 +331,7 @@ class WalletManager {
       const mempoolStatus = mempoolResponse.success ? mempoolResponse.data : null;
 
       logger.info('WALLET_MANAGER', `✅ Wallet synced successfully`);
-      logger.info('WALLET_MANAGER', `Balance: ${balance} PAS`);
+      logger.info('WALLET_MANAGER', `Balance: ${formatAtomicUnits(balance)} PAS`);
       logger.info('WALLET_MANAGER', `Transactions: ${transactions.length}`);
 
       if (mempoolStatus) {
@@ -476,7 +482,7 @@ class WalletManager {
           return;
         }
         const balance = await this.getBalance(this.currentWallet.getAddress());
-        console.log(`💰 Balance: ${balance} PAS`);
+        console.log(`💰 Balance: ${formatAtomicUnits(balance)} PAS`);
         break;
 
       case 'send':
@@ -489,7 +495,7 @@ class WalletManager {
           return;
         }
         const amount = parseFloat(parts[2]);
-        const fee = parts[3] ? parseFloat(parts[3]) : 0.001;
+        const fee = parts[3] ? parseFloat(parts[3]) : 100000; // 0.001 PAS in atomic units
         await this.sendTransaction(parts[1], amount, fee);
             break;
 

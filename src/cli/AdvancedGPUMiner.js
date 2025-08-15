@@ -4,6 +4,7 @@ const chalk = require('chalk');
 const { GPU } = require('gpu.js');
 
 const KawPowUtils = require('../utils/kawpow.js');
+const { toAtomicUnits, fromAtomicUnits, formatAtomicUnits, calculateHalvedReward } = require('../utils/atomicUnits.js');
 
 /**
  *
@@ -760,7 +761,7 @@ class AdvancedGPUMiner {
       console.log(chalk.white(`⏰ Mining Duration:      ${chalk.cyan(timeDisplay)}`));
       console.log(chalk.white(`🔢 Total Hashes:         ${chalk.cyan(this.totalHashes.toLocaleString())}`));
       console.log(chalk.white(`🏆 Blocks Mined:         ${chalk.green(this.blocksMined)}`));
-      console.log(chalk.white(`💸 Total Fees Collected: ${chalk.green(this.totalFeesCollected.toFixed(8))} PAS`));
+      console.log(chalk.white(`💸 Total Fees Collected: ${chalk.green(formatAtomicUnits(this.totalFeesCollected))} PAS`));
 
       if (this.currentMiningBlock) {
         console.log(chalk.white(`📦 Current Block:        ${chalk.cyan(`#${this.currentMiningBlock.index}`)}`));
@@ -803,8 +804,8 @@ class AdvancedGPUMiner {
     if (this.isMining) {
       console.log(chalk.blue('\n💰 MINING REWARDS'));
       console.log(chalk.blue('────────────────────────────────────────────────────────────────────────────────'));
-      const baseReward = this.cli.config.blockchain.coinbaseReward || 50;
-      console.log(chalk.white(`🏆 Base Mining Reward:   ${chalk.green(baseReward.toFixed(8))} PAS`));
+      const baseReward = this.cli.config.blockchain.coinbaseReward;
+      console.log(chalk.white(`🏆 Base Mining Reward:   ${chalk.green(formatAtomicUnits(baseReward))} PAS`));
 
       // Show current block fees if available
       if (
@@ -817,17 +818,17 @@ class AdvancedGPUMiner {
           .reduce((total, tx) => total + (tx.fee && typeof tx.fee === 'number' ? tx.fee : 0), 0);
 
         if (currentBlockFees > 0) {
-          console.log(chalk.white(`💸 Current Block Fees:   ${chalk.green(currentBlockFees.toFixed(8))} PAS`));
+          console.log(chalk.white(`💸 Current Block Fees:   ${chalk.green(formatAtomicUnits(currentBlockFees))} PAS`));
           console.log(
-            chalk.white(`💰 Current Block Reward: ${chalk.green((baseReward + currentBlockFees).toFixed(8))} PAS`)
+            chalk.white(`💰 Current Block Reward: ${chalk.green(formatAtomicUnits(baseReward + currentBlockFees))} PAS`)
           );
         } else {
-          console.log(chalk.white(`💸 Current Block Fees:   ${chalk.gray('0.00000000')} PAS`));
-          console.log(chalk.white(`💰 Current Block Reward: ${chalk.green(baseReward.toFixed(8))} PAS`));
+          console.log(chalk.white(`💸 Current Block Fees:   ${chalk.gray(formatAtomicUnits(0))} PAS`));
+          console.log(chalk.white(`💰 Current Block Reward: ${chalk.green(formatAtomicUnits(baseReward))} PAS`));
         }
       } else {
-        console.log(chalk.white(`💸 Current Block Fees:   ${chalk.gray('Calculating...')}`));
-        console.log(chalk.white(`💰 Current Block Reward: ${chalk.green(baseReward.toFixed(8))} PAS`));
+        console.log(chalk.white(`💸 Current Block Fees:   ${chalk.gray(formatAtomicUnits(0))} PAS`));
+        console.log(chalk.white(`💰 Current Block Reward: ${chalk.green(formatAtomicUnits(baseReward))} PAS`));
       }
 
       console.log(chalk.white(`📊 Pending Transactions: ${chalk.cyan('Check with "mine fees"')}`));
@@ -1087,18 +1088,23 @@ class AdvancedGPUMiner {
         }
 
         // Create a coinbase transaction for the mining reward
-        const baseReward = daemonStatus.miningReward || 50;
+        const baseReward = this.cli.config.blockchain.coinbaseReward;
+        const halvingBlocks = this.cli.config.blockchain.halvingBlocks || 1000;
+
+        // Calculate the halved reward based on current block height
+        const currentReward = calculateHalvedReward(height, baseReward, halvingBlocks);
+
         const coinbaseTransaction = this.cli.Transaction.createCoinbase(
           this.miningAddress,
-          baseReward, // Use config mining reward or default to 50
+          currentReward, // Use halved reward instead of base reward
           Date.now()
         );
         coinbaseTransaction.timestamp = Date.now();
         coinbaseTransaction.calculateId();
 
         // Safety check: ensure base reward is reasonable
-        if (baseReward < 0 || baseReward > 1000000) {
-          // Max 1M PAS per block
+        if (baseReward < 0 || baseReward > 10000000000) {
+          // Max 10B PAS per block
           throw new Error(`Invalid base reward amount: ${baseReward} PAS`);
         }
 
@@ -1165,23 +1171,39 @@ class AdvancedGPUMiner {
       return;
     }
 
-    const baseReward = this.cli.config.blockchain.coinbaseReward || 50;
-    const totalBaseReward = this.blocksMined * baseReward;
-    const totalEarnings = totalBaseReward + this.totalFeesCollected;
+    const baseReward = this.cli.config.blockchain.coinbaseReward;
+    const halvingBlocks = this.cli.config.blockchain.halvingBlocks || 1000;
+    const currentHeight = this.cli.blockchain?.getLatestBlock()?.index || 0;
+    
+    // Calculate current halved reward
+    const currentReward = calculateHalvedReward(currentHeight, baseReward, halvingBlocks);
+    const totalCurrentReward = this.blocksMined * currentReward;
+    const totalEarnings = totalCurrentReward + this.totalFeesCollected;
+
+    // Get halving information
+    const { getHalvingInfo } = require('../utils/atomicUnits');
+    const halvingInfo = getHalvingInfo(currentHeight, baseReward, halvingBlocks);
 
     console.log(chalk.blue('────────────────────────────────────────────────────────────────────────────────'));
     console.log(chalk.blue('📊 SESSION SUMMARY'));
     console.log(chalk.blue('────────────────────────────────────────────────────────────────────────────────'));
     console.log(chalk.white(`🏆 Blocks Mined:        ${chalk.green(this.blocksMined)}`));
-    console.log(chalk.white(`💰 Base Reward per Block: ${chalk.cyan(baseReward.toFixed(8))} PAS`));
-    console.log(chalk.white(`💵 Total Base Rewards:    ${chalk.green(totalBaseReward.toFixed(8))} PAS`));
-    console.log(chalk.white(`💸 Total Fees Collected:  ${chalk.green(this.totalFeesCollected.toFixed(8))} PAS`));
+    console.log(chalk.white(`💰 Base Reward:          ${chalk.cyan(formatAtomicUnits(baseReward))} PAS`));
+    console.log(chalk.white(`💎 Current Reward:       ${chalk.green(formatAtomicUnits(currentReward))} PAS`));
+    console.log(chalk.white(`💵 Total Current Rewards: ${chalk.green(formatAtomicUnits(totalCurrentReward))} PAS`));
+    console.log(chalk.white(`💸 Total Fees Collected:  ${chalk.green(formatAtomicUnits(this.totalFeesCollected))} PAS`));
+    console.log(chalk.white(`🏆 Total Earnings:       ${chalk.green(formatAtomicUnits(totalEarnings))} PAS`));
 
+    console.log(chalk.blue('\n📈 HALVING INFORMATION'));
     console.log(chalk.blue('────────────────────────────────────────────────────────────────────────────────'));
-    console.log(chalk.blue('🎯 TOTAL EARNINGS'));
-    console.log(chalk.blue('────────────────────────────────────────────────────────────────────────────────'));
-    console.log(chalk.white(`💰 Total Session Earnings: ${chalk.green(totalEarnings.toFixed(8))} PAS`));
+    console.log(chalk.white(`🔢 Current Block Height:  ${chalk.cyan(currentHeight)}`));
+    console.log(chalk.white(`🔄 Halvings Completed:    ${chalk.yellow(halvingInfo.halvings)}`));
+    console.log(chalk.white(`⏰ Next Halving:          ${chalk.cyan(halvingInfo.nextHalving)}`));
+    console.log(chalk.white(`📊 Blocks Until Halving:  ${chalk.green(halvingInfo.blocksUntilHalving)}`));
+    console.log(chalk.white(`💎 Reward After Next:     ${chalk.yellow(formatAtomicUnits(halvingInfo.currentReward / 2))} PAS`));
 
+    console.log(chalk.blue('\n📊 SESSION BREAKDOWN'));
+    console.log(chalk.blue('────────────────────────────────────────────────────────────────────────────────'));
     if (this.totalFeesCollected > 0) {
       const feePercentage = (this.totalFeesCollected / totalEarnings) * 100;
       console.log(chalk.white(`📊 Fees as % of Total:    ${chalk.cyan(feePercentage.toFixed(2))}%`));
@@ -1201,6 +1223,13 @@ class AdvancedGPUMiner {
       const pendingResponse = await this.cli.makeApiRequest('/api/blockchain/transactions');
       const pendingTransactions = pendingResponse.transactions || [];
 
+      const baseReward = this.cli.config.blockchain.coinbaseReward;
+      const halvingBlocks = this.cli.config.blockchain.halvingBlocks || 1000;
+      const currentHeight = this.cli.blockchain?.getLatestBlock()?.index || 0;
+      
+      // Calculate current halved reward
+      const currentReward = calculateHalvedReward(currentHeight, baseReward, halvingBlocks);
+
       if (pendingTransactions.length > 0) {
         const totalPendingFees = pendingTransactions.reduce(
           (total, tx) => total + (tx.fee && typeof tx.fee === 'number' ? tx.fee : 0),
@@ -1209,10 +1238,10 @@ class AdvancedGPUMiner {
 
         if (totalPendingFees > 0) {
           console.log(chalk.white(`📊 Pending Transactions: ${chalk.cyan(pendingTransactions.length)}`));
-          console.log(chalk.white(`💸 Total Pending Fees: ${chalk.green(totalPendingFees.toFixed(8))} PAS`));
+          console.log(chalk.white(`💸 Total Pending Fees: ${chalk.green(formatAtomicUnits(totalPendingFees))} PAS`));
           console.log(
             chalk.white(
-              `🎯 Next Block Reward: ${chalk.green((this.cli.config.blockchain.coinbaseReward + totalPendingFees).toFixed(8))} PAS`
+              `🎯 Next Block Reward: ${chalk.green(formatAtomicUnits(currentReward + totalPendingFees))} PAS`
             )
           );
 
@@ -1222,7 +1251,7 @@ class AdvancedGPUMiner {
           console.log(chalk.blue('────────────────────────────────────────────────────────────────────────────────'));
           pendingTransactions.forEach((tx, index) => {
             if (tx.fee && typeof tx.fee === 'number' && tx.fee > 0) {
-              console.log(chalk.white(`  📄 Transaction ${index + 1}: ${chalk.cyan(tx.fee.toFixed(8))} PAS`));
+              console.log(chalk.white(`  📄 Transaction ${index + 1}: ${chalk.cyan(formatAtomicUnits(tx.fee))} PAS`));
               if (tx.id) {
                 console.log(chalk.white(`     ID: ${chalk.gray(tx.id.substring(0, 16))}...`));
               }
@@ -1237,25 +1266,25 @@ class AdvancedGPUMiner {
           });
         } else {
           console.log(chalk.white(`📊 Pending Transactions: ${chalk.cyan(pendingTransactions.length)}`));
-          console.log(chalk.white(`💸 Total Pending Fees: ${chalk.gray('0.00000000')} PAS`));
+          console.log(chalk.white(`💸 Total Pending Fees: ${chalk.gray(formatAtomicUnits(0))} PAS`));
           console.log(
             chalk.white(
-              `🎯 Next Block Reward: ${chalk.green(this.cli.config.blockchain.coinbaseReward.toFixed(8))} PAS`
+              `🎯 Next Block Reward: ${chalk.green(formatAtomicUnits(currentReward))} PAS`
             )
           );
         }
       } else {
         console.log(chalk.white(`📊 Pending Transactions: ${chalk.gray('0')}`));
-        console.log(chalk.white(`💸 Total Pending Fees: ${chalk.gray('0.00000000')} PAS`));
+        console.log(chalk.white(`💸 Total Pending Fees: ${chalk.gray(formatAtomicUnits(0))} PAS`));
         console.log(
-          chalk.white(`🎯 Next Block Reward: ${chalk.green(this.cli.config.blockchain.coinbaseReward.toFixed(8))} PAS`)
+          chalk.white(`🎯 Next Block Reward: ${chalk.green(formatAtomicUnits(currentReward))} PAS`)
         );
       }
     } catch (error) {
       console.log(chalk.white(`📊 Pending Transactions: ${chalk.red('Error fetching')}`));
       console.log(chalk.white(`💸 Total Pending Fees: ${chalk.red('Unknown')}`));
       console.log(
-        chalk.white(`🎯 Next Block Reward: ${chalk.green(this.cli.config.blockchain.coinbaseReward.toFixed(8))} PAS`)
+        chalk.white(`🎯 Next Block Reward: ${chalk.green(formatAtomicUnits(this.cli.config.blockchain.coinbaseReward))} PAS`)
       );
     }
   }
@@ -1310,7 +1339,7 @@ class AdvancedGPUMiner {
 
     // Safety validation: ensure final coinbase amount is reasonable
     const finalCoinbaseAmount = coinbaseTransaction.outputs[0].amount;
-    const baseReward = this.cli.config.blockchain.coinbaseReward || 50;
+    const baseReward = this.cli.config.blockchain.coinbaseReward;
     const maxReasonableAmount = baseReward * 1000; // Max 1000x base reward (allows for high fees)
 
     if (finalCoinbaseAmount > maxReasonableAmount) {
@@ -1334,10 +1363,10 @@ class AdvancedGPUMiner {
       console.log(chalk.white(`💰 Coinbase transaction included`));
 
       if (totalFees > 0) {
-        console.log(chalk.white(`💸 Total fees collected: ${chalk.green(totalFees.toFixed(8))} PAS`));
+        console.log(chalk.white(`💸 Total fees collected: ${chalk.green(formatAtomicUnits(totalFees))} PAS`));
         console.log(
           chalk.white(
-            `🏆 Miner reward: ${chalk.green(coinbaseTransaction.outputs[0].amount.toFixed(8))} PAS (${(this.cli.config.blockchain.coinbaseReward || 50).toFixed(8)} + ${totalFees.toFixed(8)} fees)`
+            `🏆 Miner reward: ${chalk.green(formatAtomicUnits(coinbaseTransaction.outputs[0].amount))} PAS (${formatAtomicUnits(this.cli.config.blockchain.coinbaseReward)} + ${formatAtomicUnits(totalFees)} fees)`
           )
         );
 
@@ -1347,17 +1376,17 @@ class AdvancedGPUMiner {
         console.log(chalk.blue('────────────────────────────────────────────────────────────────────────────────'));
         selectedTransactions.forEach((tx, index) => {
           if (tx.fee && typeof tx.fee === 'number' && tx.fee > 0) {
-            console.log(chalk.white(`  📄 Transaction ${index + 1}: ${chalk.cyan(tx.fee.toFixed(8))} PAS`));
+            console.log(chalk.white(`  📄 Transaction ${index + 1}: ${chalk.cyan(formatAtomicUnits(tx.fee))} PAS`));
             if (tx.id) {
               console.log(chalk.white(`     ID: ${chalk.gray(tx.id.substring(0, 16))}...`));
             }
           }
         });
       } else {
-        console.log(chalk.white(`💸 Total fees collected: ${chalk.gray('0.00000000')} PAS`));
+        console.log(chalk.white(`💸 Total fees collected: ${chalk.gray(formatAtomicUnits(0))} PAS`));
         console.log(
           chalk.white(
-            `🏆 Miner reward: ${chalk.green(coinbaseTransaction.outputs[0].amount.toFixed(8))} PAS (base reward only)`
+            `🏆 Miner reward: ${chalk.green(formatAtomicUnits(coinbaseTransaction.outputs[0].amount))} PAS (base reward only)`
           )
         );
       }

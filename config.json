@@ -17,18 +17,21 @@
   "blockchain": {
     "blockTime": 15000,
     "maxBlockSize": 8388608,
-    "coinbaseReward": 50,
+    "coinbaseReward": 5000000000,
+    "halvingBlocks": 1000,
     "difficultyAlgorithm": "lwma3",
     "difficultyBlocks": 60,
     "difficultyMinimum": 1,
     "genesis": {
-      "timestamp": 1754946089494,
-      "premineAmount": 100,
-      "premineAddress": "1QCGbf73bnaW3pHyWzmi5QcNhqYo3FH9JK",
+      "timestamp": 1755259511418,
+      "premineAmount": 2100000000000,
+      "premineAddress": "1Ggdo3kTzGvmhSDuoZBuFZQeqDSg57FEf6",
       "difficulty": 10000,
       "nonce": 1037,
       "hash": "003dcd10eecc379031a14483df555d63f2dd96ed03ef0b9ed68c38c4220a4fe1",
-      "algorithm": "kawpow"
+      "algorithm": "kawpow",
+      "coinbaseNonce": "mecs6yyledmnr2ow17w1ri29x1hu",
+      "coinbaseAtomicSequence": "1755259511418-genesis-coinbase-561721"
     },
     "difficulty": 10000
   },
@@ -39,8 +42,8 @@
   },
   "wallet": {
     "enabled": false,
-    "defaultFee": 0.001,
-    "minFee": 0.00000100
+    "defaultFee": 100000,
+    "minFee": 100
   },
   "api": {
     "enabled": true,
