@@ -1174,7 +1174,7 @@ class AdvancedGPUMiner {
     const baseReward = this.cli.config.blockchain.coinbaseReward;
     const halvingBlocks = this.cli.config.blockchain.halvingBlocks || 1000;
     const currentHeight = this.cli.blockchain?.getLatestBlock()?.index || 0;
-    
+
     // Calculate current halved reward
     const currentReward = calculateHalvedReward(currentHeight, baseReward, halvingBlocks);
     const totalCurrentReward = this.blocksMined * currentReward;
@@ -1226,7 +1226,7 @@ class AdvancedGPUMiner {
       const baseReward = this.cli.config.blockchain.coinbaseReward;
       const halvingBlocks = this.cli.config.blockchain.halvingBlocks || 1000;
       const currentHeight = this.cli.blockchain?.getLatestBlock()?.index || 0;
-      
+
       // Calculate current halved reward
       const currentReward = calculateHalvedReward(currentHeight, baseReward, halvingBlocks);
 

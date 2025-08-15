@@ -172,7 +172,8 @@ class Blockchain {
           this.config
         );
         if (!suppressLogging) {
-          logger.info('BLOCKCHAIN', `Genesis block created with premine: ${premineAmount} PAS to ${premineAddress}`);
+          const { formatAtomicUnits } = require('../utils/atomicUnits');
+          logger.info('BLOCKCHAIN', `Genesis block created with premine: ${formatAtomicUnits(premineAmount)} PAS to ${premineAddress}`);
         }
       } else {
         // Use config timestamp if available, otherwise create without timestamp
@@ -1062,7 +1063,7 @@ class Blockchain {
         logger.error('BLOCKCHAIN', '  • If you are SYNCING: Delete blockchain folder and redownload binaries');
         logger.error('BLOCKCHAIN', '');
         logger.error('BLOCKCHAIN', 'The daemon will now stop to prevent using an invalid genesis block.');
-        
+
         // Stop the daemon immediately
         process.exit(1);
       }
@@ -1180,7 +1181,7 @@ class Blockchain {
           logger.error('BLOCKCHAIN', 'SOLUTION:');
           logger.error('BLOCKCHAIN', '  • If you are FORKING: node src/index.js --generate-genesis');
           logger.error('BLOCKCHAIN', '  • If you are SYNCING: Delete blockchain folder and redownload binaries');
-          
+
           // Stop the daemon immediately
           process.exit(1);
         }
