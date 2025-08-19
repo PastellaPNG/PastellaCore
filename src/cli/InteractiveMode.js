@@ -43,8 +43,7 @@ class InteractiveMode {
           name: 'command',
           message: generatePrompt(
             this.cli.walletLoaded,
-            this.cli.walletName,
-            this.cli.miningManager?.isMining || false
+            this.cli.walletName
           ),
           prefix: '',
           transformer: input => input.trim(),
@@ -86,10 +85,6 @@ class InteractiveMode {
       case 'wallet':
         await this.cli.networkWalletManager.handleCommand(args.slice(1));
         break;
-      // CPU mining removed - only KawPow GPU mining available
-      case 'mine':
-        await this.cli.gpuMiningManager.handleCommand(args.slice(1));
-        break;
       case 'chain':
         await this.cli.networkManager.handleChainCommand(args.slice(1));
         break;
@@ -109,9 +104,6 @@ class InteractiveMode {
         break;
       case 'replay-protection':
         await this.handleReplayProtectionCommand(args.slice(1));
-        break;
-      case 'consensus':
-        await this.handleConsensusCommand(args.slice(1));
         break;
       case 'memory':
         await this.handleMemoryCommand(args.slice(1));
@@ -295,93 +287,7 @@ class InteractiveMode {
     }
   }
 
-  /**
-   *
-   * @param args
-   */
-  async handleConsensusCommand(args) {
-    if (args.length === 0 || args[0] === 'status') {
-      try {
-        const response = await this.cli.makeApiRequest('/api/blockchain/consensus', 'GET');
-        if (response) {
-          console.log(chalk.blue.bold('🔗 CONSENSUS & MINING STATUS:'));
-          console.log(chalk.cyan('  Security Level:'), chalk.white(`${response.securityLevel}/100`));
-          console.log(
-            chalk.cyan('  Total Network Hash Rate:'),
-            chalk.white(`${(response.totalNetworkHashRate / 1000000).toFixed(2)} MH/s`)
-          );
-          console.log(chalk.cyan('  Validator Count:'), chalk.white(response.validatorCount));
-          console.log(chalk.cyan('  Total Stake:'), chalk.white(`${response.totalStake} PAS`));
-          console.log(chalk.cyan('  Consensus Threshold:'), chalk.white(`${response.consensusThreshold * 100}%`));
-          console.log('');
 
-          console.log(chalk.cyan('  Network Status:'));
-          console.log(chalk.white(`    Partitioned: ${response.networkPartition ? '⚠️  YES' : '✅ NO'}`));
-          console.log(chalk.white(`    Consecutive Late Blocks: ${response.consecutiveLateBlocks}`));
-          console.log('');
-
-          if (response.miningPowerDistribution.length > 0) {
-            console.log(chalk.cyan('  Top Miners:'));
-            response.miningPowerDistribution.slice(0, 5).forEach((miner, index) => {
-              const riskColor =
-                parseFloat(miner.share) > 30 ? chalk.red : parseFloat(miner.share) > 20 ? chalk.yellow : chalk.green;
-              console.log(riskColor(`    ${index + 1}. ${miner.address.substring(0, 16)}... - ${miner.share}%`));
-            });
-            console.log('');
-          }
-
-          if (response.suspiciousMiners.length > 0) {
-            console.log(chalk.red('  ⚠️  Suspicious Miners:'));
-            response.suspiciousMiners.forEach((miner, index) => {
-              console.log(chalk.red(`    ${index + 1}. ${miner}`));
-            });
-            console.log('');
-          }
-
-          // Security recommendations based on consensus status
-          if (response.securityLevel < 70) {
-            console.log(chalk.red('  🚨 IMMEDIATE ACTION REQUIRED:'));
-            console.log(chalk.red('     - Security level is critically low'));
-            console.log(chalk.red('     - Review all mining operations'));
-            console.log(chalk.red('     - Check for network attacks'));
-          } else if (response.securityLevel < 80) {
-            console.log(chalk.yellow('  ⚠️  ATTENTION REQUIRED:'));
-            console.log(chalk.yellow('     - Security level below recommended threshold'));
-            console.log(chalk.yellow('     - Consider adding more validators'));
-          } else {
-            console.log(chalk.green('  ✅ Security status is good'));
-          }
-        }
-      } catch (error) {
-        console.log(chalk.red(`❌ Error: ${error.message}`));
-      }
-    } else if (args[0] === 'miners') {
-      try {
-        const response = await this.cli.makeApiRequest('/api/blockchain/consensus', 'GET');
-        if (response && response.miningPowerDistribution.length > 0) {
-          console.log(chalk.blue.bold('⛏️  MINING POWER DISTRIBUTION:'));
-          response.miningPowerDistribution.forEach((miner, index) => {
-            const riskColor =
-              parseFloat(miner.share) > 30 ? chalk.red : parseFloat(miner.share) > 20 ? chalk.yellow : chalk.green;
-            const riskLevel =
-              parseFloat(miner.share) > 30 ? 'HIGH RISK' : parseFloat(miner.share) > 20 ? 'MEDIUM RISK' : 'LOW RISK';
-
-            console.log(riskColor(`  ${index + 1}. ${miner.address.substring(0, 16)}...`));
-            console.log(chalk.white(`     Hash Rate: ${(miner.hashRate / 1000000).toFixed(2)} MH/s`));
-            console.log(chalk.white(`     Network Share: ${miner.share}%`));
-            console.log(riskColor(`     Risk Level: ${riskLevel}`));
-            console.log('');
-          });
-        } else {
-          console.log(chalk.gray('No mining data available'));
-        }
-      } catch (error) {
-        console.log(chalk.red(`❌ Error: ${error.message}`));
-      }
-    } else {
-      console.log(chalk.yellow('Usage: consensus [status|miners]'));
-    }
-  }
 
   /**
    *
@@ -555,18 +461,6 @@ class InteractiveMode {
     console.log(chalk.cyan('  wallet save                        - Manually save wallet with current data'));
     console.log('');
 
-    console.log(chalk.yellow.bold('⛏️  KAW POW GPU MINING COMMANDS:'));
-    console.log(
-      chalk.cyan('  mine start                         - Start KawPow GPU mining (Memory-hard, ASIC-resistant)')
-    );
-    console.log(chalk.cyan('  mine stop                          - Stop GPU mining'));
-    console.log(chalk.cyan('  mine status                        - Show GPU mining status and performance'));
-    console.log(chalk.cyan('  mine config                        - Configure GPU mining settings'));
-    console.log(chalk.cyan('  mine detect                        - Detect available GPUs and initialize kernels'));
-    console.log(chalk.cyan('  mine benchmark                     - Run GPU mining benchmark'));
-    console.log(chalk.cyan('  mine log                           - Toggle GPU mining logs'));
-    console.log('');
-
     console.log(chalk.yellow.bold('🔗 BLOCKCHAIN COMMANDS:'));
     console.log(chalk.cyan('  chain status                       - Show blockchain status'));
     console.log(chalk.cyan('  chain blocks                       - Show recent blocks'));
@@ -598,7 +492,7 @@ class InteractiveMode {
     console.log(chalk.cyan('  mempool status                     - Show memory pool status'));
     console.log(chalk.cyan('  spam-protection                    - Manage spam protection system'));
     console.log(chalk.cyan('  replay-protection                  - Show replay attack protection status'));
-    console.log(chalk.cyan('  consensus                          - Show consensus and mining status'));
+
     console.log(chalk.cyan('  memory                             - Show memory protection status'));
     console.log(chalk.cyan('  reputation                         - Show peer reputation status'));
     console.log('');

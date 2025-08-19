@@ -785,8 +785,6 @@ async function main() {
     console.log(chalk.cyan('  --p2p-port <port>    '), chalk.white('P2P network port (default: 3001)'));
     console.log(chalk.cyan('  --no-api             '), chalk.white('Disable REST API server'));
     console.log(chalk.cyan('  --no-p2p             '), chalk.white('Disable P2P network'));
-    console.log(chalk.cyan('  --mining             '), chalk.white('Enable mining api'));
-    console.log(chalk.cyan('  --difficulty <level> '), chalk.white('Set mining difficulty (default: 4)'));
     console.log(chalk.cyan('  --block-time <ms>    '), chalk.white('Set block time in milliseconds (default: 60000)'));
     console.log(chalk.cyan('  --min-seed-conn <n>  '), chalk.white('Minimum seed node connections (0-10, default: 2)'));
     console.log(chalk.cyan('  --api-key <key>      '), chalk.white('API key for authentication (default: none)'));
@@ -797,10 +795,6 @@ async function main() {
     console.log(
       chalk.cyan('  node src/index.js                                     '),
       chalk.white('# Start with all services')
-    );
-    console.log(
-      chalk.cyan('  node src/index.js --mining                            '),
-      chalk.white('# Start with mining enabled')
     );
     console.log(
       chalk.cyan('  node src/index.js --debug                             '),
@@ -814,10 +808,6 @@ async function main() {
     console.log(
       chalk.cyan('  node src/index.js --data-dir /path/to/data            '),
       chalk.white('# Custom data directory')
-    );
-    console.log(
-      chalk.cyan('  node src/index.js --mining --difficulty 2             '),
-      chalk.white('# Enable mining with low difficulty')
     );
     console.log(
       chalk.cyan('  node src/index.js --min-seed-conn 1                   '),
@@ -838,7 +828,7 @@ async function main() {
     console.log('');
     console.log(chalk.yellow.bold('🔗 SERVICES:'));
     console.log(chalk.green('  • Blockchain:     '), chalk.white('Core blockchain with UTXO model'));
-    console.log(chalk.green('  • Mining:         '), chalk.white('SHA256 Proof-of-Work mining'));
+    console.log(chalk.green('  • Mining:         '), chalk.white('Velora mining'));
     console.log(chalk.green('  • P2P Network:    '), chalk.white('WebSocket peer-to-peer networking'));
     console.log(chalk.green('  • REST API:       '), chalk.white('HTTP API for external integration'));
     console.log(chalk.green('  • CLI Wallet:     '), chalk.white('Local wallet management (use CLI)'));
@@ -1215,9 +1205,6 @@ async function main() {
   if (args.includes('--no-p2p')) {
     config.network.enabled = false;
   }
-  if (args.includes('--mining')) {
-    config.mining.enabled = true;
-  }
   if (args.includes('--wallet')) {
     config.wallet = config.wallet || {};
     config.wallet.enabled = true;
@@ -1247,20 +1234,6 @@ async function main() {
   const dataDir = parseArgValue('--data-dir');
   if (dataDir) {
     config.storage.dataDir = dataDir;
-  }
-
-  const difficulty = parseArgValue('--difficulty');
-  if (difficulty) {
-    const diff = parseInt(difficulty);
-    if (isNaN(diff) || diff < 1 || diff > 10) {
-      logger.error('SYSTEM', 'Invalid difficulty. Must be between 1 and 10.');
-      process.exit(1);
-    }
-    // Set genesis difficulty instead of blockchain.difficulty to avoid confusion
-    if (!config.blockchain.genesis) {
-      config.blockchain.genesis = {};
-    }
-    config.blockchain.genesis.difficulty = diff;
   }
 
   const difficultyAlgorithm = parseArgValue('--difficulty-algorithm');

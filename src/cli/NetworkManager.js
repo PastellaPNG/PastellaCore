@@ -137,7 +137,7 @@ class NetworkManager {
         console.log(chalk.cyan('  Consensus Status:'));
         console.log(chalk.white(`    Security Level: ${response.consensus.securityLevel}/100`));
         console.log(chalk.white(`    Network Partition: ${response.consensus.networkPartition ? '⚠️  YES' : '✅ NO'}`));
-        console.log(chalk.white(`    Suspicious Miners: ${response.consensus.suspiciousMiners.length}`));
+
         console.log('');
 
         if (response.threats.length > 0) {
@@ -688,10 +688,6 @@ class NetworkManager {
           if (response.network.port) {
             console.log(chalk.cyan(`P2P Port: ${response.network.port}`));
           }
-        }
-
-        if (response.mining && typeof response.mining === 'object') {
-          console.log(chalk.cyan(`Mining: ${response.mining.isRunning ? 'Running' : 'Stopped'}`));
         }
       } else {
         console.log(chalk.cyan('Status: Running (API connected)'));

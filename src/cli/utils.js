@@ -36,36 +36,12 @@ function formatHashRate(hashRate) {
 }
 
 /**
- * Calculate current hash rate based on recent mining activity
- * @param totalHashes
- * @param miningStartTime
- * @param isMining
- */
-function calculateHashRate(totalHashes, miningStartTime, isMining) {
-  if (!miningStartTime || !isMining) {
-    return 0;
-  }
-
-  const elapsedTime = (Date.now() - miningStartTime) / 1000; // seconds
-  if (elapsedTime === 0) return 0;
-
-  // Estimate hash rate based on total hashes and time
-  return Math.floor((totalHashes || 0) / elapsedTime);
-}
-
-/**
- * Generate CLI prompt based on wallet status and mining status
+ * Generate CLI prompt based on wallet status
  * @param walletLoaded
  * @param walletName
- * @param isMining
  */
-function generatePrompt(walletLoaded, walletName, isMining = false) {
+function generatePrompt(walletLoaded, walletName) {
   let prompt = '';
-
-  // Add mining indicator first if mining
-  if (isMining) {
-    prompt += chalk.blue('[') + chalk.red('Mining') + chalk.blue('] ');
-  }
 
   // Add wallet name if loaded
   if (walletLoaded && walletName) {
@@ -79,6 +55,5 @@ function generatePrompt(walletLoaded, walletName, isMining = false) {
 module.exports = {
   validateAddress,
   formatHashRate,
-  calculateHashRate,
   generatePrompt,
 };

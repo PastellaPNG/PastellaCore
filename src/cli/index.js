@@ -12,7 +12,6 @@ const Blockchain = require('../models/Blockchain.js');
 const { Transaction } = require('../models/Transaction.js');
 const Wallet = require('../models/Wallet.js');
 
-const AdvancedGPUMiner = require('./AdvancedGPUMiner.js');
 const InteractiveMode = require('./InteractiveMode.js');
 const NetworkManager = require('./NetworkManager.js');
 const { validateAddress } = require('./utils.js');
@@ -31,17 +30,16 @@ class PastellaCLI {
     this.isConnected = false;
     this.config = config; // Add config reference
 
-    // Initialize managers (CPU mining removed)
-    this.gpuMiningManager = new AdvancedGPUMiner(this);
+    // Initialize managers
     this.networkWalletManager = new NetworkWalletManager(); // New network wallet manager
     this.networkManager = new NetworkManager(this);
     this.interactiveMode = new InteractiveMode(this);
 
-    // Local components (kept for backward compatibility)
+    // Local components
     this.localBlockchain = new Blockchain();
     this.localWallet = new Wallet();
 
-    // Add references for GPU mining manager
+    // Add references for compatibility
     this.Block = Block;
     this.Transaction = Transaction;
     this.inquirer = inquirer;
@@ -196,7 +194,7 @@ class PastellaCLI {
     this.program
       .name('pastella')
       .description(
-        'Pastella Cryptocurrency CLI (KawPow GPU Mining Only)\n\nExamples:\n  pastella --host 192.168.1.100 --port 22001 wallet balance\n  pastella --port 22002 chain status\n  pastella --host localhost --port 22003 mine start'
+        'Pastella Cryptocurrency CLI\n\nExamples:\n  pastella --host 192.168.1.100 --port 22001 wallet balance\n  pastella --port 22002 chain status\n  pastella --host localhost --port 22003 network status'
       )
       .version('1.0.0')
       .option('--host <host>', 'API server host (default: localhost)', 'localhost')
@@ -309,17 +307,6 @@ class PastellaCLI {
         }
       });
 
-    // CPU mining removed - only KawPow GPU mining available
-
-    // KawPow GPU Mining commands (Main mining system)
-    this.program
-      .command('mine')
-      .description('KawPow GPU Mining - Memory-hard, ASIC-resistant mining algorithm')
-      .argument('[command]', 'GPU mining command to execute')
-      .action(async command => {
-        await this.gpuMiningManager.handleCommand(command);
-      });
-
     // Chain commands
     this.program
       .command('chain')
@@ -373,10 +360,7 @@ class PastellaCLI {
         console.log('');
         console.log(chalk.yellow.bold('📖 AVAILABLE COMMANDS:'));
         console.log(chalk.cyan('  wallet <command>                                             - Wallet management'));
-        console.log(chalk.cyan('  mine <command>                                               - KawPow GPU mining'));
-        console.log(
-          chalk.cyan('  chain <command>                                              - Blockchain operations')
-        );
+        console.log(chalk.cyan('  chain <command>                                              - Blockchain operations'));
         console.log(chalk.cyan('  network <command>                                            - Network management'));
         console.log(chalk.cyan('  daemon <command>                                             - Daemon control'));
         console.log(
@@ -490,7 +474,6 @@ class PastellaCLI {
         console.log(
           chalk.cyan('  pastella wallet connect 127.0.0.1 22000                      - Connect to local node')
         );
-        console.log(chalk.cyan('  pastella mine start                                      - Start GPU mining'));
         console.log(chalk.cyan('  pastella chain validate checkpoint                           - Fast validation'));
         console.log(
           chalk.cyan('  pastella chain checkpoints add 100                           - Add checkpoint at height 100')
@@ -542,7 +525,7 @@ class PastellaCLI {
       } else {
         // Check if only global options are provided (no command)
         const hasCommand = args.some(arg =>
-          ['wallet', 'mine', 'chain', 'network', 'daemon', 'connection', 'help'].includes(arg)
+          ['wallet', 'chain', 'network', 'daemon', 'connection', 'help'].includes(arg)
         );
 
         if (!hasCommand) {
